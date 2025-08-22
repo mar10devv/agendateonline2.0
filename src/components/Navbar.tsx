@@ -64,9 +64,9 @@ export default function Navbar() {
           {/* Logo */}
           <a
             href="/"
-            className="text-3xl font-bold lowercase tracking-tight text-neutral-900 font-inter"
+            className="text-3xl font-bold tracking-tight text-neutral-900 font-inter"
           >
-            agéndate
+            AgéndateOnline
           </a>
 
           {/* Desktop */}
@@ -132,59 +132,114 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile dropdown */}
+      {/* Mobile sidebar */}
       {mobileOpen && (
-        <div className="md:hidden px-4 pb-4 pt-2 space-y-3 bg-white border-t">
-          {checkingAuth ? (
-            <p className="text-sm text-gray-500">Cargando...</p>
-          ) : user ? (
-            <>
-              <div className="flex items-center gap-2">
-                <img
-                  src={user.photoURL ?? ""}
-                  alt="Usuario"
-                  className="h-8 w-8 rounded-full"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="text-sm">{user.displayName}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="block w-full text-left text-sm text-red-600 hover:bg-red-50 px-4 py-2 rounded"
-              >
-                Cerrar sesión
-              </button>
-              <a
-                href={isPremium ? "/panel" : "/registrar-negocio"}
-                className="block text-sm hover:underline"
-              >
-                {isPremium ? "Panel de control" : "Registrar negocio"}
-              </a>
-            </>
-          ) : (
+  <div className="fixed inset-0 z-[9999] flex justify-end">
+    {/* Overlay con fade */}
+    <div
+      className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn"
+      onClick={() => setMobileOpen(false)}
+    />
+
+    {/* Sidebar con slide */}
+    <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
+      
+      {/* Banner */}
+      <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="absolute top-3 right-3 text-white hover:text-gray-200 transition-transform hover:scale-110"
+        >
+          ✕
+        </button>
+
+        {user ? (
+          <div className="flex items-center gap-3 animate-fadeIn delay-150">
+            <img
+              src={user.photoURL ?? ""}
+              alt="Usuario"
+              className="w-12 h-12 rounded-full border-2 border-white"
+              referrerPolicy="no-referrer"
+            />
+            <div>
+              <p className="font-semibold">{user.displayName}</p>
+              <p className="text-xs opacity-80">{user.email}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="font-semibold animate-fadeIn delay-150">Bienvenido 👋</p>
+        )}
+      </div>
+
+      {/* Opciones con animación stagger */}
+      <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
+        {checkingAuth ? (
+          <p className="text-sm text-gray-500 animate-fadeIn delay-200">Cargando...</p>
+        ) : !user ? (
+          <>
             <button
               onClick={handleLogin}
-              className="block w-full text-left text-sm text-gray-700 hover:bg-gray-100 px-4 py-2 rounded"
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
             >
-              Iniciar sesión
+              👉 Iniciar sesión
             </button>
-          )}
-
-          <hr />
-
-          {clientes.map((item) => (
             <a
-              key={item.href}
-              href={item.href}
-              className={`block text-sm px-4 py-2 rounded ${
-                item.highlight ? "text-violet-600 font-medium" : "text-gray-700"
-              } hover:bg-gray-100`}
+              href="/app"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
             >
-              {item.label}
+              📲 Descargar la app
             </a>
-          ))}
-        </div>
-      )}
+            <a
+              href="/ayuda"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
+            >
+              ❓ Ayuda y servicio al cliente
+            </a>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 animate-fadeIn delay-200"
+            >
+              🚪 Cerrar sesión
+            </button>
+
+            {isPremium ? (
+              <a
+                href="/panel"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+              >
+                🛠 Panel de control
+              </a>
+            ) : (
+              <a
+                href="/registrar-negocio"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+              >
+                🏢 Registrar empresa
+              </a>
+            )}
+
+            <a
+              href="/app"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
+            >
+              📲 Descargar la app
+            </a>
+            <a
+              href="/ayuda"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-500"
+            >
+              ❓ Ayuda y servicio al cliente
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
     </header>
   );
 }
