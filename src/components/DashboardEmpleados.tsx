@@ -59,13 +59,12 @@ export default function DashboardEmpleados() {
     reader.readAsDataURL(file);
   };
 
-  // Cargar/reemplazar una foto de trabajo en un slot específico (0..4)
   const handleFotoTrabajo = (indexEmpleado: number, slot: number, file: File | null) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
       const nuevo = [...config.empleadosData];
-      const arr = Array.from({ length: 5 }, (_, i) => nuevo[indexEmpleado]?.trabajos?.[i] || "");
+      const arr = Array.from({ length: 6 }, (_, i) => nuevo[indexEmpleado]?.trabajos?.[i] || "");
       arr[slot] = reader.result as string;
       nuevo[indexEmpleado].trabajos = arr;
       setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
@@ -127,7 +126,7 @@ export default function DashboardEmpleados() {
                   empleadosData: Array.from({ length: cantidad }, (_, i) => ({
                     nombre: prev.empleadosData?.[i]?.nombre || "",
                     fotoPerfil: prev.empleadosData?.[i]?.fotoPerfil || "",
-                    trabajos: prev.empleadosData?.[i]?.trabajos || Array(5).fill(""),
+                    trabajos: prev.empleadosData?.[i]?.trabajos || Array(6).fill(""),
                     calendario: prev.empleadosData?.[i]?.calendario || {},
                   })),
                 }));
@@ -150,7 +149,7 @@ export default function DashboardEmpleados() {
                 className="bg-white border rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col items-center gap-4 w-full"
               >
                 {/* Foto de perfil */}
-                <div className="flex flex-col items-center">
+                <div className="relative">
                   <input
                     id={`fotoPerfil-${index}`}
                     type="file"
@@ -162,12 +161,11 @@ export default function DashboardEmpleados() {
                     htmlFor={`fotoPerfil-${index}`}
                     className="w-24 h-24 rounded-full bg-white border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                   >
-                    {typeof empleado.fotoPerfil === "string" && empleado.fotoPerfil.trim() ? (
+                    {empleado.fotoPerfil ? (
                       <img
                         src={empleado.fotoPerfil}
-                        alt="" // no mostrar texto si falla
+                        alt=""
                         className="object-cover w-full h-full"
-                        onError={() => handleChangeEmpleado(index, "fotoPerfil", "")} // fallback a “+ Perfil”
                       />
                     ) : (
                       <>
@@ -176,6 +174,17 @@ export default function DashboardEmpleados() {
                       </>
                     )}
                   </label>
+
+                  {/* X para borrar perfil */}
+                  {empleado.fotoPerfil && (
+                    <button
+                      type="button"
+                      onClick={() => handleChangeEmpleado(index, "fotoPerfil", "")}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
                 {/* Nombre */}
@@ -187,14 +196,14 @@ export default function DashboardEmpleados() {
                   className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
                 />
 
-                {/* Trabajos (5 slots circulares) */}
+                {/* Trabajos (6 slots circulares) */}
                 <div className="w-full">
-                  <p className="text-sm text-gray-600 mb-2">Fotos de trabajos (máx. 5)</p>
+                  <p className="text-sm text-gray-600 mb-2">Fotos de trabajos (máx. 6)</p>
                   <div className="grid grid-cols-3 gap-3 justify-items-center">
-                    {Array.from({ length: 5 }).map((_, i) => {
+                    {Array.from({ length: 6 }).map((_, i) => {
                       const img = empleado.trabajos?.[i] || "";
                       return (
-                        <div key={i} className="flex flex-col items-center">
+                        <div key={i} className="relative w-16 h-16">
                           <input
                             id={`trabajo-${index}-${i}`}
                             type="file"
@@ -209,20 +218,30 @@ export default function DashboardEmpleados() {
                             {img ? (
                               <img
                                 src={img}
-                                alt="" // sin texto alternativo visible
+                                alt=""
                                 className="object-cover w-full h-full"
-                                onError={() => {
-                                  const nuevo = [...config.empleadosData];
-                                  const arr = Array.from({ length: 5 }, (_, k) => nuevo[index]?.trabajos?.[k] || "");
-                                  arr[i] = "";
-                                  nuevo[index].trabajos = arr;
-                                  setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                                }}
                               />
                             ) : (
                               <span className="text-lg text-gray-400">+</span>
                             )}
                           </label>
+
+                          {/* X para borrar cada foto */}
+                          {img && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nuevo = [...config.empleadosData];
+                                const arr = [...(nuevo[index].trabajos || Array(6).fill(""))];
+                                arr[i] = "";
+                                nuevo[index].trabajos = arr;
+                                setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
+                              }}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow hover:bg-red-600"
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
                       );
                     })}
