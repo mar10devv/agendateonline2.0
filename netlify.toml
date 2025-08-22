@@ -1,9 +1,8 @@
 [build]
   command = "npm run build"
-  publish = "dist"
+  publish = ".netlify/functions" # 👈 serverless output
 
-# Para SSR con @astrojs/netlify (función "server")
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/server"
+  to = "/.netlify/functions/render"
   status = 200
