@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".netlify/functions" # 👈 serverless output
+  publish = "dist"   # 👈 dejalo como dist, el adapter ignora esto en SSR
 
 [[redirects]]
   from = "/*"
