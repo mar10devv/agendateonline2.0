@@ -1,0 +1,16 @@
+---
+const { title, children } = Astro.props;
+import NavbarBarberia from "../components/barberia/NavbarBarberia";
+import "../styles/global.css";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{title} | AgendateOnline</title>
+  </head>
+  <body class="bg-black text-white">
+    <NavbarBarberia title={title} />
+    <main>{children}</main>
+  </body>
+</html>

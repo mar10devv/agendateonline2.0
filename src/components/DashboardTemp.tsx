@@ -111,7 +111,20 @@ export default function DashboardTemp() {
     setEstado("listo");
   };
 
-  if (estado === "cargando") return <p>Cargando usuario y configuración...</p>;
+  if (estado === "cargando")
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-700">
+        {/* Loader animado */}
+        <div className="loader">
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+        </div>
+        <p className="mt-6 text-lg font-medium">Cargando usuario y configuración...</p>
+      </div>
+    );
+
   if (estado === "sin-acceso") return <p className="text-red-600">{mensaje}</p>;
   if (!config) return null;
 
@@ -129,11 +142,7 @@ export default function DashboardTemp() {
         </div>
 
         {/* Contenido */}
-        <form
-          onSubmit={handleSubmit}
-          className="p-8 flex flex-col gap-8" // ✅ ahora todo en una columna
-        >
-
+        <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-8">
           {/* Nombre */}
           <div className="relative">
             <input
@@ -270,164 +279,6 @@ export default function DashboardTemp() {
             </label>
           </div>
 
-          {/* Empleados */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cantidad de empleados
-            </label>
-            <select
-              name="empleados"
-              value={config.empleados || 1}
-              onChange={(e) => {
-                const cantidad = parseInt(e.target.value, 10);
-                setConfig((prev: any) => ({
-                  ...prev,
-                  empleados: cantidad,
-                  empleadosData: Array.from({ length: cantidad }, (_, i) => ({
-                    nombre: prev.empleadosData?.[i]?.nombre || "",
-                    fotoPerfil: prev.empleadosData?.[i]?.fotoPerfil || "",
-                    trabajos: prev.empleadosData?.[i]?.trabajos || [],
-                    calendario: prev.empleadosData?.[i]?.calendario || {},
-                  })),
-                }));
-              }}
-              className="w-full px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-md 
-               focus:outline-none focus:ring-2 focus:ring-gray-800 transition-all"
-            >
-              {[...Array(10)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Perfiles dinámicos */}
-          {config.empleados > 0 && (
-            <div className="mt-4 space-y-6">
-              {Array.from({ length: config.empleados }).map((_, index) => (
-                <div
-                  key={index}
-                  className="p-4 border rounded-lg bg-gray-50 shadow-sm"
-                >
-                  <h3 className="font-semibold mb-4">Empleado {index + 1}</h3>
-
-                  {/* Nombre */}
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre del empleado
-                  </label>
-                  <input
-                    type="text"
-                    value={config.empleadosData?.[index]?.nombre || ""}
-                    onChange={(e) => {
-                      const nuevo = [...config.empleadosData];
-                      nuevo[index].nombre = e.target.value;
-                      setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                    }}
-                    className="w-full px-4 py-2 bg-white border rounded-md mb-3"
-                    placeholder="Ej: Juan Pérez"
-                  />
-
-                  {/* Foto perfil */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const imageUrl = URL.createObjectURL(file);
-                        const nuevo = [...config.empleadosData];
-                        nuevo[index].fotoPerfil = imageUrl;
-                        setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                      }
-                    }}
-                    className="block w-full mb-3 text-sm text-gray-700 
-                               file:mr-4 file:py-2 file:px-4 
-                               file:rounded-md file:border-0 
-                               file:text-sm file:font-semibold 
-                               file:bg-blue-50 file:text-blue-700 
-                               hover:file:bg-blue-100 cursor-pointer"
-                  />
-
-                  {config.empleadosData?.[index]?.fotoPerfil && (
-                    <div className="relative inline-block">
-                      <img
-                        src={config.empleadosData[index].fotoPerfil}
-                        className="max-h-20 mb-3 rounded-md border"
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          const nuevo = [...config.empleadosData];
-                          nuevo[index].fotoPerfil = "";
-                          setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                          const input = (e.currentTarget.parentElement?.previousSibling as HTMLInputElement);
-                          if (input) input.value = "";
-                        }}
-                        className="absolute top-0 right-0 bg-red-600 text-white rounded-full px-2 text-xs"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Trabajos */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []).slice(0, 5);
-                      const trabajos = files.map((file) => URL.createObjectURL(file));
-                      const nuevo = [...config.empleadosData];
-                      nuevo[index].trabajos = [...(nuevo[index].trabajos || []), ...trabajos].slice(0, 5);
-                      setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                    }}
-                    className="block w-full mb-3 text-sm text-gray-700 
-                               file:mr-4 file:py-2 file:px-4 
-                               file:rounded-md file:border-0 
-                               file:text-sm file:font-semibold 
-                               file:bg-blue-50 file:text-blue-700 
-                               hover:file:bg-blue-100 cursor-pointer"
-                  />
-
-                  {config.empleadosData?.[index]?.trabajos?.length > 0 && (
-                    <div className="flex gap-2 flex-wrap mt-2">
-                      {config.empleadosData[index].trabajos.map((img, i) => (
-                        <div key={i} className="relative inline-block">
-                          <img src={img} className="w-16 h-16 object-cover rounded border" />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              const nuevo = [...config.empleadosData];
-                              nuevo[index].trabajos = nuevo[index].trabajos.filter((_, idx) => idx !== i);
-                              setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                              const input = (e.currentTarget.parentElement?.parentElement?.previousSibling as HTMLInputElement);
-                              if (input) input.value = "";
-                            }}
-                            className="absolute top-0 right-0 bg-red-600 text-white rounded-full px-2 text-xs"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Calendario */}
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700"
-                    >
-                      Configurar calendario
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Botones */}
           <div className="flex items-center gap-4 mt-4">
             <button
@@ -448,6 +299,14 @@ export default function DashboardTemp() {
                 Visitar web
               </a>
             )}
+
+            {/* 👉 Nuevo botón para empleados */}
+            <a
+              href="/panel-empleados"
+              className="bg-green-600 text-white px-6 py-2 rounded-lg shadow hover:bg-green-700 transition"
+            >
+              Configurar empleados y agenda
+            </a>
           </div>
         </form>
 
