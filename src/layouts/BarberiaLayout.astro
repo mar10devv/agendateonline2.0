@@ -1,16 +1,32 @@
 ---
-const { title, children } = Astro.props;
-import NavbarBarberia from "../components/barberia/NavbarBarberia";
+// src/layouts/BarberiaLayout.astro
 import "../styles/global.css";
+import NavbarBarberia from "../components/barberia/NavbarBarberia.tsx";
+
+interface Props {
+  title?: string;
+  hoverColor?: string;
+  logoUrl?: string;
+  children?: any;
+}
+
+const {
+  title = "AgéndateOnline",
+  hoverColor,
+  logoUrl,
+  children,
+} = Astro.props as Props;
 ---
 
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} | AgendateOnline</title>
   </head>
   <body class="bg-black text-white">
-    <NavbarBarberia title={title} />
+    <!-- 👇 Hidrata el componente React -->
+    <NavbarBarberia client:load title={title} hoverColor={hoverColor} logoUrl={logoUrl} />
     <main>{children}</main>
   </body>
 </html>
