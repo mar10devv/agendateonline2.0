@@ -1,0 +1,18 @@
+---
+// src/pages/panel.astro
+import "../styles/global.css";
+import Dashboard from "../components/DashboardTemp.tsx";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel Premium</title>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <main class="container mx-auto px-4">
+      <Dashboard client:load />
+    </main>
+  </body>
+</html>
