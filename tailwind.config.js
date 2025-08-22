@@ -4,7 +4,19 @@ module.exports = {
     "./src/**/*.{astro,html,js,jsx,ts,tsx,md,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        slide: {
+          "0%": { transform: "translateX(0)" },
+          "33%": { transform: "translateX(-100%)" },
+          "66%": { transform: "translateX(-200%)" },
+          "100%": { transform: "translateX(0)" },
+        },
+      },
+      animation: {
+        slide: "slide 12s infinite ease-in-out",
+      },
+    },
   },
   plugins: [],
 };

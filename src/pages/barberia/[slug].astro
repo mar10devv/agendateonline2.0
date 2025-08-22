@@ -1,14 +1,17 @@
 ---
+// src/pages/barberia/[slug].astro
 export const prerender = false;
 
 import BarberiaLayout from "../../layouts/BarberiaLayout.astro";
 import NavbarBarberia from "../../components/barberia/NavbarBarberia";
+import HeroBarberia from "../../components/barberia/HeroBarberia";
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 
+// 📌 Obtenemos el slug desde la URL
 const { slug } = Astro.params;
 
-// Buscar negocio en Firestore con ese slug
+// 📌 Buscamos el negocio en Firestore
 let negocio = null;
 const q = query(collection(db, "Negocios"), where("slug", "==", slug));
 const snap = await getDocs(q);
@@ -17,9 +20,10 @@ if (!snap.empty) {
   negocio = snap.docs[0].data();
 }
 
+// 📌 Variables dinámicas (ej: colores)
 const hoverColor = negocio?.hoverColor || "#3b82f6";
 
-// 🔧 Estilos dinámicos como string
+// 🎨 Estilos dinámicos
 const css = `
   :root {
     --hoverColor: ${hoverColor};
@@ -43,7 +47,7 @@ const css = `
   <h1 class="text-center text-2xl mt-10">❌ Este negocio no existe.</h1>
 ) : (
   <BarberiaLayout title={negocio.nombre}>
-    <!-- 🎨 Inyectar estilos dinámicos globales -->
+    <!-- 🎨 Inyectar estilos dinámicos -->
     <style is:global set:html={css} />
 
     <!-- ✅ Navbar dinámico -->
@@ -54,24 +58,35 @@ const css = `
       client:load
     />
 
-    <!-- ✅ Sección con botones -->
-    <div class="negocio space-y-6 mt-6 p-6 border rounded bg-gray-50">
-      <a
-        href="#"
-        class="inline-block px-4 py-2 border rounded font-medium"
-      >
+    <!-- 🎯 HERO personalizado -->
+    <HeroBarberia
+      images={[
+        "/img/1.jpeg",
+        "/img/2.jpg",
+        "/img/3.jpg"
+      ]}
+    />
+
+    <!-- 🎯 BOTONES DE ACCIÓN -->
+    <section class="negocio space-y-6 mt-6 p-6 border rounded bg-white shadow-sm">
+      <a href="#servicios" class="inline-block px-4 py-2 border rounded font-medium">
         Ver servicios
       </a>
-
-      <button
-        class="px-4 py-2 border rounded font-medium"
-      >
+      <button class="px-4 py-2 border rounded font-medium">
         Reservar turno
       </button>
+    </section>
 
+    <!-- 🎯 PROMOCIONES -->
+    <section class="negocio mt-8 grid md:grid-cols-2 gap-4">
       <div class="border p-4 rounded shadow-sm hover:shadow-md">
-        Tarjeta promocional de {negocio.nombre}
+        <h3 class="font-bold mb-2">🔥 Promo destacada</h3>
+        <p>{negocio.promo || "Primera visita con 20% de descuento"}</p>
       </div>
-    </div>
+      <div class="border p-4 rounded shadow-sm hover:shadow-md">
+        <h3 class="font-bold mb-2">⭐ Servicios más populares</h3>
+        <p>Corte + barba, Tinte, Peinados</p>
+      </div>
+    </section>
   </BarberiaLayout>
 )}

@@ -1,12 +1,14 @@
 ---
-// src/layouts/BarberiaLayout.astro
 import "../styles/global.css";
 import NavbarBarberia from "../components/barberia/NavbarBarberia.tsx";
+import HeroBarberia from "../components/barberia/HeroBarberia.tsx";
 
 interface Props {
   title?: string;
   hoverColor?: string;
   logoUrl?: string;
+  heroImages?: string[];
+  nombre?: string; // 👈 nuevo
   children?: any;
 }
 
@@ -14,8 +16,11 @@ const {
   title = "AgéndateOnline",
   hoverColor,
   logoUrl,
+  heroImages = ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"],
+  nombre, // 👈 sin valor por defecto
   children,
 } = Astro.props as Props;
+
 ---
 
 <html lang="es">
@@ -24,9 +29,12 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} | AgendateOnline</title>
   </head>
-  <body class="bg-black text-white">
-    <!-- 👇 Hidrata el componente React -->
+  <body class="bg-white text-black">
     <NavbarBarberia client:load title={title} hoverColor={hoverColor} logoUrl={logoUrl} />
+
+    <!-- 👇 Hero React con nombre -->
+    <HeroBarberia client:load images={heroImages} nombre={title} />
+
     <main>{children}</main>
   </body>
 </html>

@@ -1,83 +1,192 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+  type User,
+} from "firebase/auth";
+import { auth, googleProvider } from "../../lib/firebase";
 
 type Props = {
-  title?: string;
-  hoverColor?: string; // color dinámico desde Firestore
-  logoUrl?: string;    // Ej: "/uploads/logo.png"
+  title: string;
+  hoverColor?: string;
+  logoUrl?: string | null;
 };
 
 export default function NavbarBarberia({
-  title = "GALANO BARBERSHOP",
-  hoverColor,
+  title,
+  hoverColor = "#3b82f6",
   logoUrl,
 }: Props) {
-  // ✅ fallback si no viene color
-  const color = hoverColor || "#3b82f6";
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setCheckingAuth(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      alert(`No se pudo iniciar sesión: ${String((e as any)?.code || e)}`);
+    }
+  };
+
+  const handleLogout = () => {
+    signOut(auth).catch((e) => console.error("[NavbarBarberia] signOut error:", e));
+  };
 
   return (
-    <nav className="w-full bg-black text-white border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between gap-6">
-          
-          {/* Izquierda: logo (si hay) + nombre */}
-          <div className="flex items-center gap-3 shrink-0">
-            {logoUrl && (
-              <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
-            )}
-            <span className="text-sm uppercase tracking-wide">{title}</span>
-          </div>
+    <header className="bg-black text-white px-4 h-16 flex items-center sticky top-0 z-[9999]">
+      <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
+        {/* Logo o título */}
+        <div className="flex items-center space-x-2">
+          {logoUrl ? (
+            <img src={logoUrl} alt={title} className="h-10 w-10 object-contain" />
+          ) : (
+            <span className="text-lg font-bold">{title.toUpperCase()}</span>
+          )}
+        </div>
 
-          {/* Centro: menú con hover dinámico */}
-          <ul className="hidden md:flex flex-1 justify-center gap-10 text-sm font-medium">
-            {[
-              { href: "#inicio", label: "Inicio" },
-              { href: "#sobrenosotros", label: "Sobre nosotros" },
-              { href: "#cursos", label: "Cursos" },
-              { href: "#contacto", label: "Contacto" },
-            ].map(({ href, label }) => (
-              <li key={href}>
-                <a href={href} className="relative group text-white">
-                  {label}
-                  <span
-                    className="absolute left-0 -bottom-1 w-full h-0.5 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"
-                    style={{ backgroundColor: color }}
-                  ></span>
-                </a>
-              </li>
-            ))}
-          </ul>
+        {/* Links desktop */}
+        <div className="hidden md:flex space-x-6 items-center">
+          <a href="#" className="hover:text-[var(--hoverColor)]">
+            Inicio
+          </a>
+          <a href="#nosotros" className="hover:text-[var(--hoverColor)]">
+            Sobre nosotros
+          </a>
+          <a href="#cursos" className="hover:text-[var(--hoverColor)]">
+            Cursos
+          </a>
+          <a href="#contacto" className="hover:text-[var(--hoverColor)]">
+            Contacto
+          </a>
+          <a
+            href="#reservar"
+            className="bg-[var(--hoverColor)] text-white px-4 py-2 rounded-md font-semibold hover:opacity-90 transition"
+          >
+            Reservar cita
+          </a>
+        </div>
 
-          {/* Derecha: botón */}
-          <div className="shrink-0">
-            <a
-              href="#reservar"
-              className="px-4 py-2 rounded-md text-sm font-medium transition-colors text-white"
-              style={{ backgroundColor: color }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = darkenColor(color))
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = color)
-              }
-            >
-              Reservar cita
-            </a>
-          </div>
+        {/* Botón hamburguesa */}
+        <div className="md:hidden">
+          <button
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+          >
+            ☰
+          </button>
         </div>
       </div>
-    </nav>
+
+      {/* Sidebar móvil */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[9999] flex justify-end">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* Sidebar */}
+          <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
+            {/* Banner */}
+            <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="absolute top-3 right-3 text-white hover:text-gray-200 transition-transform hover:scale-110"
+              >
+                ✕
+              </button>
+
+              {user ? (
+                <div className="flex items-center gap-3 animate-fadeIn delay-150">
+                  <img
+                    src={user.photoURL ?? ""}
+                    alt="Usuario"
+                    className="w-12 h-12 rounded-full border-2 border-white"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <p className="font-semibold">{user.displayName}</p>
+                    <p className="text-xs opacity-80">{user.email}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="font-semibold animate-fadeIn delay-150">
+                  Bienvenido 👋
+                </p>
+              )}
+            </div>
+
+            {/* Links con íconos */}
+            <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
+              <a
+                href="#"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+              >
+                🏠 Inicio
+              </a>
+              <a
+                href="#nosotros"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+              >
+                👤 Sobre nosotros
+              </a>
+              <a
+                href="#cursos"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+              >
+                🎓 Cursos
+              </a>
+              <a
+                href="#contacto"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+              >
+                📞 Contacto
+              </a>
+              <a
+                href="#reservar"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+              >
+                📅 Reservar cita
+              </a>
+
+              <hr className="my-3" />
+
+              {/* Sesión */}
+              {checkingAuth ? (
+                <p className="text-sm text-gray-500">Cargando...</p>
+              ) : !user ? (
+                <button
+                  onClick={handleLogin}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800"
+                >
+                  👉 Iniciar sesión
+                </button>
+              ) : (
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600"
+                >
+                  🚪 Cerrar sesión
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
   );
-}
-
-// Función para oscurecer ligeramente el color del botón en hover
-function darkenColor(hex: string, amount = 0.15) {
-  let col = hex.replace("#", "");
-  if (col.length === 3) col = col.split("").map((c) => c + c).join("");
-
-  const num = parseInt(col, 16);
-  const r = Math.max(0, ((num >> 16) & 255) * (1 - amount));
-  const g = Math.max(0, ((num >> 8) & 255) * (1 - amount));
-  const b = Math.max(0, (num & 255) * (1 - amount));
-
-  return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
 }
