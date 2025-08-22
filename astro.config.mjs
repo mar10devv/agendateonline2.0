@@ -3,19 +3,19 @@
 import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import tailwind from "@astrojs/tailwind";
-import netlify from "@astrojs/netlify"; // 👈 agregado
+import netlify from "@astrojs/netlify";
 
-// Netlify pone NETLIFY="true" en el build
+// Detecta si estás en Netlify
 const isNetlify = process.env.NETLIFY === "true";
 
 export default defineConfig({
   integrations: [
     react(),
     tailwind({
-      applyBaseStyles: true, // ok para v3
+      applyBaseStyles: true,
     }),
   ],
-  // 👉 En local sigue "static"; en Netlify usa SSR + adapter
+  // 👇 Si estás en local = static. En Netlify = server con adapter
   output: isNetlify ? "server" : "static",
   adapter: isNetlify ? netlify() : undefined,
 });

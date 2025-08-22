@@ -1,8 +1,0 @@
-[build]
-  command = "npm run build"
-  publish = "dist"   # 👈 dejalo como dist, el adapter ignora esto en SSR
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/render"
-  status = 200
