@@ -81,17 +81,18 @@ export default function PlantillaForm() {
 
   // 🔄 Loader
   if (estado === "cargando")
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-700">
-        <div className="loader">
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-        </div>
-        <p className="mt-6 text-lg font-medium">Cargando plantilla...</p>
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+      <div className="loader">
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
       </div>
-    );
+      <p className="mt-6 text-lg font-medium">Cargando plantilla...</p>
+    </div>
+  );
+
 
   if (estado === "sin-acceso") return <p className="p-6 text-red-600">{mensaje}</p>;
   if (!config) return null;

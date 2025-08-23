@@ -70,37 +70,39 @@ export default function DashboardTemp() {
   }, []);
 
   if (estado === "cargando")
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-700">
-        <div className="loader">
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-        </div>
-        <p className="mt-6 text-lg font-medium">
-          Cargando usuario y configuración...
-        </p>
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+      <div className="loader">
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
       </div>
-    );
+      <p className="mt-6 text-lg font-medium">
+        Cargando usuario y configuración...
+      </p>
+    </div>
+  );
+
 
   if (estado === "sin-acceso") return <p className="text-red-600">{mensaje}</p>;
   if (!config) return null;
 
   return (
-    <div className="max-w-5xl mx-auto p-8">
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div className="w-[95vw] sm:w-[90vw] max-w-6xl mx-auto p-2 sm:p-4 md:p-6">
+      <div className="w-full bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
         {/* ✅ Encabezado */}
         <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
           <h1 className="text-xl md:text-2xl font-bold">
             Panel – {config.nombre}
           </h1>
-          <a
-            href="/"
-            className="text-sm underline hover:text-gray-200 transition"
+          <button
+            onClick={() => (window.location.href = "/")}
+            className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg shadow hover:bg-blue-50 transition"
           >
-            Volver atrás
-          </a>
+            <span className="text-lg">←</span>
+            <span className="font-medium">Volver atrás</span>
+          </button>
         </div>
 
         {/* ✅ Menú principal */}
@@ -108,37 +110,37 @@ export default function DashboardTemp() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <a
               href="/panel-agenda"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Agenda
             </a>
             <a
               href="/panel-empleados"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Personal
             </a>
             <a
               href="/panel-plantilla"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Plantilla
             </a>
             <a
               href="#"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Ejemplo 1
             </a>
             <a
               href="#"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Ejemplo 2
             </a>
             <a
               href="#"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-2xl aspect-square shadow hover:scale-105 transition"
             >
               Ejemplo 3
             </a>

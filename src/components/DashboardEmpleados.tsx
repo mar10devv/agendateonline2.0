@@ -81,16 +81,18 @@ export default function DashboardEmpleados() {
   };
 
   if (estado === "cargando")
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="loader">
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-        </div>
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+      <div className="loader">
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
       </div>
-    );
+      <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
+    </div>
+  );
+
 
   if (estado === "sin-acceso") return <p className="text-red-600 text-center mt-10">{mensaje}</p>;
   if (!config) return null;
