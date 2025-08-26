@@ -16,6 +16,13 @@ module.exports = {
       animation: {
         slide: "slide 12s infinite ease-in-out",
       },
+      fontFamily: {
+        montserrat: ['Montserrat', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+        raleway: ['Raleway', 'sans-serif'],
+        playfair: ['Playfair Display', 'serif'],
+        bebas: ['Bebas Neue', 'sans-serif'],
+      },
     },
   },
   plugins: [],

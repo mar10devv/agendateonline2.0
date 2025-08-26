@@ -1,3 +1,4 @@
+// src/components/PlantillaForm.tsx
 import { useEffect, useState } from "react";
 import { obtenerConfigNegocio, guardarConfigNegocio } from "../lib/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -16,7 +17,9 @@ function generarSlug(nombre: string) {
 export default function PlantillaForm() {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [estado, setEstado] = useState<"cargando" | "listo" | "guardando" | "sin-acceso">("cargando");
+  const [estado, setEstado] = useState<
+    "cargando" | "listo" | "guardando" | "sin-acceso"
+  >("cargando");
   const [mensaje, setMensaje] = useState("");
   const [mostrarPaleta, setMostrarPaleta] = useState(false);
 
@@ -43,7 +46,9 @@ export default function PlantillaForm() {
           const negocioConfig = await obtenerConfigNegocio(usuario.uid);
           if (negocioConfig) {
             if (!negocioConfig.slug) {
-              negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
+              negocioConfig.slug = generarSlug(
+                negocioConfig.nombre || "mi-negocio"
+              );
             }
             setUser(usuario);
             setConfig(negocioConfig);
@@ -61,10 +66,15 @@ export default function PlantillaForm() {
     return () => unsub();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value, type, checked } = e.target;
     setConfig((prev: any) => {
-      const newConfig = { ...prev, [name]: type === "checkbox" ? checked : value };
+      const newConfig = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
       if (name === "nombre") newConfig.slug = generarSlug(value);
       return newConfig;
     });
@@ -75,33 +85,37 @@ export default function PlantillaForm() {
     if (!user) return;
     setEstado("guardando");
     const ok = await guardarConfigNegocio(user.uid, config);
-    setMensaje(ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar.");
+    setMensaje(
+      ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar."
+    );
     setEstado("listo");
   };
 
   // 🔄 Loader
   if (estado === "cargando")
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-      <div className="loader">
-        <div className="circle"></div>
-        <div className="circle"></div>
-        <div className="circle"></div>
-        <div className="circle"></div>
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+        <div className="loader">
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+        </div>
+        <p className="mt-6 text-lg font-medium">Cargando plantilla...</p>
       </div>
-      <p className="mt-6 text-lg font-medium">Cargando plantilla...</p>
-    </div>
-  );
+    );
 
-
-  if (estado === "sin-acceso") return <p className="p-6 text-red-600">{mensaje}</p>;
+  if (estado === "sin-acceso")
+    return <p className="p-6 text-red-600">{mensaje}</p>;
   if (!config) return null;
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
       {/* ✅ Encabezado con botón volver */}
       <div className="px-6 py-4 bg-gradient-to-r from-pink-500 to-fuchsia-600 text-white flex items-center justify-between">
-        <h1 className="text-xl md:text-2xl font-bold">Personaliza tu Plantilla</h1>
+        <h1 className="text-xl md:text-2xl font-bold">
+          Personaliza tu negocio
+        </h1>
 
         <button
           onClick={() => (window.location.href = "/panel")}
@@ -127,7 +141,11 @@ export default function PlantillaForm() {
           />
           <label
             className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
-              ${config.nombre ? "-translate-y-6 scale-90 text-gray-700" : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"}
+              ${
+                config.nombre
+                  ? "-translate-y-6 scale-90 text-gray-700"
+                  : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+              }
               peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
           >
             Nombre del negocio
@@ -136,7 +154,9 @@ export default function PlantillaForm() {
 
         {/* Logo */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Logo de tu negocio</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Logo de tu negocio
+          </label>
           <input
             type="file"
             accept="image/*"
@@ -144,7 +164,11 @@ export default function PlantillaForm() {
               const file = e.target.files?.[0];
               if (file) {
                 const imageUrl = URL.createObjectURL(file);
-                setConfig((prev: any) => ({ ...prev, logoUrl: imageUrl, usarLogo: true }));
+                setConfig((prev: any) => ({
+                  ...prev,
+                  logoUrl: imageUrl,
+                  usarLogo: true,
+                }));
               }
             }}
             className="block w-full text-sm text-gray-700 
@@ -156,7 +180,11 @@ export default function PlantillaForm() {
           />
           {config.logoUrl && config.usarLogo && (
             <div className="mt-3">
-              <img src={config.logoUrl} alt="Logo del negocio" className="max-h-20 object-contain rounded-md border" />
+              <img
+                src={config.logoUrl}
+                alt="Logo del negocio"
+                className="max-h-20 object-contain rounded-md border"
+              />
             </div>
           )}
 
@@ -166,17 +194,89 @@ export default function PlantillaForm() {
               name="usarLogo"
               checked={!config.usarLogo}
               onChange={(e) => {
-                setConfig((prev: any) => ({ ...prev, usarLogo: !e.target.checked }));
+                setConfig((prev: any) => ({
+                  ...prev,
+                  usarLogo: !e.target.checked,
+                }));
               }}
               className="w-4 h-4 text-pink-600 border-gray-300 rounded cursor-pointer"
             />
-            <label className="ml-2 text-sm text-gray-700">Usar texto, no quiero logo</label>
+            <label className="ml-2 text-sm text-gray-700">
+              Usar texto, no quiero logo
+            </label>
           </div>
         </div>
 
+        {/* Escoger fuente */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Escoger fuente
+  </label>
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    {/* Fuente Logo → solo aparece si NO se usa logo imagen */}
+    {!config.usarLogo && (
+      <div className="flex flex-col">
+        <span className="text-xs text-gray-600 mb-1">Logo</span>
+        <select
+          name="fuenteLogo"
+          value={config.fuenteLogo || ""}
+          onChange={handleChange}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+        >
+          <option value="">Seleccionar fuente</option>
+          <option value="montserrat" className="font-montserrat">Montserrat</option>
+          <option value="poppins" className="font-poppins">Poppins</option>
+          <option value="raleway" className="font-raleway">Raleway</option>
+          <option value="playfair" className="font-playfair">Playfair Display</option>
+          <option value="bebas" className="font-bebas">Bebas Neue</option>
+        </select>
+      </div>
+    )}
+
+    {/* Fuente Botones */}
+    <div className="flex flex-col">
+      <span className="text-xs text-gray-600 mb-1">Botones</span>
+      <select
+        name="fuenteBotones"
+        value={config.fuenteBotones || ""}
+        onChange={handleChange}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+      >
+        <option value="">Seleccionar fuente</option>
+        <option value="montserrat" className="font-montserrat">Montserrat</option>
+        <option value="poppins" className="font-poppins">Poppins</option>
+        <option value="raleway" className="font-raleway">Raleway</option>
+        <option value="playfair" className="font-playfair">Playfair Display</option>
+        <option value="bebas" className="font-bebas">Bebas Neue</option>
+      </select>
+    </div>
+
+    {/* Fuente Texto */}
+    <div className="flex flex-col">
+      <span className="text-xs text-gray-600 mb-1">Texto</span>
+      <select
+        name="fuenteTexto"
+        value={config.fuenteTexto || ""}
+        onChange={handleChange}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+      >
+        <option value="">Seleccionar fuente</option>
+        <option value="montserrat" className="font-montserrat">Montserrat</option>
+        <option value="poppins" className="font-poppins">Poppins</option>
+        <option value="raleway" className="font-raleway">Raleway</option>
+        <option value="playfair" className="font-playfair">Playfair Display</option>
+        <option value="bebas" className="font-bebas">Bebas Neue</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+
         {/* Color hover */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Color del hover</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Color del hover
+          </label>
           <button
             type="button"
             onClick={() => setMostrarPaleta(!mostrarPaleta)}
@@ -193,7 +293,10 @@ export default function PlantillaForm() {
                   key={color}
                   type="button"
                   onClick={() => {
-                    setConfig((prev: any) => ({ ...prev, hoverColor: color }));
+                    setConfig((prev: any) => ({
+                      ...prev,
+                      hoverColor: color,
+                    }));
                     setMostrarPaleta(false);
                   }}
                   className="w-10 h-10 rounded-full border-2 border-gray-200 hover:scale-110 transition-transform"
@@ -222,7 +325,11 @@ export default function PlantillaForm() {
           </select>
           <label
             className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
-            ${config.plantilla ? "-translate-y-6 scale-90 text-gray-700" : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"}
+            ${
+              config.plantilla
+                ? "-translate-y-6 scale-90 text-gray-700"
+                : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+            }
             peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
           >
             Plantilla
