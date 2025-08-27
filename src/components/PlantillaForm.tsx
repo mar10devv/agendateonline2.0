@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { obtenerConfigNegocio, guardarConfigNegocio } from "../lib/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getDoc, setDoc, doc } from "firebase/firestore";
+import { getDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 function generarSlug(nombre: string) {
@@ -43,13 +43,20 @@ export default function PlantillaForm() {
 
         const data = snap.data();
         if (data?.premium) {
-          const negocioConfig = await obtenerConfigNegocio(usuario.uid);
+          const negocioConfig: any = await obtenerConfigNegocio(usuario.uid);
           if (negocioConfig) {
             if (!negocioConfig.slug) {
               negocioConfig.slug = generarSlug(
                 negocioConfig.nombre || "mi-negocio"
               );
             }
+
+            // ⚡ Valores por defecto seguros
+            negocioConfig.fuenteBotones = negocioConfig.fuenteBotones || "poppins";
+            negocioConfig.fuenteTexto = negocioConfig.fuenteTexto || "raleway";
+            negocioConfig.eslogan =
+              negocioConfig.eslogan || "Cortes modernos, clásicos y a tu medida";
+
             setUser(usuario);
             setConfig(negocioConfig);
             setEstado("listo");
@@ -76,6 +83,9 @@ export default function PlantillaForm() {
         [name]: type === "checkbox" ? checked : value,
       };
       if (name === "nombre") newConfig.slug = generarSlug(value);
+      if (name === "eslogan" && value.trim() === "") {
+        newConfig.eslogan = "Cortes modernos, clásicos y a tu medida";
+      }
       return newConfig;
     });
   };
@@ -152,125 +162,71 @@ export default function PlantillaForm() {
           </label>
         </div>
 
-        {/* Logo */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Logo de tu negocio
-          </label>
+        {/* Eslogan */}
+        <div className="relative">
           <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const imageUrl = URL.createObjectURL(file);
-                setConfig((prev: any) => ({
-                  ...prev,
-                  logoUrl: imageUrl,
-                  usarLogo: true,
-                }));
-              }
-            }}
-            className="block w-full text-sm text-gray-700 
-             file:mr-4 file:py-2 file:px-4 
-             file:rounded-md file:border-0 
-             file:text-sm file:font-semibold 
-             file:bg-blue-50 file:text-blue-700 
-             hover:file:bg-blue-100 cursor-pointer"
+            name="eslogan"
+            value={config.eslogan}
+            onChange={handleChange}
+            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
+                       focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-transparent"
+            placeholder="Eslogan de la web"
           />
-          {config.logoUrl && config.usarLogo && (
-            <div className="mt-3">
-              <img
-                src={config.logoUrl}
-                alt="Logo del negocio"
-                className="max-h-20 object-contain rounded-md border"
-              />
-            </div>
-          )}
-
-          <div className="flex items-center mt-3">
-            <input
-              type="checkbox"
-              name="usarLogo"
-              checked={!config.usarLogo}
-              onChange={(e) => {
-                setConfig((prev: any) => ({
-                  ...prev,
-                  usarLogo: !e.target.checked,
-                }));
-              }}
-              className="w-4 h-4 text-pink-600 border-gray-300 rounded cursor-pointer"
-            />
-            <label className="ml-2 text-sm text-gray-700">
-              Usar texto, no quiero logo
-            </label>
-          </div>
+          <label
+            className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
+              ${
+                config.eslogan
+                  ? "-translate-y-6 scale-90 text-gray-700"
+                  : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+              }
+              peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
+          >
+            Eslogan de la web
+          </label>
         </div>
 
         {/* Escoger fuente */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Escoger fuente
-  </label>
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    {/* Fuente Logo → solo aparece si NO se usa logo imagen */}
-    {!config.usarLogo && (
-      <div className="flex flex-col">
-        <span className="text-xs text-gray-600 mb-1">Logo</span>
-        <select
-          name="fuenteLogo"
-          value={config.fuenteLogo || ""}
-          onChange={handleChange}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-        >
-          <option value="">Seleccionar fuente</option>
-          <option value="montserrat" className="font-montserrat">Montserrat</option>
-          <option value="poppins" className="font-poppins">Poppins</option>
-          <option value="raleway" className="font-raleway">Raleway</option>
-          <option value="playfair" className="font-playfair">Playfair Display</option>
-          <option value="bebas" className="font-bebas">Bebas Neue</option>
-        </select>
-      </div>
-    )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Escoger fuente
+          </label>
 
-    {/* Fuente Botones */}
-    <div className="flex flex-col">
-      <span className="text-xs text-gray-600 mb-1">Botones</span>
-      <select
-        name="fuenteBotones"
-        value={config.fuenteBotones || ""}
-        onChange={handleChange}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-      >
-        <option value="">Seleccionar fuente</option>
-        <option value="montserrat" className="font-montserrat">Montserrat</option>
-        <option value="poppins" className="font-poppins">Poppins</option>
-        <option value="raleway" className="font-raleway">Raleway</option>
-        <option value="playfair" className="font-playfair">Playfair Display</option>
-        <option value="bebas" className="font-bebas">Bebas Neue</option>
-      </select>
-    </div>
+          <div className="flex flex-col gap-4">
+            {/* Fuente Botones */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 w-24">Botones</span>
+              <select
+                name="fuenteBotones"
+                value={config.fuenteBotones}
+                onChange={handleChange}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+              >
+                <option value="montserrat" className="font-montserrat">Montserrat</option>
+                <option value="poppins" className="font-poppins">Poppins</option>
+                <option value="raleway" className="font-raleway">Raleway</option>
+                <option value="playfair" className="font-playfair">Playfair Display</option>
+                <option value="bebas" className="font-bebas">Bebas Neue</option>
+              </select>
+            </div>
 
-    {/* Fuente Texto */}
-    <div className="flex flex-col">
-      <span className="text-xs text-gray-600 mb-1">Texto</span>
-      <select
-        name="fuenteTexto"
-        value={config.fuenteTexto || ""}
-        onChange={handleChange}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-      >
-        <option value="">Seleccionar fuente</option>
-        <option value="montserrat" className="font-montserrat">Montserrat</option>
-        <option value="poppins" className="font-poppins">Poppins</option>
-        <option value="raleway" className="font-raleway">Raleway</option>
-        <option value="playfair" className="font-playfair">Playfair Display</option>
-        <option value="bebas" className="font-bebas">Bebas Neue</option>
-      </select>
-    </div>
-  </div>
-</div>
-
+            {/* Fuente Texto */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 w-24">Texto</span>
+              <select
+                name="fuenteTexto"
+                value={config.fuenteTexto}
+                onChange={handleChange}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+              >
+                <option value="montserrat" className="font-montserrat">Montserrat</option>
+                <option value="poppins" className="font-poppins">Poppins</option>
+                <option value="raleway" className="font-raleway">Raleway</option>
+                <option value="playfair" className="font-playfair">Playfair Display</option>
+                <option value="bebas" className="font-bebas">Bebas Neue</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
         {/* Color hover */}
         <div>

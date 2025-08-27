@@ -2,7 +2,6 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
-// 🔹 Tipado opcional de la config
 export interface NegocioConfig {
   nombre: string;
   slug: string;
@@ -11,13 +10,17 @@ export interface NegocioConfig {
   logoUrl: string;
   usarLogo: boolean;
   email: string;
+  eslogan?: string;
+  fuenteBotones?: string;
+  fuenteTexto?: string;
+  fuenteLogo?: string;
 }
 
-// Obtener configuración de un negocio
+// Obtener configuración de un negocio (siempre desde Usuarios/{uid})
 export async function obtenerConfigNegocio(uid: string): Promise<NegocioConfig | null> {
   try {
-    const negocioRef = doc(db, "Negocios", uid);
-    const snap = await getDoc(negocioRef);
+    const userRef = doc(db, "Usuarios", uid);
+    const snap = await getDoc(userRef);
 
     if (snap.exists()) {
       return snap.data() as NegocioConfig;
@@ -30,11 +33,19 @@ export async function obtenerConfigNegocio(uid: string): Promise<NegocioConfig |
   }
 }
 
-// Guardar configuración de un negocio
+// Guardar configuración tanto en Usuarios/{uid} como en Negocios/{slug}
 export async function guardarConfigNegocio(uid: string, data: Partial<NegocioConfig>) {
   try {
-    const negocioRef = doc(db, "Negocios", uid);
-    await setDoc(negocioRef, data, { merge: true });
+    // Guardar en Usuarios/{uid}
+    const userRef = doc(db, "Usuarios", uid);
+    await setDoc(userRef, data, { merge: true });
+
+    // Guardar en Negocios/{slug} para la web pública
+    if (data.slug) {
+      const negocioRef = doc(db, "Negocios", data.slug);
+      await setDoc(negocioRef, data, { merge: true });
+    }
+
     return true;
   } catch (error) {
     console.error("❌ Error al guardar config negocio:", error);

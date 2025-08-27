@@ -8,17 +8,24 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, googleProvider } from "../../lib/firebase";
+import { fuentesMap } from "../../lib/fonts"; // ✅ Solo necesitas fuentesMap
 
 type Props = {
   title: string;
   hoverColor?: string;
   logoUrl?: string | null;
+  fuenteLogo?: string;
+  fuenteTexto?: string;
+  fuenteBotones?: string;
 };
 
 export default function NavbarBarberia({
   title,
   hoverColor = "#3b82f6",
   logoUrl,
+  fuenteLogo = "montserrat",
+  fuenteTexto = "raleway",
+  fuenteBotones = "poppins",
 }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -42,45 +49,42 @@ export default function NavbarBarberia({
   };
 
   const handleLogout = () => {
-    signOut(auth).catch((e) => console.error("[NavbarBarberia] signOut error:", e));
+    signOut(auth).catch((e) =>
+      console.error("[NavbarBarberia] signOut error:", e)
+    );
   };
 
   return (
     <header className="bg-black text-white px-4 h-16 flex items-center sticky top-0 z-[9999]">
       <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
+
         {/* Logo o título */}
-        <div className="flex items-center space-x-2">
-          {logoUrl ? (
+        <div className="flex items-center justify-center lg:justify-start w-full lg:w-auto">
+          {logoUrl && logoUrl.trim() !== "" ? (
             <img src={logoUrl} alt={title} className="h-10 w-10 object-contain" />
           ) : (
-            <span className="text-lg font-bold">{title.toUpperCase()}</span>
+            <span className="font-bebas tracking-wide text-3xl sm:text-4xl lg:text-5xl">
+              {title.toUpperCase()}
+            </span>
           )}
         </div>
 
         {/* Links desktop */}
-        <div className="hidden md:flex space-x-6 items-center">
-          <a href="#" className="hover:text-[var(--hoverColor)]">
-            Inicio
-          </a>
-          <a href="#nosotros" className="hover:text-[var(--hoverColor)]">
-            Sobre nosotros
-          </a>
-          <a href="#cursos" className="hover:text-[var(--hoverColor)]">
-            Cursos
-          </a>
-          <a href="#contacto" className="hover:text-[var(--hoverColor)]">
-            Contacto
-          </a>
+        <nav className="hidden lg:flex space-x-6 items-center">
+          <a href="#" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Inicio</a>
+          <a href="#nosotros" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Sobre nosotros</a>
+          <a href="#cursos" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Cursos</a>
+          <a href="#contacto" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Contacto</a>
           <a
             href="#reservar"
-            className="bg-[var(--hoverColor)] text-white px-4 py-2 rounded-md font-semibold hover:opacity-90 transition"
+            className={`bg-[var(--hoverColor)] text-white px-4 py-2 rounded-md font-semibold hover:opacity-90 transition ${fuentesMap[fuenteBotones]}`}
           >
             Reservar cita
           </a>
-        </div>
+        </nav>
 
-        {/* Botón hamburguesa */}
-        <div className="md:hidden">
+        {/* Botón hamburguesa móvil */}
+        <div className="lg:hidden">
           <button
             onClick={() => setMobileOpen((prev) => !prev)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -119,49 +123,24 @@ export default function NavbarBarberia({
                     referrerPolicy="no-referrer"
                   />
                   <div>
-                    <p className="font-semibold">{user.displayName}</p>
+                    <p className={`font-semibold ${fuentesMap[fuenteTexto]}`}>{user.displayName}</p>
                     <p className="text-xs opacity-80">{user.email}</p>
                   </div>
                 </div>
               ) : (
-                <p className="font-semibold animate-fadeIn delay-150">
+                <p className={`font-semibold animate-fadeIn delay-150 ${fuentesMap[fuenteTexto]}`}>
                   Bienvenido 👋
                 </p>
               )}
             </div>
 
-            {/* Links con íconos */}
+            {/* Links móvil */}
             <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
-              <a
-                href="#"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                🏠 Inicio
-              </a>
-              <a
-                href="#nosotros"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                👤 Sobre nosotros
-              </a>
-              <a
-                href="#cursos"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                🎓 Cursos
-              </a>
-              <a
-                href="#contacto"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                📞 Contacto
-              </a>
-              <a
-                href="#reservar"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                📅 Reservar cita
-              </a>
+              <a href="#" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>🏠 Inicio</a>
+              <a href="#nosotros" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>👤 Sobre nosotros</a>
+              <a href="#cursos" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>🎓 Cursos</a>
+              <a href="#contacto" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>📞 Contacto</a>
+              <a href="#reservar" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteBotones]}`}>📅 Reservar cita</a>
 
               <hr className="my-3" />
 
@@ -171,14 +150,14 @@ export default function NavbarBarberia({
               ) : !user ? (
                 <button
                   onClick={handleLogin}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800"
+                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 ${fuentesMap[fuenteBotones]}`}
                 >
                   👉 Iniciar sesión
                 </button>
               ) : (
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600"
+                  className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 ${fuentesMap[fuenteBotones]}`}
                 >
                   🚪 Cerrar sesión
                 </button>

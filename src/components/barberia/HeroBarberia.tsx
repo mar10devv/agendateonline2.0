@@ -1,28 +1,37 @@
 import React, { useEffect, useState } from "react";
+import { fuentesMap } from "../../lib/fonts"; // ✅ Importar mapa de fuentes
 
 type Props = {
   images: string[];
-  nombre: string; // 👈 importante
+  nombre: string;
+  eslogan?: string; // 👈 añadimos eslogan
+  fuenteLogo?: string;
+  fuenteTexto?: string;
+  fuenteBotones?: string;
 };
 
-export default function HeroBarberia({ images, nombre }: Props) {
+export default function HeroBarberia({
+  images,
+  nombre,
+  eslogan = "Cortes modernos, clásicos y a tu medida", // 👈 valor por defecto
+  fuenteLogo = "montserrat",
+  fuenteTexto = "raleway",
+  fuenteBotones = "poppins",
+}: Props) {
   const [current, setCurrent] = useState(0);
   const [zoom, setZoom] = useState(false);
 
-  // Zoom inicial
   useEffect(() => {
     const timer = setTimeout(() => setZoom(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
-  // Cambio de imagen
   useEffect(() => {
     const interval = setInterval(() => {
       setZoom(false);
       setCurrent((prev) => (prev + 1) % images.length);
       setTimeout(() => setZoom(true), 100);
     }, 6000);
-
     return () => clearInterval(interval);
   }, [images.length]);
 
@@ -45,18 +54,22 @@ export default function HeroBarberia({ images, nombre }: Props) {
         </div>
       ))}
 
+      {/* Overlay */}
       <div className="absolute inset-0 bg-black/40" />
 
+      {/* Texto */}
       <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white z-10">
-        <h1 className="text-4xl md:text-6xl font-bold">
+        <h1 className={`text-4xl md:text-6xl font-bold ${fuentesMap[fuenteLogo]}`}>
           Bienvenido a {nombre}
         </h1>
-        <p className="mt-4 text-lg md:text-2xl">
-          Cortes modernos, clásicos y a tu medida
+
+        <p className={`mt-4 text-lg md:text-2xl ${fuentesMap[fuenteTexto]}`}>
+          {eslogan}
         </p>
+
         <a
           href="#reservar"
-          className="mt-6 inline-block bg-yellow-500 text-black px-6 py-3 rounded-xl font-semibold hover:bg-yellow-600 transition"
+          className={`mt-6 inline-block px-6 py-3 rounded-xl font-semibold transition bg-yellow-500 text-black hover:bg-yellow-600 ${fuentesMap[fuenteBotones]}`}
         >
           Reservar cita
         </a>

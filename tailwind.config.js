@@ -3,6 +3,13 @@ module.exports = {
   content: [
     "./src/**/*.{astro,html,js,jsx,ts,tsx,md,mdx}",
   ],
+  safelist: [
+    "font-montserrat",
+    "font-poppins",
+    "font-raleway",
+    "font-playfair",
+    "font-bebas",
+  ],
   theme: {
     extend: {
       keyframes: {

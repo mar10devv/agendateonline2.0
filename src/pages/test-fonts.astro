@@ -1,0 +1,41 @@
+---
+import { db } from "../lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { fuentesMap } from "../lib/fonts"; // 👈 mapa de fuentes
+
+// 🚀 Slug fijo de prueba (cambiálo por el tuyo real)
+const slug = "barberstyl";
+
+// 📌 Buscar el negocio en Firestore
+let negocio = null;
+const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+const snap = await getDocs(q);
+
+if (!snap.empty) {
+  negocio = snap.docs[0].data();
+}
+
+// Fuente desde Firestore o fallback
+const fuenteLogo = negocio?.fuenteLogo || "montserrat";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Prueba Fuentes</title>
+  </head>
+  <body class="min-h-screen flex items-center justify-center bg-gray-100">
+    {!negocio ? (
+      <h1 class="text-xl text-red-600">❌ Negocio no encontrado</h1>
+    ) : (
+      <div class="text-center">
+        <h1 class={`text-4xl font-bold ${fuentesMap[fuenteLogo]}`}>
+          Texto de prueba con fuente: {fuenteLogo}
+        </h1>
+        <p class="mt-4 text-gray-700">
+          Si esto cambia desde el panel, ya tenemos el flujo funcionando 🎉
+        </p>
+      </div>
+    )}
+  </body>
+</html>

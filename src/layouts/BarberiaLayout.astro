@@ -8,7 +8,11 @@ interface Props {
   hoverColor?: string;
   logoUrl?: string;
   heroImages?: string[];
-  nombre?: string; // 👈 nuevo
+  nombre?: string;
+  eslogan?: string;
+  fuenteLogo?: string;
+  fuenteTexto?: string;
+  fuenteBotones?: string;
   children?: any;
 }
 
@@ -17,10 +21,13 @@ const {
   hoverColor,
   logoUrl,
   heroImages = ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"],
-  nombre, // 👈 sin valor por defecto
+  nombre,
+  eslogan,
+  fuenteLogo = "montserrat",
+  fuenteTexto = "raleway",
+  fuenteBotones = "poppins",
   children,
 } = Astro.props as Props;
-
 ---
 
 <html lang="es">
@@ -30,10 +37,24 @@ const {
     <title>{title} | AgendateOnline</title>
   </head>
   <body class="bg-white text-black">
-    <NavbarBarberia client:load title={title} hoverColor={hoverColor} logoUrl={logoUrl} />
+    <!-- ✅ Navbar con color hover y logo -->
+    <NavbarBarberia
+      client:load
+      title={title}
+      hoverColor={hoverColor}
+      logoUrl={logoUrl}
+    />
 
-    <!-- 👇 Hero React con nombre -->
-    <HeroBarberia client:load images={heroImages} nombre={title} />
+    <!-- ✅ Hero con fuentes dinámicas -->
+    <HeroBarberia
+      client:load
+      images={heroImages}
+      nombre={nombre || title}
+      eslogan={eslogan}
+      fuenteLogo={fuenteLogo}
+      fuenteTexto={fuenteTexto}
+      fuenteBotones={fuenteBotones}
+    />
 
     <main>{children}</main>
   </body>

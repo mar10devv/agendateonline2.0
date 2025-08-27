@@ -1,36 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;800&family=Poppins:wght@400;600&family=Raleway:wght@400;700&family=Playfair+Display:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ✅ Clases para fuentes dinámicas */
+.font-montserrat { font-family: 'Montserrat', sans-serif; }
+.font-poppins    { font-family: 'Poppins', sans-serif; }
+.font-raleway    { font-family: 'Raleway', sans-serif; }
+.font-playfair   { font-family: 'Playfair Display', serif; }
+.font-bebas      { font-family: 'Bebas Neue', sans-serif; }
+
+/* ================= Animaciones personalizadas ================= */
 @keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-slideIn {
-  animation: slideIn 0.3s ease-out forwards;
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.4s ease-out forwards;
-}
+.animate-slideIn { animation: slideIn 0.3s ease-out forwards; }
+.animate-fadeIn  { animation: fadeIn 0.4s ease-out forwards; }
 
 .delay-150 { animation-delay: 0.15s; }
 .delay-200 { animation-delay: 0.2s; }
@@ -38,7 +31,7 @@
 .delay-400 { animation-delay: 0.4s; }
 .delay-500 { animation-delay: 0.5s; }
 
-/* loader personalizado */
+/* ================= Loader personalizado ================= */
 .loader {
   --dim: 3rem;
   width: var(--dim);
@@ -57,40 +50,15 @@
   position: absolute;
 }
 
-.loader .circle:nth-child(1) {
-  top: 0;
-  left: 0;
-}
-
-.loader .circle:nth-child(2) {
-  top: 0;
-  right: 0;
-}
-
-.loader .circle:nth-child(3) {
-  bottom: 0;
-  left: 0;
-}
-
-.loader .circle:nth-child(4) {
-  bottom: 0;
-  right: 0;
-}
+.loader .circle:nth-child(1) { top: 0; left: 0; }
+.loader .circle:nth-child(2) { top: 0; right: 0; }
+.loader .circle:nth-child(3) { bottom: 0; left: 0; }
+.loader .circle:nth-child(4) { bottom: 0; right: 0; }
 
 @keyframes spin988 {
-  0% {
-    transform: scale(1) rotate(0);
-  }
-  20%, 25% {
-    transform: scale(1.3) rotate(90deg);
-  }
-  45%, 50% {
-    transform: scale(1) rotate(180deg);
-  }
-  70%, 75% {
-    transform: scale(1.3) rotate(270deg);
-  }
-  95%, 100% {
-    transform: scale(1) rotate(360deg);
-  }
+  0%   { transform: scale(1) rotate(0); }
+  20%,25% { transform: scale(1.3) rotate(90deg); }
+  45%,50% { transform: scale(1) rotate(180deg); }
+  70%,75% { transform: scale(1.3) rotate(270deg); }
+  95%,100% { transform: scale(1) rotate(360deg); }
 }
