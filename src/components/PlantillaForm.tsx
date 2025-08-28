@@ -8,6 +8,11 @@ import { db } from "../lib/firebase";
 // 📂 Importamos Firebase Storage (no lo usamos pero lo dejamos)
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
+// 📂 Leaflet
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 function generarSlug(nombre: string) {
   return nombre
     .toLowerCase()
@@ -21,6 +26,14 @@ type BannerImage = {
   url: string;
   deleteUrl?: string;
 };
+
+// ✅ Icono personalizado para Leaflet
+const customIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
 
 export default function PlantillaForm() {
   const [user, setUser] = useState<any>(null);
@@ -101,55 +114,47 @@ export default function PlantillaForm() {
     });
   };
 
-// 🚀 Subida a ImgBB (solo local, se guarda al dar "Guardar cambios")
-const handleBannerChange = async (
-  e: React.ChangeEvent<HTMLInputElement>,
-  index: number
-) => {
-  if (!e.target.files || !user) return;
-  const file = e.target.files[0];
-  if (!file) return;
+  // 🚀 Subida a ImgBB (solo local, se guarda al dar "Guardar cambios")
+  const handleBannerChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    index: number
+  ) => {
+    if (!e.target.files || !user) return;
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const formData = new FormData();
-  formData.append("image", file);
+    const formData = new FormData();
+    formData.append("image", file);
 
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
-    { method: "POST", body: formData }
-  );
+    const res = await fetch(
+      `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
+      { method: "POST", body: formData }
+    );
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data?.data?.display_url && data?.data?.delete_url) {
-    const nuevasImagenes = [...config.bannerImages];   // copiamos las actuales
-    nuevasImagenes[index] = {                         // reemplazamos solo ese slot
-      url: data.data.display_url,
-      deleteUrl: data.data.delete_url,
-    };
+    if (data?.data?.display_url && data?.data?.delete_url) {
+      const nuevasImagenes = [...config.bannerImages];   // copiamos las actuales
+      nuevasImagenes[index] = {                         // reemplazamos solo ese slot
+        url: data.data.display_url,
+        deleteUrl: data.data.delete_url,
+      };
 
+      const newConfig = { ...config, bannerImages: nuevasImagenes };
+      setConfig(newConfig);
+
+      setMensaje("⚠️ Recuerda guardar para aplicar cambios.");
+    }
+  };
+
+  // 🗑️ Eliminar imagen del banner (solo local, se aplica al guardar)
+  const eliminarImagen = (index: number) => {
+    const nuevasImagenes = [...config.bannerImages];
+    nuevasImagenes[index] = null;
     const newConfig = { ...config, bannerImages: nuevasImagenes };
     setConfig(newConfig);
-
-    // ⛔ quitamos el guardado automático
     setMensaje("⚠️ Recuerda guardar para aplicar cambios.");
-  }
-};
-
-// 🗑️ Eliminar imagen del banner (solo local, se aplica al guardar)
-const eliminarImagen = (index: number) => {
-  // Copiamos las imágenes actuales
-  const nuevasImagenes = [...config.bannerImages];
-
-  // Dejamos el hueco vacío con null (en lugar de undefined)
-  nuevasImagenes[index] = null;
-
-  // Actualizamos solo el estado local
-  const newConfig = { ...config, bannerImages: nuevasImagenes };
-  setConfig(newConfig);
-
-  // Mensaje de aviso
-  setMensaje("⚠️ Recuerda guardar para aplicar cambios.");
-};
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,68 +350,79 @@ const eliminarImagen = (index: number) => {
     </div>
   )}
 </div>
-{/* Ubicación */}
-<div className="space-y-3">
-  {/* Input manual */}
-  <div className="relative">
-    <input
-      name="ubicacion"
-      value={config.ubicacion?.direccion || ""}
-      onChange={(e) =>
-        setConfig((prev: any) => ({
-          ...prev,
-          ubicacion: { ...prev.ubicacion, direccion: e.target.value },
-        }))
-      }
-      className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
-                 focus:outline-none focus:ring-2 focus:ring-pink-500 
-                 placeholder-transparent"
-      placeholder="Ubicación del negocio"
-    />
-    <label
-      className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
-        config.ubicacion?.direccion
-          ? "-translate-y-6 scale-90 text-gray-700"
-          : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
-      } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
-    >
-      Ubicación del negocio
-    </label>
-  </div>
 
-  {/* Botón para usar ubicación actual */}
-  <button
-    type="button"
-    onClick={() => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            setConfig((prev: any) => ({
-              ...prev,
-              ubicacion: {
-                ...prev.ubicacion,
-                lat: latitude,
-                lng: longitude,
-                direccion: `Lat: ${latitude}, Lng: ${longitude}`, // luego lo convertimos a dirección real
-              },
-            }));
-            setMensaje("📍 Ubicación actual detectada, recuerda guardar los cambios.");
-          },
-          (error) => {
-            console.error(error);
-            setMensaje("❌ No se pudo obtener tu ubicación.");
-          }
-        );
-      } else {
-        setMensaje("⚠️ Tu navegador no soporta geolocalización.");
-      }
-    }}
-    className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
-  >
-    Usar mi ubicación actual
-  </button>
-</div>
+ {/* Botón para usar ubicación actual */}
+<button
+  type="button"
+  onClick={() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setConfig((prev: any) => ({
+            ...prev,
+            lat: latitude,
+            lng: longitude,
+            direccion: `${latitude}, ${longitude}`,
+          }));
+          setMensaje("📍 Ubicación actual detectada.");
+        },
+        (error) => {
+          console.error(error);
+          setMensaje("❌ No se pudo obtener tu ubicación.");
+        }
+      );
+    } else {
+      setMensaje("⚠️ Tu navegador no soporta geolocalización.");
+    }
+  }}
+  className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
+>
+  Usar mi ubicación actual
+</button>
+
+{/* Mini mapa debajo del botón */}
+{config.lat && config.lng && (
+  <div className="mt-3 space-y-2">
+    <div className="p-3 bg-gray-100 rounded-md border text-gray-700">
+      <p className="text-sm font-medium">📍 Ubicación detectada:</p>
+      <p className="text-sm">{config.direccion}</p>
+    </div>
+
+    <div className="w-full h-64 rounded-md overflow-hidden border">
+      <MapContainer
+        key={`${config.lat}-${config.lng}`} // 🔑 fuerza rerender al mover pin
+        center={[config.lat, config.lng]}
+        zoom={16}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+        />
+        <Marker
+          position={[config.lat, config.lng]}
+          icon={customIcon}
+          draggable={true}
+          eventHandlers={{
+            dragend: (e) => {
+              const newPos = e.target.getLatLng();
+              setConfig((prev: any) => ({
+                ...prev,
+                lat: newPos.lat,
+                lng: newPos.lng,
+                direccion: `${newPos.lat}, ${newPos.lng}`,
+              }));
+            },
+          }}
+        >
+          <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+        </Marker>
+      </MapContainer>
+    </div>
+  </div>
+)}
+
 
         {/* Botones */}
         <div className="flex items-center gap-4 mt-4">

@@ -11,7 +11,8 @@ import PlantillaForm from "../components/PlantillaForm.tsx";
   </head>
   <body class="bg-gray-100 min-h-screen">
     <main class="container mx-auto px-4 py-8">
-      <PlantillaForm client:load />
+      <!-- 👇 Cambio clave -->
+      <PlantillaForm client:only="react" />
     </main>
   </body>
 </html>
