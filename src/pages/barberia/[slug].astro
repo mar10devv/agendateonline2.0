@@ -25,10 +25,14 @@ const fuenteLogo = negocio?.fuenteLogo || "montserrat";
 const fuenteBotones = negocio?.fuenteBotones || "poppins";
 const fuenteTexto = negocio?.fuenteTexto || "raleway";
 
-// ✅ Usar imágenes personalizadas si existen, si no mostrar fallback
-const heroImages = negocio?.bannerImages?.length
-  ? negocio.bannerImages
-  : ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"];
+// 📌 Modo imágenes desde Firestore
+const modoImagenes = negocio?.modoImagenes || "defecto";
+
+// ✅ Usar imágenes según el modo
+const heroImages =
+  modoImagenes === "personalizado" && negocio?.bannerImages?.length
+    ? negocio.bannerImages
+    : ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"];
 
 // 🎨 Estilos dinámicos
 const css = `
@@ -59,6 +63,7 @@ const css = `
     hoverColor={hoverColor}
     logoUrl={negocio.usarLogo ? negocio.logoUrl : null}
     heroImages={heroImages}
+    modoImagenes={modoImagenes}
     nombre={negocio.nombre}
     eslogan={negocio.eslogan}
     fuenteLogo={fuenteLogo}

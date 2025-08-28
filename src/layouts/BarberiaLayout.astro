@@ -8,6 +8,7 @@ interface Props {
   hoverColor?: string;
   logoUrl?: string;
   heroImages?: string[];
+  modoImagenes?: "defecto" | "personalizado";   // 👈 agregado
   nombre?: string;
   eslogan?: string;
   fuenteLogo?: string;
@@ -21,6 +22,7 @@ const {
   hoverColor,
   logoUrl,
   heroImages = ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"],
+  modoImagenes = "defecto",                     // 👈 agregado
   nombre,
   eslogan,
   fuenteLogo = "montserrat",
@@ -38,12 +40,18 @@ const {
   </head>
   <body class="bg-white text-black">
     <!-- ✅ Navbar con color hover y logo -->
-    <NavbarBarberia client:load title={title} hoverColor={hoverColor} logoUrl={logoUrl} />
+    <NavbarBarberia 
+      client:load 
+      title={title} 
+      hoverColor={hoverColor} 
+      logoUrl={logoUrl} 
+    />
 
     <!-- ✅ Hero con imágenes y fuentes dinámicas -->
     <HeroBarberia
       client:load
       images={heroImages}
+      modoImagenes={modoImagenes}
       nombre={nombre || title}
       eslogan={eslogan}
       fuenteLogo={fuenteLogo}

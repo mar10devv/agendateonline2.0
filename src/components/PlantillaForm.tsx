@@ -46,9 +46,7 @@ export default function PlantillaForm() {
     plantilla: "",
     bannerImages: [] as BannerImage[],
     modoImagenes: "defecto",
-    direccion: "",
-    lat: null,
-    lng: null,
+    ubicacion: null,
   });
   const [estado, setEstado] = useState<"cargando" | "listo" | "guardando" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
@@ -81,13 +79,15 @@ export default function PlantillaForm() {
             }
             setUser(usuario);
             setConfig((prev: any) => ({
-              ...prev,
-              ...negocioConfig,
-              fuenteBotones: negocioConfig.fuenteBotones || "poppins",
-              fuenteTexto: negocioConfig.fuenteTexto || "raleway",
-              eslogan: negocioConfig.eslogan || "Cortes modernos, clásicos y a tu medida",
-              bannerImages: negocioConfig.bannerImages || [],
-            }));
+  ...prev,
+  ...negocioConfig,
+  fuenteBotones: negocioConfig.fuenteBotones || "poppins",
+  fuenteTexto: negocioConfig.fuenteTexto || "raleway",
+  eslogan: negocioConfig.eslogan || "Cortes modernos, clásicos y a tu medida",
+  bannerImages: negocioConfig.bannerImages || [],
+  modoImagenes: negocioConfig.modoImagenes || "defecto", // 👈 AGREGAR ESTA LÍNEA
+}));
+
             setEstado("listo");
           }
         } else {
@@ -261,36 +261,36 @@ export default function PlantillaForm() {
   </label>
 
   {/* Toggle */}
-  <div className="flex items-center gap-3 mb-4">
-    <span className="text-sm font-medium text-gray-600">
-      {config.modoImagenes === "defecto" ? "Defecto" : "Personalizado"}
-    </span>
-    <label className="relative inline-block w-[3.5em] h-[2em]">
-      <input
-        type="checkbox"
-        checked={config.modoImagenes === "automatico"}
-        onChange={(e) =>
-          setConfig((prev: any) => ({
-            ...prev,
-            modoImagenes: e.target.checked ? "automatico" : "defecto",
-          }))
-        }
-        className="opacity-0 w-0 h-0 peer"
-      />
-      <span
-        className="
-          absolute cursor-pointer top-0 left-0 right-0 bottom-0
-          bg-white border border-gray-400 rounded-[30px]
-          transition-colors duration-300
-          peer-checked:bg-blue-500 peer-checked:border-blue-500
-          after:content-[''] after:absolute after:h-[1.4em] after:w-[1.4em]
-          after:rounded-full after:left-[0.27em] after:bottom-[0.25em]
-          after:bg-gray-400 after:transition-transform after:duration-300
-          peer-checked:after:translate-x-[1.4em] peer-checked:after:bg-white
-        "
-      ></span>
-    </label>
-  </div>
+<div className="flex items-center gap-3 mb-4">
+  <span className="text-sm font-medium text-gray-600">
+    {config.modoImagenes === "defecto" ? "Defecto" : "Personalizado"}
+  </span>
+  <label className="relative inline-block w-[3.5em] h-[2em]">
+    <input
+      type="checkbox"
+      checked={config.modoImagenes === "personalizado"}
+      onChange={(e) =>
+        setConfig((prev: any) => ({
+          ...prev,
+          modoImagenes: e.target.checked ? "personalizado" : "defecto",
+        }))
+      }
+      className="opacity-0 w-0 h-0 peer"
+    />
+    <span
+      className="
+        absolute cursor-pointer top-0 left-0 right-0 bottom-0
+        bg-white border border-gray-400 rounded-[30px]
+        transition-colors duration-300
+        peer-checked:bg-blue-500 peer-checked:border-blue-500
+        after:content-[''] after:absolute after:h-[1.4em] after:w-[1.4em]
+        after:rounded-full after:left-[0.27em] after:bottom-[0.25em]
+        after:bg-gray-400 after:transition-transform after:duration-300
+        peer-checked:after:translate-x-[1.4em] peer-checked:after:bg-white
+      "
+    ></span>
+  </label>
+</div>
 
   {/* Render según el modo */}
   {config.modoImagenes === "defecto" ? (
@@ -361,9 +361,11 @@ export default function PlantillaForm() {
           const { latitude, longitude } = pos.coords;
           setConfig((prev: any) => ({
             ...prev,
-            lat: latitude,
-            lng: longitude,
-            direccion: `${latitude}, ${longitude}`,
+            ubicacion: {
+              lat: latitude,
+              lng: longitude,
+              direccion: `Lat: ${latitude}, Lng: ${longitude}`,
+            },
           }));
           setMensaje("📍 Ubicación actual detectada.");
         },
@@ -379,7 +381,7 @@ export default function PlantillaForm() {
             setMensaje("❌ Error desconocido al obtener ubicación.");
           }
         },
-        { enableHighAccuracy: true, timeout: 10000 } // más preciso, máximo 10s
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
       setMensaje("⚠️ Tu navegador no soporta geolocalización.");
@@ -391,17 +393,17 @@ export default function PlantillaForm() {
 </button>
 
 {/* Mini mapa debajo del botón */}
-{config.lat && config.lng && (
+{config.ubicacion?.lat && config.ubicacion?.lng && (
   <div className="mt-3 space-y-2">
     <div className="p-3 bg-gray-100 rounded-md border text-gray-700">
       <p className="text-sm font-medium">📍 Ubicación detectada:</p>
-      <p className="text-sm">{config.direccion}</p>
+      <p className="text-sm">{config.ubicacion.direccion}</p>
     </div>
 
     <div className="w-full h-64 rounded-md overflow-hidden border">
       <MapContainer
-        key={`${config.lat}-${config.lng}`} // 🔑 fuerza rerender al mover pin
-        center={[config.lat, config.lng]}
+        key={`${config.ubicacion.lat}-${config.ubicacion.lng}`} // 🔑 fuerza rerender al mover pin
+        center={[config.ubicacion.lat, config.ubicacion.lng]}
         zoom={16}
         style={{ width: "100%", height: "100%" }}
       >
@@ -410,7 +412,7 @@ export default function PlantillaForm() {
           attribution='&copy; OpenStreetMap contributors'
         />
         <Marker
-          position={[config.lat, config.lng]}
+          position={[config.ubicacion.lat, config.ubicacion.lng]}
           icon={customIcon}
           draggable={true}
           eventHandlers={{
@@ -418,9 +420,11 @@ export default function PlantillaForm() {
               const newPos = e.target.getLatLng();
               setConfig((prev: any) => ({
                 ...prev,
-                lat: newPos.lat,
-                lng: newPos.lng,
-                direccion: `${newPos.lat}, ${newPos.lng}`,
+                ubicacion: {
+                  lat: newPos.lat,
+                  lng: newPos.lng,
+                  direccion: `Lat: ${newPos.lat}, Lng: ${newPos.lng}`,
+                },
               }));
             },
           }}

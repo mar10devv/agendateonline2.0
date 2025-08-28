@@ -4,12 +4,13 @@ import { fuentesMap } from "../../lib/fonts";
 type BannerImage = string | { url: string; deleteUrl?: string };
 
 type Props = {
-  images?: BannerImage[]; // 👈 ahora acepta string o {url, deleteUrl}
+  images?: BannerImage[];
   nombre: string;
   eslogan?: string;
   fuenteLogo?: string;
   fuenteTexto?: string;
   fuenteBotones?: string;
+  modoImagenes?: "defecto" | "personalizado"; // 👈 agregado
 };
 
 export default function HeroBarberia({
@@ -19,22 +20,23 @@ export default function HeroBarberia({
   fuenteLogo = "montserrat",
   fuenteTexto = "raleway",
   fuenteBotones = "poppins",
+  modoImagenes = "defecto", // 👈 valor por defecto
 }: Props) {
   const [current, setCurrent] = useState(0);
   const [zoom, setZoom] = useState(false);
 
-  // 👇 Normalizamos: si viene string usamos directo, si viene objeto usamos .url
-  const imagenes =
-  images && images.length > 0
-    ? images
-        .filter((img) => img !== null) // 👈 quitamos los nulos
-        .map((img) =>
-          typeof img === "string"
-            ? img
-            : (img as { url: string }).url
-        )
-    : ["/default1.jpg", "/default2.jpg", "/default3.jpg"];
+  // 👇 imágenes por defecto
+  const IMAGENES_DEFECTO = ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"];
 
+  // 👇 decisión según modo
+  const imagenes =
+    modoImagenes === "personalizado" && images && images.length > 0
+      ? images
+          .filter((img) => img !== null)
+          .map((img) =>
+            typeof img === "string" ? img : (img as { url: string }).url
+          )
+      : IMAGENES_DEFECTO;
 
   // Efecto inicial de zoom
   useEffect(() => {
@@ -76,7 +78,9 @@ export default function HeroBarberia({
 
       {/* Texto */}
       <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white z-10">
-        <h1 className={`text-4xl md:text-6xl font-bold ${fuentesMap[fuenteLogo]}`}>
+        <h1
+          className={`text-4xl md:text-6xl font-bold ${fuentesMap[fuenteLogo]}`}
+        >
           Bienvenido a {nombre}
         </h1>
 
