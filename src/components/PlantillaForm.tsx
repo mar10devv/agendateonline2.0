@@ -352,57 +352,43 @@ export default function PlantillaForm() {
 </div>
 
 {/* Botón para usar ubicación actual */}
-<div className="flex items-center gap-3">
-  <button
-    type="button"
-    onClick={() => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const { latitude, longitude } = pos.coords;
-            setConfig((prev: any) => ({
-              ...prev,
-              lat: latitude,
-              lng: longitude,
-              direccion: `${latitude}, ${longitude}`,
-            }));
-            setMensaje("📍 Ubicación actual detectada.");
-          },
-          (error) => {
-            console.error(error);
-            setMensaje("❌ No se pudo obtener tu ubicación.");
+<button
+  type="button"
+  onClick={() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setConfig((prev: any) => ({
+            ...prev,
+            lat: latitude,
+            lng: longitude,
+            direccion: `${latitude}, ${longitude}`,
+          }));
+          setMensaje("📍 Ubicación actual detectada.");
+        },
+        (error) => {
+          console.error(error);
+          if (error.code === 1) {
+            setMensaje("⚠️ Permiso de ubicación denegado. Activa el GPS y otorga permisos.");
+          } else if (error.code === 2) {
+            setMensaje("⚠️ No se pudo obtener tu ubicación. Verifica tu señal o activa el GPS.");
+          } else if (error.code === 3) {
+            setMensaje("⚠️ Tiempo de espera agotado al intentar obtener tu ubicación.");
+          } else {
+            setMensaje("❌ Error desconocido al obtener ubicación.");
           }
-        );
-      } else {
-        setMensaje("⚠️ Tu navegador no soporta geolocalización.");
-      }
-    }}
-    className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
-  >
-    Usar mi ubicación actual
-  </button>
-
-  {/* Botón eliminar ubicación */}
-{config.lat && config.lng && (
-  <button
-    type="button"
-    onClick={() => {
-      setConfig((prev: any) => ({
-        ...prev,
-        lat: null,
-        lng: null,
-        direccion: "",
-        ubicacion: null, // 👈 limpiamos todo el campo
-      }));
-      setMensaje("🗑️ Ubicación eliminada. Recuerda guardar los cambios.");
-    }}
-    className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition"
-  >
-    Eliminar ubicación
-  </button>
-)}
-
-</div>
+        },
+        { enableHighAccuracy: true, timeout: 10000 } // más preciso, máximo 10s
+      );
+    } else {
+      setMensaje("⚠️ Tu navegador no soporta geolocalización.");
+    }
+  }}
+  className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
+>
+  Usar mi ubicación actual
+</button>
 
 {/* Mini mapa debajo del botón */}
 {config.lat && config.lng && (
