@@ -28,54 +28,80 @@ export default function DashboardTemp() {
   const [estado, setEstado] = useState<"cargando" | "listo" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
 
-  useEffect(() => {
-    const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, async (usuario) => {
-      if (usuario) {
-        const userRef = doc(db, "Usuarios", usuario.uid);
-        const snap = await getDoc(userRef);
+useEffect(() => {
+  const auth = getAuth();
+  const unsub = onAuthStateChanged(auth, async (usuario) => {
+    if (!usuario) {
+      setEstado("sin-acceso");
+      setMensaje("🔒 No has iniciado sesión.");
+      return;
+    }
 
-        if (!snap.exists()) {
-          await setDoc(userRef, {
-            uid: usuario.uid,
-            email: usuario.email,
-            nombre: usuario.displayName || "",
-            foto: usuario.photoURL || "",
-            premium: false,
-            plantilla: null,
-            localesRecientes: [],
-            ubicacion: null,
-            creadoEn: new Date(),
-          });
-          setEstado("sin-acceso");
-          setMensaje("🚫 No tienes acceso al panel.");
-          return;
+    try {
+      // ✅ Revisar si ya tenemos cache
+      const cachePremium = localStorage.getItem("usuarioPremium");
+      const cacheConfig = localStorage.getItem("negocioConfig");
+
+      if (cachePremium === "true" && cacheConfig) {
+        setUser(usuario);
+        setConfig(JSON.parse(cacheConfig));
+        setEstado("listo");
+        return; // 👈 evitamos volver a consultar Firestore
+      }
+
+      const userRef = doc(db, "Usuarios", usuario.uid);
+
+      // 👇 Pedimos al mismo tiempo user y config
+      const [snap, negocioConfig] = await Promise.all([
+        getDoc(userRef),
+        obtenerConfigNegocio(usuario.uid),
+      ]);
+
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: usuario.uid,
+          email: usuario.email,
+          nombre: usuario.displayName || "",
+          foto: usuario.photoURL || "",
+          premium: false,
+          plantilla: null,
+          localesRecientes: [],
+          ubicacion: null,
+          creadoEn: new Date(),
+        });
+        setEstado("sin-acceso");
+        setMensaje("🚫 No tienes acceso al panel.");
+        return;
+      }
+
+      const data = snap.data();
+      if (data?.premium && negocioConfig) {
+        if (!negocioConfig.slug) {
+          negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
         }
 
-        const data = snap.data();
+        // ✅ Guardamos en localStorage para no consultar más
+        localStorage.setItem("usuarioPremium", "true");
+        localStorage.setItem("negocioConfig", JSON.stringify(negocioConfig));
 
-        if (data?.premium) {
-          const negocioConfig = await obtenerConfigNegocio(usuario.uid);
-          if (negocioConfig) {
-            if (!negocioConfig.slug) {
-              negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
-            }
-            setUser(usuario);
-            setConfig(negocioConfig);
-            setEstado("listo");
-          }
-        } else {
-          setEstado("sin-acceso");
-          setMensaje("🚫 No tienes acceso al panel.");
-        }
+        setUser(usuario);
+        setConfig(negocioConfig);
+        setEstado("listo");
       } else {
         setEstado("sin-acceso");
-        setMensaje("🔒 No has iniciado sesión.");
+        setMensaje("🚫 No tienes acceso al panel.");
       }
-    });
+    } catch (e) {
+      console.error(e);
+      setEstado("sin-acceso");
+      setMensaje("❌ Error al cargar el panel.");
+    }
+  });
 
-    return () => unsub();
-  }, []);
+  return () => unsub();
+}, []);
+
+
 
   if (estado === "cargando")
     return (

@@ -183,12 +183,13 @@ export default function PlantillaForm() {
       <div className="px-6 py-4 bg-gradient-to-r from-pink-500 to-fuchsia-600 text-white flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold">Personaliza tu negocio</h1>
         <button
-          onClick={() => (window.location.href = "/panel")}
-          className="flex items-center gap-2 bg-white text-pink-600 px-4 py-2 rounded-lg shadow hover:bg-pink-50 transition"
-        >
-          <span className="text-lg">←</span>
-          <span className="font-medium">Volver al panel</span>
-        </button>
+  onClick={() => (window.location.href = "/panel")}
+  className="flex items-center gap-2 bg-white text-pink-600 px-4 py-2 rounded-lg shadow hover:bg-pink-50 transition"
+>
+  <span className="text-lg">←</span>
+  <span className="font-medium">Volver al panel</span>
+</button>
+
       </div>
 
       {/* Formulario */}
