@@ -81,25 +81,24 @@ export default function DashboardEmpleados() {
   };
 
   if (estado === "cargando")
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-      <div className="loader">
-        <div className="circle"></div>
-        <div className="circle"></div>
-        <div className="circle"></div>
-        <div className="circle"></div>
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+        <div className="loader">
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+        </div>
+        <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
       </div>
-      <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
-    </div>
-  );
-
+    );
 
   if (estado === "sin-acceso") return <p className="text-red-600 text-center mt-10">{mensaje}</p>;
   if (!config) return null;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 md:p-10">
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div className="w-full p-6 md:p-10">
+      <div className="w-full bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
         {/* Encabezado */}
         <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white flex items-center justify-between">
           <h1 className="text-xl md:text-2xl font-bold">Panel de empleados</h1>
@@ -114,7 +113,7 @@ export default function DashboardEmpleados() {
         </div>
 
         {/* Contenido */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-8">
           {/* Selector cantidad */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad de empleados</label>
@@ -148,7 +147,7 @@ export default function DashboardEmpleados() {
             {config.empleadosData?.map((empleado: any, index: number) => (
               <div
                 key={index}
-                className="bg-white border rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col items-center gap-4 w-full"
+                className="border rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col items-center gap-4 w-full"
               >
                 {/* Foto de perfil */}
                 <div className="relative">
@@ -164,11 +163,7 @@ export default function DashboardEmpleados() {
                     className="w-24 h-24 rounded-full bg-white border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                   >
                     {empleado.fotoPerfil ? (
-                      <img
-                        src={empleado.fotoPerfil}
-                        alt=""
-                        className="object-cover w-full h-full"
-                      />
+                      <img src={empleado.fotoPerfil} alt="" className="object-cover w-full h-full" />
                     ) : (
                       <>
                         <span className="text-xl text-gray-500">+</span>
@@ -201,7 +196,7 @@ export default function DashboardEmpleados() {
                 {/* Trabajos (6 slots circulares) */}
                 <div className="w-full">
                   <p className="text-sm text-gray-600 mb-2">Fotos de trabajos (máx. 6)</p>
-                  <div className="grid grid-cols-3 gap-3 justify-items-center">
+                  <div className="flex flex-wrap gap-3 justify-center">
                     {Array.from({ length: 6 }).map((_, i) => {
                       const img = empleado.trabajos?.[i] || "";
                       return (
@@ -218,11 +213,7 @@ export default function DashboardEmpleados() {
                             className="w-16 h-16 rounded-full bg-white border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                           >
                             {img ? (
-                              <img
-                                src={img}
-                                alt=""
-                                className="object-cover w-full h-full"
-                              />
+                              <img src={img} alt="" className="object-cover w-full h-full" />
                             ) : (
                               <span className="text-lg text-gray-400">+</span>
                             )}
