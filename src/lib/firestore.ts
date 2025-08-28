@@ -14,38 +14,29 @@ export interface NegocioConfig {
   fuenteBotones?: string;
   fuenteTexto?: string;
   fuenteLogo?: string;
+  bannerImages?: string[];
+  empleados?: number;
+  empleadosData?: any[];
+  trabajos?: any[];
 }
 
-// Obtener configuración de un negocio (siempre desde Usuarios/{uid})
+// ✅ Obtener config usando UID (único por usuario)
 export async function obtenerConfigNegocio(uid: string): Promise<NegocioConfig | null> {
   try {
-    const userRef = doc(db, "Usuarios", uid);
-    const snap = await getDoc(userRef);
-
-    if (snap.exists()) {
-      return snap.data() as NegocioConfig;
-    } else {
-      return null;
-    }
+    const negocioRef = doc(db, "Negocios", uid);
+    const snap = await getDoc(negocioRef);
+    return snap.exists() ? (snap.data() as NegocioConfig) : null;
   } catch (error) {
     console.error("❌ Error al obtener config negocio:", error);
     return null;
   }
 }
 
-// Guardar configuración tanto en Usuarios/{uid} como en Negocios/{slug}
+// ✅ Guardar config en Negocios/{uid}
 export async function guardarConfigNegocio(uid: string, data: Partial<NegocioConfig>) {
   try {
-    // Guardar en Usuarios/{uid}
-    const userRef = doc(db, "Usuarios", uid);
-    await setDoc(userRef, data, { merge: true });
-
-    // Guardar en Negocios/{slug} para la web pública
-    if (data.slug) {
-      const negocioRef = doc(db, "Negocios", data.slug);
-      await setDoc(negocioRef, data, { merge: true });
-    }
-
+    const negocioRef = doc(db, "Negocios", uid);
+    await setDoc(negocioRef, data, { merge: true });
     return true;
   } catch (error) {
     console.error("❌ Error al guardar config negocio:", error);

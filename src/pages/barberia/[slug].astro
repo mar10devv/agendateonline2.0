@@ -10,7 +10,7 @@ import { fuentesMap, fuentesStyle } from "../../lib/fonts";
 // 📌 Obtenemos el slug desde la URL
 const { slug } = Astro.params;
 
-// 📌 Buscamos el negocio en Firestore
+// 📌 Buscamos el negocio en Firestore (colección Negocios)
 let negocio = null;
 const q = query(collection(db, "Negocios"), where("slug", "==", slug));
 const snap = await getDocs(q);
@@ -24,6 +24,11 @@ const hoverColor = negocio?.hoverColor || "#3b82f6";
 const fuenteLogo = negocio?.fuenteLogo || "montserrat";
 const fuenteBotones = negocio?.fuenteBotones || "poppins";
 const fuenteTexto = negocio?.fuenteTexto || "raleway";
+
+// ✅ Usar imágenes personalizadas si existen, si no mostrar fallback
+const heroImages = negocio?.bannerImages?.length
+  ? negocio.bannerImages
+  : ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"];
 
 // 🎨 Estilos dinámicos
 const css = `
@@ -53,7 +58,9 @@ const css = `
     title={negocio.nombre}
     hoverColor={hoverColor}
     logoUrl={negocio.usarLogo ? negocio.logoUrl : null}
-    eslogan={negocio.eslogan} 
+    heroImages={heroImages}
+    nombre={negocio.nombre}
+    eslogan={negocio.eslogan}
     fuenteLogo={fuenteLogo}
     fuenteTexto={fuenteTexto}
     fuenteBotones={fuenteBotones}

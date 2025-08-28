@@ -9,6 +9,8 @@ import { db } from "../lib/firebase";
 import CalendarioIcon from "../assets/calendario-svg.svg?url";
 import PersonalIcon from "../assets/personal-svg.svg?url";
 import PlantillaIcon from "../assets/plantilla-svg.svg?url";
+import EstadisticasIcon from "../assets/estadisticas-svg.svg?url";
+import SoporteIcon from "../assets/soporte-tecnico-svg.svg?url";
 
 // 🔨 función para crear slug a partir del nombre
 function generarSlug(nombre: string) {
@@ -23,9 +25,7 @@ function generarSlug(nombre: string) {
 export default function DashboardTemp() {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [estado, setEstado] = useState<
-    "cargando" | "listo" | "sin-acceso"
-  >("cargando");
+  const [estado, setEstado] = useState<"cargando" | "listo" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
 
   useEffect(() => {
@@ -58,9 +58,7 @@ export default function DashboardTemp() {
           const negocioConfig = await obtenerConfigNegocio(usuario.uid);
           if (negocioConfig) {
             if (!negocioConfig.slug) {
-              negocioConfig.slug = generarSlug(
-                negocioConfig.nombre || "mi-negocio"
-              );
+              negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
             }
             setUser(usuario);
             setConfig(negocioConfig);
@@ -88,9 +86,7 @@ export default function DashboardTemp() {
           <div className="circle"></div>
           <div className="circle"></div>
         </div>
-        <p className="mt-6 text-lg font-medium">
-          Cargando usuario y configuración...
-        </p>
+        <p className="mt-6 text-lg font-medium">Cargando usuario y configuración...</p>
       </div>
     );
 
@@ -101,19 +97,16 @@ export default function DashboardTemp() {
     <div className="w-[95vw] sm:w-[90vw] max-w-6xl mx-auto p-2 sm:p-4 md:p-6">
       <div className="w-full bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
         {/* ✅ Encabezado */}
-<div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
-  <h1 className="text-xl md:text-2xl font-bold">
-    Panel de Control
-  </h1>
-  <button
-    onClick={() => (window.location.href = "/")}
-    className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg shadow hover:bg-blue-50 transition"
-  >
-    <span className="text-lg">←</span>
-    <span className="font-medium">Volver atrás</span>
-  </button>
-</div>
-
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+          <h1 className="text-xl md:text-2xl font-bold">Panel de Control</h1>
+          <button
+            onClick={() => (window.location.href = "/")}
+            className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg shadow hover:bg-blue-50 transition"
+          >
+            <span className="text-lg">←</span>
+            <span className="font-medium">Volver atrás</span>
+          </button>
+        </div>
 
         {/* ✅ Menú principal (cards cuadradas con íconos) */}
         <div className="p-6">
@@ -124,7 +117,7 @@ export default function DashboardTemp() {
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
               <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
-              <span>Agenda</span>
+              <span>Mi Agenda</span>
             </a>
 
             {/* Card Personal */}
@@ -133,7 +126,7 @@ export default function DashboardTemp() {
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
               <img src={PersonalIcon} alt="Personal" className="w-12 h-12 mb-3" />
-              <span>Personal</span>
+              <span>Mi Personal</span>
             </a>
 
             {/* Card Plantilla */}
@@ -142,26 +135,32 @@ export default function DashboardTemp() {
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
               <img src={PlantillaIcon} alt="Plantilla" className="w-12 h-12 mb-3" />
-              <span>Plantilla</span>
+              <span>Personalizar mi web</span>
             </a>
 
-            {/* Ejemplo 1 */}
+            {/* ✅ Soporte Técnico (con SVG) */}
             <a
-              href="#"
+              href="/panel-soporte"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
+              aria-label="Soporte técnico"
             >
-              Ejemplo 1
+              <img src={SoporteIcon} alt="Soporte técnico" className="w-12 h-12 mb-3" />
+              <span className="text-center leading-tight">
+                Soporte<br />Técnico
+              </span>
             </a>
 
-            {/* Ejemplo 2 */}
+            {/* ✅ Estadísticas (con SVG) */}
             <a
-              href="#"
+              href="/panel-estadisticas"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
+              aria-label="Estadísticas"
             >
-              Ejemplo 2
+              <img src={EstadisticasIcon} alt="Estadísticas" className="w-12 h-12 mb-3" />
+              <span>Estadísticas</span>
             </a>
 
-            {/* Ejemplo 3 */}
+            {/* Ejemplo 3 (placeholder) */}
             <a
               href="#"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"

@@ -5,6 +5,9 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
+// 📂 Importamos Firebase Storage (no lo usamos pero lo dejamos)
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 function generarSlug(nombre: string) {
   return nombre
     .toLowerCase()
@@ -14,12 +17,27 @@ function generarSlug(nombre: string) {
     .replace(/(^-|-$)+/g, "");
 }
 
+type BannerImage = {
+  url: string;
+  deleteUrl?: string;
+};
+
 export default function PlantillaForm() {
   const [user, setUser] = useState<any>(null);
-  const [config, setConfig] = useState<any>(null);
-  const [estado, setEstado] = useState<
-    "cargando" | "listo" | "guardando" | "sin-acceso"
-  >("cargando");
+  const [config, setConfig] = useState<any>({
+    nombre: "",
+    eslogan: "Cortes modernos, clásicos y a tu medida",
+    fuenteBotones: "poppins",
+    fuenteTexto: "raleway",
+    hoverColor: "#3b82f6",
+    plantilla: "",
+    bannerImages: [] as BannerImage[],
+    modoImagenes: "defecto",
+    direccion: "",
+    lat: null,
+    lng: null,
+  });
+  const [estado, setEstado] = useState<"cargando" | "listo" | "guardando" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
   const [mostrarPaleta, setMostrarPaleta] = useState(false);
 
@@ -46,19 +64,17 @@ export default function PlantillaForm() {
           const negocioConfig: any = await obtenerConfigNegocio(usuario.uid);
           if (negocioConfig) {
             if (!negocioConfig.slug) {
-              negocioConfig.slug = generarSlug(
-                negocioConfig.nombre || "mi-negocio"
-              );
+              negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
             }
-
-            // ⚡ Valores por defecto seguros
-            negocioConfig.fuenteBotones = negocioConfig.fuenteBotones || "poppins";
-            negocioConfig.fuenteTexto = negocioConfig.fuenteTexto || "raleway";
-            negocioConfig.eslogan =
-              negocioConfig.eslogan || "Cortes modernos, clásicos y a tu medida";
-
             setUser(usuario);
-            setConfig(negocioConfig);
+            setConfig((prev: any) => ({
+              ...prev,
+              ...negocioConfig,
+              fuenteBotones: negocioConfig.fuenteBotones || "poppins",
+              fuenteTexto: negocioConfig.fuenteTexto || "raleway",
+              eslogan: negocioConfig.eslogan || "Cortes modernos, clásicos y a tu medida",
+              bannerImages: negocioConfig.bannerImages || [],
+            }));
             setEstado("listo");
           }
         } else {
@@ -73,15 +89,10 @@ export default function PlantillaForm() {
     return () => unsub();
   }, []);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type, checked } = e.target;
     setConfig((prev: any) => {
-      const newConfig = {
-        ...prev,
-        [name]: type === "checkbox" ? checked : value,
-      };
+      const newConfig = { ...prev, [name]: type === "checkbox" ? checked : value };
       if (name === "nombre") newConfig.slug = generarSlug(value);
       if (name === "eslogan" && value.trim() === "") {
         newConfig.eslogan = "Cortes modernos, clásicos y a tu medida";
@@ -90,43 +101,82 @@ export default function PlantillaForm() {
     });
   };
 
+// 🚀 Subida a ImgBB (solo local, se guarda al dar "Guardar cambios")
+const handleBannerChange = async (
+  e: React.ChangeEvent<HTMLInputElement>,
+  index: number
+) => {
+  if (!e.target.files || !user) return;
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+
+  if (data?.data?.display_url && data?.data?.delete_url) {
+    const nuevasImagenes = [...config.bannerImages];   // copiamos las actuales
+    nuevasImagenes[index] = {                         // reemplazamos solo ese slot
+      url: data.data.display_url,
+      deleteUrl: data.data.delete_url,
+    };
+
+    const newConfig = { ...config, bannerImages: nuevasImagenes };
+    setConfig(newConfig);
+
+    // ⛔ quitamos el guardado automático
+    setMensaje("⚠️ Recuerda guardar para aplicar cambios.");
+  }
+};
+
+// 🗑️ Eliminar imagen del banner (solo local, se aplica al guardar)
+const eliminarImagen = (index: number) => {
+  // Copiamos las imágenes actuales
+  const nuevasImagenes = [...config.bannerImages];
+
+  // Dejamos el hueco vacío con null (en lugar de undefined)
+  nuevasImagenes[index] = null;
+
+  // Actualizamos solo el estado local
+  const newConfig = { ...config, bannerImages: nuevasImagenes };
+  setConfig(newConfig);
+
+  // Mensaje de aviso
+  setMensaje("⚠️ Recuerda guardar para aplicar cambios.");
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setEstado("guardando");
+
     const ok = await guardarConfigNegocio(user.uid, config);
-    setMensaje(
-      ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar."
-    );
+    setMensaje(ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar.");
     setEstado("listo");
   };
 
-  // 🔄 Loader
   if (estado === "cargando")
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-        <div className="loader">
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-        </div>
+        <div className="loader"><div className="circle"></div><div className="circle"></div><div className="circle"></div><div className="circle"></div></div>
         <p className="mt-6 text-lg font-medium">Cargando plantilla...</p>
       </div>
     );
 
-  if (estado === "sin-acceso")
-    return <p className="p-6 text-red-600">{mensaje}</p>;
+  if (estado === "sin-acceso") return <p className="p-6 text-red-600">{mensaje}</p>;
   if (!config) return null;
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-      {/* ✅ Encabezado con botón volver */}
+      {/* Encabezado */}
       <div className="px-6 py-4 bg-gradient-to-r from-pink-500 to-fuchsia-600 text-white flex items-center justify-between">
-        <h1 className="text-xl md:text-2xl font-bold">
-          Personaliza tu negocio
-        </h1>
-
+        <h1 className="text-xl md:text-2xl font-bold">Personaliza tu negocio</h1>
         <button
           onClick={() => (window.location.href = "/panel")}
           className="flex items-center gap-2 bg-white text-pink-600 px-4 py-2 rounded-lg shadow hover:bg-pink-50 transition"
@@ -145,19 +195,12 @@ export default function PlantillaForm() {
             value={config.nombre}
             onChange={handleChange}
             required
-            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-md 
-                       focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-transparent"
+            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-transparent"
             placeholder="Nombre del negocio"
           />
-          <label
-            className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
-              ${
-                config.nombre
-                  ? "-translate-y-6 scale-90 text-gray-700"
-                  : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
-              }
-              peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
-          >
+          <label className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
+            config.nombre ? "-translate-y-6 scale-90 text-gray-700" : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+          } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}>
             Nombre del negocio
           </label>
         </div>
@@ -168,147 +211,211 @@ export default function PlantillaForm() {
             name="eslogan"
             value={config.eslogan}
             onChange={handleChange}
-            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
-                       focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-transparent"
+            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder-transparent"
             placeholder="Eslogan de la web"
           />
-          <label
-            className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
-              ${
-                config.eslogan
-                  ? "-translate-y-6 scale-90 text-gray-700"
-                  : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
-              }
-              peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
-          >
+          <label className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
+            config.eslogan ? "-translate-y-6 scale-90 text-gray-700" : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+          } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}>
             Eslogan de la web
           </label>
         </div>
 
-        {/* Escoger fuente */}
+        {/* Fuentes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Escoger fuente
-          </label>
-
+          <label className="block text-sm font-medium text-gray-700 mb-2">Escoger fuente</label>
           <div className="flex flex-col gap-4">
-            {/* Fuente Botones */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 w-24">Botones</span>
-              <select
-                name="fuenteBotones"
-                value={config.fuenteBotones}
-                onChange={handleChange}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-              >
-                <option value="montserrat" className="font-montserrat">Montserrat</option>
-                <option value="poppins" className="font-poppins">Poppins</option>
-                <option value="raleway" className="font-raleway">Raleway</option>
-                <option value="playfair" className="font-playfair">Playfair Display</option>
-                <option value="bebas" className="font-bebas">Bebas Neue</option>
+              <select name="fuenteBotones" value={config.fuenteBotones} onChange={handleChange} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
+                <option value="montserrat">Montserrat</option>
+                <option value="poppins">Poppins</option>
+                <option value="raleway">Raleway</option>
+                <option value="playfair">Playfair Display</option>
+                <option value="bebas">Bebas Neue</option>
               </select>
             </div>
 
-            {/* Fuente Texto */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 w-24">Texto</span>
-              <select
-                name="fuenteTexto"
-                value={config.fuenteTexto}
-                onChange={handleChange}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-              >
-                <option value="montserrat" className="font-montserrat">Montserrat</option>
-                <option value="poppins" className="font-poppins">Poppins</option>
-                <option value="raleway" className="font-raleway">Raleway</option>
-                <option value="playfair" className="font-playfair">Playfair Display</option>
-                <option value="bebas" className="font-bebas">Bebas Neue</option>
+              <select name="fuenteTexto" value={config.fuenteTexto} onChange={handleChange} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
+                <option value="montserrat">Montserrat</option>
+                <option value="poppins">Poppins</option>
+                <option value="raleway">Raleway</option>
+                <option value="playfair">Playfair Display</option>
+                <option value="bebas">Bebas Neue</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Color hover */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Color del hover
-          </label>
-          <button
-            type="button"
-            onClick={() => setMostrarPaleta(!mostrarPaleta)}
-            className="flex items-center justify-center w-full px-4 py-2 rounded-xl shadow-sm text-white font-medium transition-transform hover:scale-105"
-            style={{ backgroundColor: config.hoverColor }}
-          >
-            {mostrarPaleta ? "Selecciona un color" : "Cambiar color"}
-          </button>
+        {/* Imágenes del banner */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-3">
+    Imágenes del banner
+  </label>
 
-          {mostrarPaleta && (
-            <div className="grid grid-cols-5 gap-3 mt-3">
-              {COLORES.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => {
-                    setConfig((prev: any) => ({
-                      ...prev,
-                      hoverColor: color,
-                    }));
-                    setMostrarPaleta(false);
-                  }}
-                  className="w-10 h-10 rounded-full border-2 border-gray-200 hover:scale-110 transition-transform"
-                  style={{ backgroundColor: color }}
+  {/* Toggle */}
+  <div className="flex items-center gap-3 mb-4">
+    <span className="text-sm font-medium text-gray-600">
+      {config.modoImagenes === "defecto" ? "Defecto" : "Personalizado"}
+    </span>
+    <label className="relative inline-block w-[3.5em] h-[2em]">
+      <input
+        type="checkbox"
+        checked={config.modoImagenes === "automatico"}
+        onChange={(e) =>
+          setConfig((prev: any) => ({
+            ...prev,
+            modoImagenes: e.target.checked ? "automatico" : "defecto",
+          }))
+        }
+        className="opacity-0 w-0 h-0 peer"
+      />
+      <span
+        className="
+          absolute cursor-pointer top-0 left-0 right-0 bottom-0
+          bg-white border border-gray-400 rounded-[30px]
+          transition-colors duration-300
+          peer-checked:bg-blue-500 peer-checked:border-blue-500
+          after:content-[''] after:absolute after:h-[1.4em] after:w-[1.4em]
+          after:rounded-full after:left-[0.27em] after:bottom-[0.25em]
+          after:bg-gray-400 after:transition-transform after:duration-300
+          peer-checked:after:translate-x-[1.4em] peer-checked:after:bg-white
+        "
+      ></span>
+    </label>
+  </div>
+
+  {/* Render según el modo */}
+  {config.modoImagenes === "defecto" ? (
+    <div className="flex gap-3">
+      <img src="/img/1.jpeg" className="w-20 h-20 object-cover rounded-lg" />
+      <img src="/img/2.jpg" className="w-20 h-20 object-cover rounded-lg" />
+      <img src="/img/3.jpg" className="w-20 h-20 object-cover rounded-lg" />
+    </div>
+  ) : (
+    <div>
+      <div className="flex gap-3 mt-3 flex-wrap">
+        {Array.from({ length: 4 }).map((_, i) => {
+          const img = config.bannerImages?.[i]; // revisamos si existe imagen en ese índice
+
+          if (img) {
+            const src = typeof img === "string" ? img : img.url;
+            return (
+              <div key={i} className="relative w-20 h-20">
+                {/* Imagen circular */}
+                <img
+                  src={src}
+                  alt={`banner-${i}`}
+                  className="w-full h-full object-cover rounded-full border border-gray-300"
                 />
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Plantilla */}
-        <div className="relative">
-          <select
-            name="plantilla"
-            value={config.plantilla}
-            onChange={handleChange}
-            required
-            className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-md 
-             focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
-          >
-            <option value="" disabled hidden></option>
-            <option value="barberia">Barbería</option>
-            <option value="estilo1">Estilo 1</option>
-            <option value="estilo2">Estilo 2</option>
-            <option value="estilo3">Estilo 3</option>
-          </select>
-          <label
-            className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all
-            ${
-              config.plantilla
-                ? "-translate-y-6 scale-90 text-gray-700"
-                : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
-            }
-            peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
-          >
-            Plantilla
-          </label>
-        </div>
+                {/* Botón eliminar afuera */}
+                <button
+                  type="button"
+                  onClick={() => eliminarImagen(i)}
+                  className="absolute -top-2 -right-2 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow z-10 border"
+                >
+                  <span className="text-red-600 font-bold text-sm">✕</span>
+                </button>
+              </div>
+            );
+          }
+
+          // Si no hay imagen → renderiza círculo con "+"
+          return (
+            <label
+              key={i}
+              className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-full text-gray-400 cursor-pointer hover:bg-gray-50"
+            >
+              <span className="text-lg">+</span>
+              <span className="text-xs">Añadir</span>
+              <input
+  type="file"
+  accept="image/*"
+  className="hidden"
+  onChange={(e) => handleBannerChange(e, i)}
+/>
+
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  )}
+</div>
+{/* Ubicación */}
+<div className="space-y-3">
+  {/* Input manual */}
+  <div className="relative">
+    <input
+      name="ubicacion"
+      value={config.ubicacion?.direccion || ""}
+      onChange={(e) =>
+        setConfig((prev: any) => ({
+          ...prev,
+          ubicacion: { ...prev.ubicacion, direccion: e.target.value },
+        }))
+      }
+      className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
+                 focus:outline-none focus:ring-2 focus:ring-pink-500 
+                 placeholder-transparent"
+      placeholder="Ubicación del negocio"
+    />
+    <label
+      className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
+        config.ubicacion?.direccion
+          ? "-translate-y-6 scale-90 text-gray-700"
+          : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+      } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
+    >
+      Ubicación del negocio
+    </label>
+  </div>
+
+  {/* Botón para usar ubicación actual */}
+  <button
+    type="button"
+    onClick={() => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            setConfig((prev: any) => ({
+              ...prev,
+              ubicacion: {
+                ...prev.ubicacion,
+                lat: latitude,
+                lng: longitude,
+                direccion: `Lat: ${latitude}, Lng: ${longitude}`, // luego lo convertimos a dirección real
+              },
+            }));
+            setMensaje("📍 Ubicación actual detectada, recuerda guardar los cambios.");
+          },
+          (error) => {
+            console.error(error);
+            setMensaje("❌ No se pudo obtener tu ubicación.");
+          }
+        );
+      } else {
+        setMensaje("⚠️ Tu navegador no soporta geolocalización.");
+      }
+    }}
+    className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
+  >
+    Usar mi ubicación actual
+  </button>
+</div>
 
         {/* Botones */}
         <div className="flex items-center gap-4 mt-4">
-          <button
-            type="submit"
-            disabled={estado === "guardando"}
-            className="bg-pink-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 shadow"
-          >
+          <button type="submit" disabled={estado === "guardando"} className="bg-pink-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 shadow">
             {estado === "guardando" ? "Guardando..." : "Guardar cambios"}
           </button>
-
           {config?.plantilla && config?.slug && (
-            <a
-              href={`/${config.plantilla}/${config.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-pink-600 text-white px-6 py-2 rounded-lg shadow hover:bg-pink-700 transition"
-            >
+            <a href={`/${config.plantilla}/${config.slug}`} target="_blank" rel="noopener noreferrer"
+              className="bg-pink-600 text-white px-6 py-2 rounded-lg shadow hover:bg-pink-700 transition">
               Visitar web
             </a>
           )}

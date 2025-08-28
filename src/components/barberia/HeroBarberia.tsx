@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { fuentesMap } from "../../lib/fonts"; // ✅ Importar mapa de fuentes
+import { fuentesMap } from "../../lib/fonts";
+
+type BannerImage = string | { url: string; deleteUrl?: string };
 
 type Props = {
-  images: string[];
+  images?: BannerImage[]; // 👈 ahora acepta string o {url, deleteUrl}
   nombre: string;
-  eslogan?: string; // 👈 añadimos eslogan
+  eslogan?: string;
   fuenteLogo?: string;
   fuenteTexto?: string;
   fuenteBotones?: string;
 };
 
 export default function HeroBarberia({
-  images,
+  images = [],
   nombre,
-  eslogan = "Cortes modernos, clásicos y a tu medida", // 👈 valor por defecto
+  eslogan = "Cortes modernos, clásicos y a tu medida",
   fuenteLogo = "montserrat",
   fuenteTexto = "raleway",
   fuenteBotones = "poppins",
@@ -21,23 +23,38 @@ export default function HeroBarberia({
   const [current, setCurrent] = useState(0);
   const [zoom, setZoom] = useState(false);
 
+  // 👇 Normalizamos: si viene string usamos directo, si viene objeto usamos .url
+  const imagenes =
+  images && images.length > 0
+    ? images
+        .filter((img) => img !== null) // 👈 quitamos los nulos
+        .map((img) =>
+          typeof img === "string"
+            ? img
+            : (img as { url: string }).url
+        )
+    : ["/default1.jpg", "/default2.jpg", "/default3.jpg"];
+
+
+  // Efecto inicial de zoom
   useEffect(() => {
     const timer = setTimeout(() => setZoom(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
+  // Cambio de imagen cada 6s
   useEffect(() => {
     const interval = setInterval(() => {
       setZoom(false);
-      setCurrent((prev) => (prev + 1) % images.length);
+      setCurrent((prev) => (prev + 1) % imagenes.length);
       setTimeout(() => setZoom(true), 100);
     }, 6000);
     return () => clearInterval(interval);
-  }, [images.length]);
+  }, [imagenes.length]);
 
   return (
     <section className="relative w-full h-[80vh] overflow-hidden">
-      {images.map((img, i) => (
+      {imagenes.map((img, i) => (
         <div
           key={i}
           className={`absolute top-0 left-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
