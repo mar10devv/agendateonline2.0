@@ -1,12 +1,14 @@
 // src/lib/gsapAnimations.ts
 import gsap from "gsap";
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-// ✅ Solo registrar plugins en el cliente
-if (typeof window !== "undefined") {
-  gsap.registerPlugin(MotionPathPlugin, ScrollTrigger);
-}
+// 👉 Llamar a esto una sola vez desde tus componentes con useEffect
+export const registerGsapPlugins = async () => {
+  if (typeof window !== "undefined") {
+    const { MotionPathPlugin } = await import("gsap/MotionPathPlugin");
+    const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+    gsap.registerPlugin(MotionPathPlugin, ScrollTrigger);
+  }
+};
 
 
 /* ===============================
