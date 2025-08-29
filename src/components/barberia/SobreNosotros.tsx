@@ -1,7 +1,7 @@
 // src/components/barberia/SobreNosotros.tsx
 import React, { useEffect } from "react";
 import { fuentesMap } from "../../lib/fonts";
-import { animateSobreNosotrosImages } from "../../lib/gsapAnimations";
+import { registerGsapPlugins, animateSobreNosotrosImages } from "../../lib/gsapAnimations";
 
 type Props = {
   fuenteTexto?: string;
@@ -13,7 +13,11 @@ export default function SobreNosotros({
   fuenteBotones = "poppins",
 }: Props) {
   useEffect(() => {
-    animateSobreNosotrosImages();
+    const initAnimations = async () => {
+      await registerGsapPlugins(); // 👈 registrar plugins primero
+      animateSobreNosotrosImages(); // 👈 luego correr animación
+    };
+    initAnimations();
   }, []);
 
   return (

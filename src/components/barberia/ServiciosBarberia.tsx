@@ -2,7 +2,7 @@
 import React, { useEffect } from "react";
 import { Scissors, User, Sparkles, Droplets, Package, Baby } from "lucide-react";
 import { fuentesMap } from "../../lib/fonts";
-import { animateCardsCascadeOnScroll } from "../../lib/gsapAnimations";
+import { registerGsapPlugins, animateCardsCascadeOnScroll } from "../../lib/gsapAnimations";
 
 type Props = {
   fuenteTexto?: string;
@@ -53,7 +53,11 @@ export default function ServiciosBarberia({
   fuenteBotones = "poppins",
 }: Props) {
   useEffect(() => {
-    animateCardsCascadeOnScroll(".servicio-card");
+    const initAnimations = async () => {
+      await registerGsapPlugins(); // 👈 registrar primero
+      animateCardsCascadeOnScroll(".servicio-card"); // 👈 luego correr animación
+    };
+    initAnimations();
   }, []);
 
   return (
