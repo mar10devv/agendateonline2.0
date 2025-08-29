@@ -3,15 +3,14 @@ export const prerender = false;
 
 import BarberiaLayout from "../../layouts/BarberiaLayout.astro";
 import NavbarBarberia from "../../components/barberia/NavbarBarberia";
+import HeroBarberia from "../../components/barberia/HeroBarberia";
 import ServiciosBarberia from "../../components/barberia/ServiciosBarberia";
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { fuentesMap, fuentesStyle } from "../../lib/fonts";
 
-// 📌 Obtenemos el slug desde la URL
 const { slug } = Astro.params;
 
-// 📌 Buscamos el negocio en Firestore (colección Negocios)
 let negocio = null;
 const q = query(collection(db, "Negocios"), where("slug", "==", slug));
 const snap = await getDocs(q);
@@ -20,22 +19,18 @@ if (!snap.empty) {
   negocio = snap.docs[0].data();
 }
 
-// 📌 Variables dinámicas
 const hoverColor = negocio?.hoverColor || "#3b82f6";
 const fuenteLogo = negocio?.fuenteLogo || "montserrat";
 const fuenteBotones = negocio?.fuenteBotones || "poppins";
 const fuenteTexto = negocio?.fuenteTexto || "raleway";
 
-// 📌 Modo imágenes desde Firestore
 const modoImagenes = negocio?.modoImagenes || "defecto";
 
-// ✅ Usar imágenes según el modo
 const heroImages =
   modoImagenes === "personalizado" && negocio?.bannerImages?.length
     ? negocio.bannerImages
     : ["/img/1.jpeg", "/img/2.jpg", "/img/3.jpg"];
 
-// 🎨 Estilos dinámicos
 const css = `
   :root {
     --hoverColor: ${hoverColor};
@@ -59,18 +54,7 @@ const css = `
 {!negocio ? (
   <h1 class="text-center text-2xl mt-10">❌ Este negocio no existe.</h1>
 ) : (
-  <BarberiaLayout
-    title={negocio.nombre}
-    hoverColor={hoverColor}
-    logoUrl={negocio.usarLogo ? negocio.logoUrl : null}
-    heroImages={heroImages}
-    modoImagenes={modoImagenes}
-    nombre={negocio.nombre}
-    eslogan={negocio.eslogan}
-    fuenteLogo={fuenteLogo}
-    fuenteTexto={fuenteTexto}
-    fuenteBotones={fuenteBotones}
-  >
+  <BarberiaLayout title={negocio.nombre}>
     <!-- 🎨 Inyectar estilos dinámicos -->
     <style is:global>{css}</style>
 
@@ -83,6 +67,18 @@ const css = `
       fuenteTexto={fuenteTexto}
       fuenteBotones={fuenteBotones}
       client:load
+    />
+
+    <!-- ✅ Hero -->
+    <HeroBarberia
+      client:load
+      images={heroImages}
+      modoImagenes={modoImagenes}
+      nombre={negocio.nombre}
+      eslogan={negocio.eslogan}
+      fuenteLogo={fuenteLogo}
+      fuenteTexto={fuenteTexto}
+      fuenteBotones={fuenteBotones}
     />
 
     <!-- ✅ Sección botones -->
