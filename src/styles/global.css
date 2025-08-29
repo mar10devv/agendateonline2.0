@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;800&family=Poppins:wght@400;600&family=Raleway:wght@400;700&family=Playfair+Display:wght@400;700&display=swap');
+/* ✅ Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;800&family=Poppins:wght@400;600&family=Raleway:wght@400;700&family=Playfair+Display:wght@400;700&family=Engagement&family=Style+Script&family=Euphoria+Script&display=swap');
+
+/* ✅ Leaflet */
 @import "leaflet/dist/leaflet.css";
 
 @tailwind base;
@@ -6,11 +9,14 @@
 @tailwind utilities;
 
 /* ✅ Clases para fuentes dinámicas */
-.font-montserrat { font-family: 'Montserrat', sans-serif; }
-.font-poppins    { font-family: 'Poppins', sans-serif; }
-.font-raleway    { font-family: 'Raleway', sans-serif; }
-.font-playfair   { font-family: 'Playfair Display', serif; }
-.font-bebas      { font-family: 'Bebas Neue', sans-serif; }
+.font-montserrat   { font-family: 'Montserrat', sans-serif; }
+.font-poppins      { font-family: 'Poppins', sans-serif; }
+.font-raleway      { font-family: 'Raleway', sans-serif; }
+.font-playfair     { font-family: 'Playfair Display', serif; }
+.font-bebas        { font-family: 'Bebas Neue', sans-serif; }
+.font-engagement   { font-family: 'Engagement', cursive; }
+.font-style-script { font-family: 'Style Script', cursive; }
+.font-euphoria     { font-family: 'Euphoria Script', cursive; }
 
 /* ================= Animaciones personalizadas ================= */
 @keyframes slideIn {

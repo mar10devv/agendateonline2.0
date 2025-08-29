@@ -1,6 +1,7 @@
 // src/components/barberia/SobreNosotros.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { fuentesMap } from "../../lib/fonts";
+import { animateSobreNosotrosImages } from "../../lib/gsapAnimations";
 
 type Props = {
   fuenteTexto?: string;
@@ -11,6 +12,10 @@ export default function SobreNosotros({
   fuenteTexto = "raleway",
   fuenteBotones = "poppins",
 }: Props) {
+  useEffect(() => {
+    animateSobreNosotrosImages();
+  }, []);
+
   return (
     <section className="py-20 px-6 md:px-12 lg:px-24 bg-white">
       <div className="grid md:grid-cols-2 gap-12 items-start">
@@ -19,17 +24,17 @@ export default function SobreNosotros({
           <img
             src="/img/barberia5.jpg"
             alt="Barbería 1"
-            className="w-full h-60 object-cover rounded-lg shadow-md"
+            className="sobre-nosotros-img w-full h-60 object-cover rounded-lg shadow-md"
           />
           <img
             src="/img/barberia6.jpg"
             alt="Barbería 2"
-            className="w-full h-60 object-cover rounded-lg shadow-md"
+            className="sobre-nosotros-img w-full h-60 object-cover rounded-lg shadow-md"
           />
           <img
             src="/img/barberia8.jpg"
             alt="Barbería 3"
-            className="col-span-2 w-full h-72 object-cover rounded-lg shadow-md"
+            className="sobre-nosotros-img col-span-2 w-full h-72 object-cover rounded-lg shadow-md"
           />
         </div>
 

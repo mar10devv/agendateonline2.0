@@ -63,8 +63,8 @@ export default function NavbarBarberia({
           {logoUrl && logoUrl.trim() !== "" ? (
             <img src={logoUrl} alt={title} className="h-10 w-10 object-contain" />
           ) : (
-            <span className="font-bebas tracking-wide text-3xl sm:text-4xl lg:text-5xl">
-              {title.toUpperCase()}
+           <span className="font-euphoria tracking-wide text-3xl sm:text-4xl lg:text-5xl">
+              {title}
             </span>
           )}
         </div>

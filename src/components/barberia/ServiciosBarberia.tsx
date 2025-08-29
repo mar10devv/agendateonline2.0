@@ -1,8 +1,8 @@
 // src/components/barberia/ServiciosBarberia.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { Scissors, User, Sparkles, Droplets, Package, Baby } from "lucide-react";
 import { fuentesMap } from "../../lib/fonts";
-
+import { animateCardsCascadeOnScroll } from "../../lib/gsapAnimations";
 
 type Props = {
   fuenteTexto?: string;
@@ -17,32 +17,32 @@ type Servicio = {
 
 const servicios: Servicio[] = [
   {
-    icon: <Scissors className="w-8 h-8 text-black" />,
+    icon: <Scissors className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Corte de Cabello",
     descripcion: "Desde estilos tradicionales hasta los más modernos.",
   },
   {
-    icon: <User className="w-8 h-8 text-black" />,
+    icon: <User className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Arreglo de Barba",
     descripcion: "Perfeccioná tu look con un perfilado profesional.",
   },
   {
-    icon: <Sparkles className="w-8 h-8 text-black" />,
+    icon: <Sparkles className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Afeitado Clásico",
     descripcion: "Una experiencia tradicional para un afeitado suave.",
   },
   {
-    icon: <Droplets className="w-8 h-8 text-black" />,
+    icon: <Droplets className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Tratamientos Capilares",
     descripcion: "Fortalecé y revitalizá tu cabello.",
   },
   {
-    icon: <Package className="w-8 h-8 text-black" />,
+    icon: <Package className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Paquetes Completos",
     descripcion: "Incluyen corte, barba y tratamiento.",
   },
   {
-    icon: <Baby className="w-8 h-8 text-black" />,
+    icon: <Baby className="w-8 h-8 text-black servicio-icon" />,
     titulo: "Corte Infantil",
     descripcion: "Para los pequeños.",
   },
@@ -52,6 +52,10 @@ export default function ServiciosBarberia({
   fuenteTexto = "raleway",
   fuenteBotones = "poppins",
 }: Props) {
+  useEffect(() => {
+    animateCardsCascadeOnScroll(".servicio-card");
+  }, []);
+
   return (
     <section id="servicios" className="mt-8 py-12 px-6 md:px-12 lg:px-24 bg-white">
       {/* Encabezado alineado a la izquierda */}
@@ -74,9 +78,9 @@ export default function ServiciosBarberia({
         {servicios.map((s, i) => (
           <div
             key={i}
-            className="bg-white border border-gray-100 shadow-md rounded-xl 
-                       p-8 text-center cursor-pointer
-                       transform transition duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-xl"
+  className="servicio-card bg-white border border-gray-100 shadow-md rounded-xl 
+             p-8 text-center cursor-pointer
+             transform transition duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-xl"
           >
             <div className="flex justify-center mb-4">
               <div className="border-2 border-black rounded-lg p-4 flex items-center justify-center">
