@@ -5,6 +5,11 @@ import BarberiaLayout from "../../layouts/BarberiaLayout.astro";
 import NavbarBarberia from "../../components/barberia/NavbarBarberia";
 import HeroBarberia from "../../components/barberia/HeroBarberia";
 import ServiciosBarberia from "../../components/barberia/ServiciosBarberia";
+import SobreNosotros from "../../components/barberia/SobreNosotros";
+import Resenas from "../../components/barberia/Resenas";
+import FooterBarberia from "../../components/barberia/FooterBarberia"
+
+
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { fuentesMap, fuentesStyle } from "../../lib/fonts";
@@ -80,41 +85,39 @@ const css = `
       fuenteTexto={fuenteTexto}
       fuenteBotones={fuenteBotones}
     />
-
-    <!-- ✅ Sección botones -->
-    <section class="negocio space-y-6 mt-6 p-6 border rounded bg-white shadow-sm">
-      <a
-        href="#servicios"
-        class={`inline-block px-4 py-2 border rounded font-medium ${fuentesMap[fuenteBotones]}`}
-      >
-        Ver servicios
-      </a>
-      <button
-        class={`px-4 py-2 border rounded font-medium ${fuentesMap[fuenteBotones]}`}
-      >
-        Reservar turno
-      </button>
-    </section>
-
-    <!-- ✅ Sección promo -->
-    <section class="negocio mt-8 grid md:grid-cols-2 gap-4">
-      <div class="border p-4 rounded shadow-sm hover:shadow-md">
-        <h3 class={`font-bold mb-2 ${fuentesMap[fuenteTexto]}`}>🔥 Promo destacada</h3>
-        <p class={`${fuentesMap[fuenteTexto]}`}>
-          {negocio.promo || "Primera visita con 20% de descuento"}
-        </p>
-      </div>
-      <div class="border p-4 rounded shadow-sm hover:shadow-md">
-        <h3 class={`font-bold mb-2 ${fuentesMap[fuenteTexto]}`}>⭐ Servicios más populares</h3>
-        <p class={`${fuentesMap[fuenteTexto]}`}>
-          Corte + barba, Tinte, Peinados
-        </p>
-      </div>
-    </section>
-
     <!-- 🚀 Nueva sección Servicios -->
-    <div id="servicios" class="mt-16">
-      <ServiciosBarberia />
-    </div>
+<div id="servicios">
+  <ServiciosBarberia 
+    fuenteTexto={fuenteTexto} 
+    fuenteBotones={fuenteBotones} 
+    client:load 
+  />
+</div>
+
+<!-- 🚀 Nueva sección Sobre Nosotros -->
+<div id="sobre-nosotros" class="mt-20">
+  <SobreNosotros 
+    fuenteTexto={fuenteTexto} 
+    fuenteBotones={fuenteBotones}
+    client:load 
+  />
+</div>
+
+<!-- ✅ Sección Reseñas -->
+<div id="reseñas" class="mt-20">
+  <Resenas 
+    fuenteTexto={fuenteTexto} 
+    fuenteBotones={fuenteBotones}
+    client:load 
+  />
+</div>
+
+<!-- ✅ Footer -->
+<FooterBarberia 
+  fuenteTexto={fuenteTexto} 
+  fuenteBotones={fuenteBotones}
+  client:load 
+/>
+
   </BarberiaLayout>
 )}

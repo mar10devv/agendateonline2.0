@@ -15,7 +15,8 @@
     "gsap": "^3.13.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.540.0",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "swiper": "^11.2.10"
   },
   "devDependencies": {
     "@astrojs/netlify": "^6.5.7",
