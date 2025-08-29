@@ -3,6 +3,7 @@ export const prerender = false;
 
 import BarberiaLayout from "../../layouts/BarberiaLayout.astro";
 import NavbarBarberia from "../../components/barberia/NavbarBarberia";
+import ServiciosBarberia from "../../components/barberia/ServiciosBarberia";
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { fuentesMap, fuentesStyle } from "../../lib/fonts";
@@ -84,7 +85,7 @@ const css = `
       client:load
     />
 
-    <!-- ✅ Ejemplo de secciones -->
+    <!-- ✅ Sección botones -->
     <section class="negocio space-y-6 mt-6 p-6 border rounded bg-white shadow-sm">
       <a
         href="#servicios"
@@ -99,6 +100,7 @@ const css = `
       </button>
     </section>
 
+    <!-- ✅ Sección promo -->
     <section class="negocio mt-8 grid md:grid-cols-2 gap-4">
       <div class="border p-4 rounded shadow-sm hover:shadow-md">
         <h3 class={`font-bold mb-2 ${fuentesMap[fuenteTexto]}`}>🔥 Promo destacada</h3>
@@ -113,5 +115,10 @@ const css = `
         </p>
       </div>
     </section>
+
+    <!-- 🚀 Nueva sección Servicios -->
+    <div id="servicios" class="mt-16">
+      <ServiciosBarberia />
+    </div>
   </BarberiaLayout>
 )}

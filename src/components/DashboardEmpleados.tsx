@@ -4,6 +4,26 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { guardarConfigNegocio, obtenerConfigNegocio } from "../lib/firestore";
 
+// 🚀 Subida a ImgBB
+const subirImagenImgBB = async (file: File): Promise<{ url: string; deleteUrl: string } | null> => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+  if (data?.data?.display_url && data?.data?.delete_url) {
+    return {
+      url: data.data.display_url,
+      deleteUrl: data.data.delete_url,
+    };
+  }
+  return null;
+};
+
 export default function DashboardEmpleados() {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
@@ -28,7 +48,11 @@ export default function DashboardEmpleados() {
           const negocioConfig = await obtenerConfigNegocio(usuario.uid);
           if (negocioConfig) {
             setUser(usuario);
-            setConfig(negocioConfig);
+            setConfig({
+              ...negocioConfig,
+              empleados: negocioConfig.empleados || 1,
+              maxEmpleados: (negocioConfig as any).maxEmpleados || 1,
+            });
             setEstado("listo");
           }
         } else {
@@ -52,11 +76,7 @@ export default function DashboardEmpleados() {
 
   const handleFotoPerfil = (index: number, file: File | null) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleChangeEmpleado(index, "fotoPerfil", reader.result);
-    };
-    reader.readAsDataURL(file);
+    handleChangeEmpleado(index, "fotoPerfil", file); // ✅ guardamos File directo
   };
 
   const handleFotoTrabajo = (indexEmpleado: number, slot: number, file: File | null) => {
@@ -74,8 +94,35 @@ export default function DashboardEmpleados() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setEstado("guardando");
-    const ok = await guardarConfigNegocio(user.uid, config);
+
+    // 🔄 Procesar empleados
+    const empleadosConImg = await Promise.all(
+      config.empleadosData.map(async (empleado: any) => {
+        let fotoPerfil = empleado.fotoPerfil;
+
+        // Si es un File, lo subimos
+        if (fotoPerfil instanceof File) {
+          const subida = await subirImagenImgBB(fotoPerfil);
+          if (subida) {
+            fotoPerfil = subida.url;
+          }
+        }
+
+        return {
+          ...empleado,
+          fotoPerfil,
+        };
+      })
+    );
+
+    const nuevaConfig = {
+      ...config,
+      empleadosData: empleadosConImg,
+    };
+
+    const ok = await guardarConfigNegocio(user.uid, nuevaConfig);
     setMensaje(ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar.");
     setEstado("listo");
   };
@@ -97,8 +144,8 @@ export default function DashboardEmpleados() {
   if (!config) return null;
 
   return (
-    <div className="w-full p-6 md:p-10">
-      <div className="w-full bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div className="w-full p-6 md:p-10 flex justify-center">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
         {/* Encabezado */}
         <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white flex items-center justify-between">
           <h1 className="text-xl md:text-2xl font-bold">Panel de empleados</h1>
@@ -134,7 +181,7 @@ export default function DashboardEmpleados() {
               }}
               className="w-32 px-4 py-2 bg-gray-100 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-600"
             >
-              {[...Array(10)].map((_, i) => (
+              {Array.from({ length: config.maxEmpleados || 1 }).map((_, i) => (
                 <option key={i + 1} value={i + 1}>
                   {i + 1}
                 </option>
@@ -163,7 +210,11 @@ export default function DashboardEmpleados() {
                     className="w-24 h-24 rounded-full bg-white border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                   >
                     {empleado.fotoPerfil ? (
-                      <img src={empleado.fotoPerfil} alt="" className="object-cover w-full h-full" />
+                      typeof empleado.fotoPerfil === "string" ? (
+                        <img src={empleado.fotoPerfil} alt="" className="object-cover w-full h-full" />
+                      ) : (
+                        <img src={URL.createObjectURL(empleado.fotoPerfil)} alt="" className="object-cover w-full h-full" />
+                      )
                     ) : (
                       <>
                         <span className="text-xl text-gray-500">+</span>
@@ -196,7 +247,8 @@ export default function DashboardEmpleados() {
                 {/* Trabajos (6 slots circulares) */}
                 <div className="w-full">
                   <p className="text-sm text-gray-600 mb-2">Fotos de trabajos (máx. 6)</p>
-                  <div className="flex flex-wrap gap-3 justify-center">
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 justify-items-center">
                     {Array.from({ length: 6 }).map((_, i) => {
                       const img = empleado.trabajos?.[i] || "";
                       return (
