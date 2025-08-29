@@ -76,17 +76,35 @@ export default function DashboardEmpleados() {
 
   const handleFotoPerfil = (index: number, file: File | null) => {
     if (!file) return;
-    handleChangeEmpleado(index, "fotoPerfil", file); // ✅ guardamos File directo
+    const nuevo = [...config.empleadosData];
+    nuevo[index].subiendoPerfil = true; // ✅ loader activo
+    nuevo[index].fotoPerfil = file;
+    setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
+
+    const img = new Image();
+    img.onload = () => {
+      const actualizado = [...config.empleadosData];
+      actualizado[index].subiendoPerfil = false; // ✅ loader desactivado
+      setConfig((prev: any) => ({ ...prev, empleadosData: actualizado }));
+    };
+    img.src = URL.createObjectURL(file);
   };
 
   const handleFotoTrabajo = (indexEmpleado: number, slot: number, file: File | null) => {
     if (!file) return;
+    const nuevo = [...config.empleadosData];
+    if (!nuevo[indexEmpleado].subiendoTrabajo) {
+      nuevo[indexEmpleado].subiendoTrabajo = Array(6).fill(false);
+    }
+    nuevo[indexEmpleado].subiendoTrabajo[slot] = true;
+    setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      const nuevo = [...config.empleadosData];
       const arr = Array.from({ length: 6 }, (_, i) => nuevo[indexEmpleado]?.trabajos?.[i] || "");
       arr[slot] = reader.result as string;
       nuevo[indexEmpleado].trabajos = arr;
+      nuevo[indexEmpleado].subiendoTrabajo[slot] = false; // ✅ loader desactivado
       setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
     };
     reader.readAsDataURL(file);
@@ -130,12 +148,7 @@ export default function DashboardEmpleados() {
   if (estado === "cargando")
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-        <div className="loader">
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-          <div className="circle"></div>
-        </div>
+        <div className="w-10 h-10 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
         <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
       </div>
     );
@@ -209,7 +222,9 @@ export default function DashboardEmpleados() {
                     htmlFor={`fotoPerfil-${index}`}
                     className="w-24 h-24 rounded-full bg-white border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                   >
-                    {empleado.fotoPerfil ? (
+                    {empleado.subiendoPerfil ? (
+                      <div className="w-10 h-10 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
+                    ) : empleado.fotoPerfil ? (
                       typeof empleado.fotoPerfil === "string" ? (
                         <img src={empleado.fotoPerfil} alt="" className="object-cover w-full h-full" />
                       ) : (
@@ -264,7 +279,9 @@ export default function DashboardEmpleados() {
                             htmlFor={`trabajo-${index}-${i}`}
                             className="w-16 h-16 rounded-full bg-white border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                           >
-                            {img ? (
+                            {empleado.subiendoTrabajo?.[i] ? (
+                              <div className="w-8 h-8 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
+                            ) : img ? (
                               <img src={img} alt="" className="object-cover w-full h-full" />
                             ) : (
                               <span className="text-lg text-gray-400">+</span>

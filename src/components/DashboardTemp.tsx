@@ -11,6 +11,7 @@ import PersonalIcon from "../assets/personal-svg.svg?url";
 import PlantillaIcon from "../assets/plantilla-svg.svg?url";
 import EstadisticasIcon from "../assets/estadisticas-svg.svg?url";
 import SoporteIcon from "../assets/soporte-tecnico-svg.svg?url";
+import MejorarPlan from "../assets/rayo-svg.svg?url";
 
 // 🔨 función para crear slug a partir del nombre
 function generarSlug(nombre: string) {
@@ -191,7 +192,8 @@ useEffect(() => {
               href="#"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
-              Ejemplo 3
+              <img src={MejorarPlan} alt="Estadísticas" className="w-12 h-12 mb-3" />
+              Mejorar Plan
             </a>
           </div>
         </div>
