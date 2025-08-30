@@ -21,7 +21,7 @@ export default function SobreNosotros({
   }, []);
 
   return (
-    <section className="py-20 px-6 md:px-12 lg:px-24 bg-white">
+    <section className="px-6 md:px-12 lg:px-24 bg-white">
       <div className="grid md:grid-cols-2 gap-12 items-start">
         {/* Columna izquierda - galería de imágenes */}
         <div className="grid grid-cols-2 gap-4">
