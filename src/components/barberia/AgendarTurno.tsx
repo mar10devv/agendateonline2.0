@@ -84,9 +84,25 @@ export default function AgendarTurno({
       {/* Slideshow con thumbnails */}
       {barberoSeleccionado && (
         <div className="mt-12 flex flex-col items-center">
-          <h2 className="text-2xl font-bold mb-6">
-            Trabajos de {barberoSeleccionado.nombre}
-          </h2>
+          {/* Encabezado tipo panel en negro */}
+<div className="w-full max-w-3xl flex items-center justify-between bg-black text-white px-6 py-3 rounded-t-xl shadow mb-6">
+  <h2 className="text-lg md:text-xl font-bold">
+    Trabajos de {barberoSeleccionado.nombre}
+  </h2>
+  <button
+  onClick={() => {
+    setBarberoSeleccionado(null);
+    setThumbsSwiper(null); // 👈 resetear el swiper de thumbnails
+  }}
+  className="flex items-center gap-1 bg-white text-black px-3 py-1 rounded-lg shadow hover:bg-gray-100 transition"
+>
+  <span>←</span>
+  <span className="text-sm font-medium">Volver</span>
+</button>
+
+</div>
+
+
 
           {trabajosValidos.length > 0 ? (
             <>
