@@ -8,6 +8,7 @@ import ServiciosBarberia from "../../components/barberia/ServiciosBarberia";
 import SobreNosotros from "../../components/barberia/SobreNosotros";
 import Resenas from "../../components/barberia/Resenas";
 import FooterBarberia from "../../components/barberia/FooterBarberia"
+import AgendarTurno from "../../components/barberia/AgendarTurno"
 
 
 import { db } from "../../lib/firebase";
@@ -97,6 +98,16 @@ const css = `
 <!-- 🚀 Nueva sección Sobre Nosotros -->
 <div id="sobre-nosotros" class="mt-20">
   <SobreNosotros 
+    fuenteTexto={fuenteTexto} 
+    fuenteBotones={fuenteBotones}
+    client:load 
+  />
+</div>
+
+<!-- 🚀 Nueva sección Agendar Turno -->
+<div id="agendar-turno" class="mt-20">
+  <AgendarTurno 
+    empleados={negocio.empleadosData || []}
     fuenteTexto={fuenteTexto} 
     fuenteBotones={fuenteBotones}
     client:load 

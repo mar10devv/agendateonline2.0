@@ -77,14 +77,14 @@ export default function DashboardEmpleados() {
   const handleFotoPerfil = (index: number, file: File | null) => {
     if (!file) return;
     const nuevo = [...config.empleadosData];
-    nuevo[index].subiendoPerfil = true; // ✅ loader activo
+    nuevo[index].subiendoPerfil = true;
     nuevo[index].fotoPerfil = file;
     setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
 
     const img = new Image();
     img.onload = () => {
       const actualizado = [...config.empleadosData];
-      actualizado[index].subiendoPerfil = false; // ✅ loader desactivado
+      actualizado[index].subiendoPerfil = false;
       setConfig((prev: any) => ({ ...prev, empleadosData: actualizado }));
     };
     img.src = URL.createObjectURL(file);
@@ -102,9 +102,9 @@ export default function DashboardEmpleados() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const arr = Array.from({ length: 6 }, (_, i) => nuevo[indexEmpleado]?.trabajos?.[i] || "");
-      arr[slot] = reader.result as string;
+      arr[slot] = file; // Guardamos el File para subirlo en handleSubmit
       nuevo[indexEmpleado].trabajos = arr;
-      nuevo[indexEmpleado].subiendoTrabajo[slot] = false; // ✅ loader desactivado
+      nuevo[indexEmpleado].subiendoTrabajo[slot] = false;
       setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
     };
     reader.readAsDataURL(file);
@@ -120,7 +120,7 @@ export default function DashboardEmpleados() {
       config.empleadosData.map(async (empleado: any) => {
         let fotoPerfil = empleado.fotoPerfil;
 
-        // Si es un File, lo subimos
+        // ✅ Subir foto de perfil si es File
         if (fotoPerfil instanceof File) {
           const subida = await subirImagenImgBB(fotoPerfil);
           if (subida) {
@@ -128,9 +128,21 @@ export default function DashboardEmpleados() {
           }
         }
 
+        // ✅ Subir trabajos si son File
+        const trabajos = await Promise.all(
+          (empleado.trabajos || []).map(async (trabajo: any) => {
+            if (trabajo instanceof File) {
+              const subida = await subirImagenImgBB(trabajo);
+              return subida ? subida.url : "";
+            }
+            return trabajo; // si ya es string, lo dejamos
+          })
+        );
+
         return {
           ...empleado,
           fotoPerfil,
+          trabajos,
         };
       })
     );
@@ -282,7 +294,11 @@ export default function DashboardEmpleados() {
                             {empleado.subiendoTrabajo?.[i] ? (
                               <div className="w-8 h-8 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
                             ) : img ? (
-                              <img src={img} alt="" className="object-cover w-full h-full" />
+                              typeof img === "string" ? (
+                                <img src={img} alt="" className="object-cover w-full h-full" />
+                              ) : (
+                                <img src={URL.createObjectURL(img)} alt="" className="object-cover w-full h-full" />
+                              )
                             ) : (
                               <span className="text-lg text-gray-400">+</span>
                             )}
