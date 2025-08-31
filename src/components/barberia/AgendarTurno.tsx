@@ -8,6 +8,11 @@ import "swiper/css/thumbs";
 import ArrowLeft from "../../assets/arrow-left.svg?url";
 import ArrowRight from "../../assets/arrow-right.svg?url";
 
+// 🔹 Firebase
+import { getAuth } from "firebase/auth";
+import { db } from "../../lib/firebase";
+import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+
 type Empleado = {
   nombre: string;
   fotoPerfil: string;
@@ -30,21 +35,149 @@ export default function AgendarTurno({
   const [barberoSeleccionado, setBarberoSeleccionado] = useState<Empleado | null>(null);
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
   const [scrollHint, setScrollHint] = useState<"left" | "right" | null>("right");
+  const [paso, setPaso] = useState<"imagenes" | "pregunta" | "precios" | "fecha" | "horarios">("imagenes");
+  const [conAmigos, setConAmigos] = useState<"solo" | "amigos" | null>(null);
+  const [cantidadAmigos, setCantidadAmigos] = useState(1);
+  const [servicioSeleccionado, setServicioSeleccionado] = useState<string | null>(null);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
+  const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(null);
 
   // 🔎 Filtramos imágenes válidas
-  const trabajosValidos =
-    barberoSeleccionado?.trabajos?.filter((t) => t && t.trim() !== "") || [];
+  const trabajosValidos = barberoSeleccionado?.trabajos?.filter((t) => t && t.trim() !== "") || [];
+
+  // Genera horarios desde 10:30 a 21:30
+  const generarHorarios = () => {
+    const horarios: string[] = [];
+    let hora = 10;
+    let minuto = 30;
+    while (hora < 21 || (hora === 21 && minuto <= 30)) {
+      const h = hora.toString().padStart(2, "0");
+      const m = minuto.toString().padStart(2, "0");
+      horarios.push(`${h}:${m}`);
+      hora++;
+      minuto = 30;
+    }
+    return horarios;
+  };
+  const horariosDisponibles = generarHorarios();
+
+  // 🔹 Generar los próximos 14 días dinámicamente
+  const generarFechas = () => {
+    return Array.from({ length: 14 }).map((_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() + i);
+      const dayName = date.toLocaleDateString("es-ES", { weekday: "short" });
+      const dayNum = date.getDate().toString().padStart(2, "0");
+      const monthNum = (date.getMonth() + 1).toString().padStart(2, "0");
+      const formatted = `${date.getFullYear()}-${monthNum}-${dayNum}`;
+      return { label: `${dayName} ${dayNum}/${monthNum}`, value: formatted };
+    });
+  };
+
+  // 🔹 Guardar turno en Firestore
+  const guardarTurno = async () => {
+    if (!barberoSeleccionado || !servicioSeleccionado || !fechaSeleccionada || !horarioSeleccionado) {
+      alert("Completa todos los campos antes de confirmar el turno.");
+      return;
+    }
+
+    try {
+      const auth = getAuth();
+      const usuario = auth.currentUser;
+      if (!usuario) {
+        alert("Debes iniciar sesión con Google para reservar un turno.");
+        return;
+      }
+
+      // Verificar si ya está ocupado ese horario
+      const q = query(
+        collection(db, "Turnos"),
+        where("barbero", "==", barberoSeleccionado.nombre),
+        where("fecha", "==", fechaSeleccionada),
+        where("hora", "==", horarioSeleccionado)
+      );
+
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        alert("Ese horario ya está ocupado, selecciona otro.");
+        return;
+      }
+
+      // Guardar turno en Firestore
+      await addDoc(collection(db, "Turnos"), {
+        negocioId: usuario.uid, // UID del negocio
+        barbero: barberoSeleccionado.nombre,
+        servicio: servicioSeleccionado,
+        fecha: fechaSeleccionada,
+        hora: horarioSeleccionado,
+        cliente: usuario.displayName || "Cliente",
+        email: usuario.email || "",
+        estado: "pendiente",
+        creadoEn: new Date(),
+      });
+
+      alert("✅ Turno reservado correctamente.");
+
+      // Reset flujo
+      setPaso("imagenes");
+      setServicioSeleccionado(null);
+      setFechaSeleccionada(null);
+      setHorarioSeleccionado(null);
+      setBarberoSeleccionado(null);
+      setMostrarBarberos(false);
+
+    } catch (e) {
+      console.error("Error al guardar turno:", e);
+      alert("❌ Hubo un error al reservar el turno.");
+    }
+  };
+
+  // 🔹 Barra superior persistente
+  const renderBarra = () => {
+    if (!barberoSeleccionado) return null;
+    return (
+      <div className="w-full max-w-3xl flex items-center justify-between bg-black text-white px-6 py-3 rounded-t-xl shadow mx-auto">
+        <h2 className="text-lg md:text-xl font-bold">
+          {paso === "imagenes" && `Trabajos de ${barberoSeleccionado.nombre}`}
+          {paso === "pregunta" && "Confirmar acompañantes"}
+          {paso === "precios" && "Seleccionar servicio"}
+          {paso === "fecha" && "Seleccionar fecha"}
+          {paso === "horarios" && "Horarios disponibles"}
+        </h2>
+        <button
+          onClick={() => {
+            if (paso === "imagenes") {
+              setBarberoSeleccionado(null);
+              setThumbsSwiper(null);
+              setScrollHint("right");
+            } else if (paso === "pregunta") {
+              setBarberoSeleccionado(null);
+              setMostrarBarberos(true);
+              setThumbsSwiper(null);
+              setScrollHint("right");
+            } else if (paso === "precios") {
+              setPaso("pregunta");
+            } else if (paso === "fecha") {
+              setPaso("precios");
+            } else if (paso === "horarios") {
+              setPaso("fecha");
+            }
+          }}
+          className="flex items-center gap-1 bg-white text-black px-3 py-1 rounded-lg shadow hover:bg-gray-100 transition"
+        >
+          <span>←</span>
+          <span className="text-sm font-medium">Volver</span>
+        </button>
+      </div>
+    );
+  };
 
   return (
-    <section
-      className={`py-20 px-6 md:px-12 lg:px-24 bg-gray-50 text-center ${fuenteTexto}`}
-    >
+    <section className={`py-20 px-6 md:px-12 lg:px-24 bg-gray-50 text-center ${fuenteTexto}`}>
       {/* Vista inicial */}
       {!mostrarBarberos && !barberoSeleccionado && (
         <>
-          <h2 className="text-3xl font-bold mb-6">
-            Reserva turno con los mejores barberos
-          </h2>
+          <h2 className="text-3xl font-bold mb-6">Reserva turno con los mejores barberos</h2>
           <button
             onClick={() => setMostrarBarberos(true)}
             className={`px-8 py-3 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
@@ -60,10 +193,7 @@ export default function AgendarTurno({
           <h2 className="text-2xl font-bold mb-10">Elige tu barbero</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {empleados.map((empleado, i) => (
-              <div
-                key={i}
-                className={`bg-white rounded-xl shadow p-6 flex flex-col items-center ${fuenteTexto}`}
-              >
+              <div key={i} className={`bg-white rounded-xl shadow p-6 flex flex-col items-center ${fuenteTexto}`}>
                 <img
                   src={empleado.fotoPerfil || "/img/default-user.jpg"}
                   alt={empleado.nombre}
@@ -71,7 +201,10 @@ export default function AgendarTurno({
                 />
                 <h3 className="text-lg font-semibold">{empleado.nombre}</h3>
                 <button
-                  onClick={() => setBarberoSeleccionado(empleado)}
+                  onClick={() => {
+                    setBarberoSeleccionado(empleado);
+                    setPaso("imagenes");
+                  }}
                   className={`mt-4 px-4 py-2 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
                 >
                   Seleccionar
@@ -82,112 +215,214 @@ export default function AgendarTurno({
         </div>
       )}
 
-      {/* Slideshow con thumbnails */}
+      {/* Flujo dentro de barbero seleccionado */}
       {barberoSeleccionado && (
-        <div className="mt-12 flex flex-col items-center">
-          {/* Encabezado tipo panel en negro */}
-          <div className="w-full max-w-3xl flex items-center justify-between bg-black text-white px-6 py-3 rounded-t-xl shadow mb-6">
-            <h2 className="text-lg md:text-xl font-bold">
-              Trabajos de {barberoSeleccionado.nombre}
-            </h2>
-            <button
-              onClick={() => {
-                setBarberoSeleccionado(null);
-                setThumbsSwiper(null); // 👈 resetear el swiper de thumbnails
-                setScrollHint("right");
-              }}
-              className="flex items-center gap-1 bg-white text-black px-3 py-1 rounded-lg shadow hover:bg-gray-100 transition"
-            >
-              <span>←</span>
-              <span className="text-sm font-medium">Volver</span>
-            </button>
-          </div>
+        <div className="mt-12 flex flex-col items-center w-full">
+          {renderBarra()}
 
-          {trabajosValidos.length > 0 ? (
-            <>
-              {/* Carrusel principal */}
-              <div className="relative w-full max-w-3xl">
-                <Swiper
-                  modules={[Navigation, Thumbs]}
-                  navigation={{
-                    prevEl: ".custom-prev",
-                    nextEl: ".custom-next",
-                  }}
-                  thumbs={{ swiper: thumbsSwiper }}
-                  className="rounded-xl shadow"
-                  touchRatio={1}       // 👈 swipe en mobile
-                  simulateTouch={true} // 👈 habilita swipe
-                >
-                  {trabajosValidos.map((foto, idx) => (
-                    <SwiperSlide key={idx}>
-                      <img
-                        src={foto}
-                        alt={`Trabajo ${idx + 1}`}
-                        className="w-full h-[400px] object-cover rounded-xl"
-                      />
-                    </SwiperSlide>
-                  ))}
-                </Swiper>
-
-                {/* Botones flechas personalizados */}
-                <button className="custom-prev absolute top-1/2 left-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
-                  <img src={ArrowLeft} alt="Anterior" className="w-6 h-6" />
-                </button>
-                <button className="custom-next absolute top-1/2 right-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
-                  <img src={ArrowRight} alt="Siguiente" className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Miniaturas desplazables + pista visual */}
-<div className="mt-6 w-full max-w-3xl flex flex-col items-center">
-  <div className="flex justify-center w-full">
-    <Swiper
-      onSwiper={setThumbsSwiper}
-      spaceBetween={10}
-      slidesPerView="auto"
-      freeMode={true}
-      watchSlidesProgress={true}
-      modules={[Thumbs]}
-      className="max-w-max" // 👈 solo ocupa lo necesario
-      onReachBeginning={() => setScrollHint("right")}
-      onReachEnd={() => setScrollHint("left")}
-      onFromEdge={() => setScrollHint(null)}
-    >
-      {trabajosValidos.map((foto, idx) => (
-        <SwiperSlide
-          key={idx}
-          style={{ width: "80px" }}
-          className="flex justify-center border-2 border-transparent rounded-md transition swiper-slide-thumb-active:border-black"
-        >
-          <img
-            src={foto}
-            alt={`Miniatura ${idx + 1}`}
-            className="h-20 w-28 object-cover rounded-md cursor-pointer"
-          />
-        </SwiperSlide>
-      ))}
-    </Swiper>
-  </div>
-
-  {/* Pista visual SOLO en mobile */}
-  {scrollHint && (
-    <div className="mt-2 text-center text-sm text-gray-600 animate-pulse md:hidden">
-      {scrollHint === "right" ? "Deslizar →" : "← Deslizar"}
-    </div>
-  )}
-</div>
-
-
-            </>
-          ) : (
-            <p className="text-gray-600">Este barbero aún no tiene trabajos subidos.</p>
+          {/* Paso imágenes */}
+          {paso === "imagenes" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
+              {trabajosValidos.length > 0 ? (
+                <>
+                  {/* Carrusel */}
+                  <div className="relative w-full">
+                    <Swiper
+                      modules={[Navigation, Thumbs]}
+                      navigation={{ prevEl: ".custom-prev", nextEl: ".custom-next" }}
+                      thumbs={{ swiper: thumbsSwiper }}
+                      className="rounded-xl shadow"
+                      touchRatio={1}
+                      simulateTouch={true}
+                    >
+                      {trabajosValidos.map((foto, idx) => (
+                        <SwiperSlide key={idx}>
+                          <img src={foto} alt={`Trabajo ${idx + 1}`} className="w-full h-[400px] object-cover rounded-xl" />
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                    <button className="custom-prev absolute top-1/2 left-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
+                      <img src={ArrowLeft} alt="Anterior" className="w-6 h-6" />
+                    </button>
+                    <button className="custom-next absolute top-1/2 right-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
+                      <img src={ArrowRight} alt="Siguiente" className="w-6 h-6" />
+                    </button>
+                  </div>
+                  {/* Miniaturas */}
+                  <div className="mt-6 w-full flex flex-col items-center">
+                    <div className="flex justify-center w-full">
+                      <Swiper
+                        onSwiper={setThumbsSwiper}
+                        spaceBetween={10}
+                        slidesPerView="auto"
+                        freeMode={true}
+                        watchSlidesProgress={true}
+                        modules={[Thumbs]}
+                        className="max-w-max"
+                        onReachBeginning={() => setScrollHint("right")}
+                        onReachEnd={() => setScrollHint("left")}
+                        onFromEdge={() => setScrollHint(null)}
+                      >
+                        {trabajosValidos.map((foto, idx) => (
+                          <SwiperSlide
+                            key={idx}
+                            style={{ width: "80px" }}
+                            className="flex justify-center border-2 border-transparent rounded-md transition swiper-slide-thumb-active:border-black"
+                          >
+                            <img src={foto} alt={`Miniatura ${idx + 1}`} className="h-20 w-28 object-cover rounded-md cursor-pointer" />
+                          </SwiperSlide>
+                        ))}
+                      </Swiper>
+                    </div>
+                    {scrollHint && (
+                      <div className="mt-2 text-center text-sm text-gray-600 animate-pulse md:hidden">
+                        {scrollHint === "right" ? "Deslizar →" : "← Deslizar"}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-600">Este barbero aún no tiene trabajos subidos.</p>
+              )}
+              <button
+                onClick={() => setPaso("pregunta")}
+                className={`mt-8 px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
+              >
+                Continuar
+              </button>
+            </div>
           )}
 
-          <button
-            className={`mt-8 px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
-          >
-            Continuar
-          </button>
+          {/* Paso pregunta */}
+          {paso === "pregunta" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
+              <p className="text-lg font-medium mb-4">¿Vienes solo o con amigos?</p>
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => {
+                    setConAmigos("solo");
+                    setPaso("precios");
+                  }}
+                  className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Solo
+                </button>
+                <button
+                  onClick={() => setConAmigos("amigos")}
+                  className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Con amigos
+                </button>
+              </div>
+              {conAmigos === "amigos" && (
+                <div className="mt-4 flex items-center">
+                  <label className="block mr-2 font-medium">¿Cuántos amigos?</label>
+                  <select
+                    value={cantidadAmigos}
+                    onChange={(e) => setCantidadAmigos(parseInt(e.target.value))}
+                    className="px-3 py-2 border rounded-lg"
+                  >
+                    {[1, 2, 3, 4].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setPaso("precios")}
+                    className="ml-4 px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Paso precios */}
+          {paso === "precios" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
+              <div className="flex flex-col gap-3 w-full">
+                {[
+                  "Corte de pelo — $400",
+                  "Corte + Barba — $500",
+                  "Corte + Barba + Cejas — $550",
+                  "Corte + Tinta — $800",
+                  "Tinta — $600",
+                ].map((serv, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setServicioSeleccionado(serv);
+                      setPaso("fecha");
+                    }}
+                    className="px-4 py-3 rounded-lg bg-black text-white hover:bg-gray-800"
+                  >
+                    {serv}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Paso fecha */}
+          {paso === "fecha" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
+              <div className="grid grid-cols-7 gap-3">
+                {generarFechas().map((d, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setFechaSeleccionada(d.value)}
+                    className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg text-sm font-medium
+                      ${fechaSeleccionada === d.value
+                        ? "bg-black text-white"
+                        : "bg-gray-100 text-black hover:bg-gray-200"}`}
+                  >
+                    <span className="capitalize">{d.label.split(" ")[0]}</span>
+                    <span>{d.label.split(" ")[1]}</span>
+                  </button>
+                ))}
+              </div>
+              {fechaSeleccionada && (
+                <button
+                  onClick={() => setPaso("horarios")}
+                  className="mt-6 px-6 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Ver horarios
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Paso horarios */}
+          {paso === "horarios" && fechaSeleccionada && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
+              <div className="flex flex-wrap gap-3 justify-center">
+                {horariosDisponibles.map((h, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setHorarioSeleccionado(h)}
+                    className={`px-4 py-2 rounded-lg ${
+                      horarioSeleccionado === h ? "bg-gray-800 text-white" : "bg-black text-white hover:bg-gray-800"
+                    }`}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+              {horarioSeleccionado && (
+                <>
+                  <p className="mt-4 font-medium">
+                    Has seleccionado: {servicioSeleccionado} el {fechaSeleccionada} a las {horarioSeleccionado}
+                  </p>
+                  <button
+                    onClick={guardarTurno}
+                    className="mt-6 px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Confirmar turno
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>

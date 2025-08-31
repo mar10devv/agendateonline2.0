@@ -140,12 +140,13 @@ useEffect(() => {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {/* Card Agenda */}
             <a
-              href="/panel-agenda"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-            >
-              <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
-              <span>Mi Agenda</span>
-            </a>
+  href="/panel-agenda"
+  className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
+>
+  <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
+  <span>Mi Agenda</span>
+</a>
+
 
             {/* Card Personal */}
             <a
