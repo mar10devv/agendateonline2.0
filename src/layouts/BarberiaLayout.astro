@@ -15,6 +15,12 @@ const { title = "AgéndateOnline" } = Astro.props as Props;
     <title>{title} | AgendateOnline</title>
   </head>
   <body class="bg-white text-black">
+    <script is:inline>
+      if ("scrollRestoration" in history) {
+        history.scrollRestoration = "manual";
+      }
+      window.scrollTo(0, 0);
+    </script>
     <main>
       <slot /> <!-- aquí va todo lo que definís en [slug].astro -->
     </main>
