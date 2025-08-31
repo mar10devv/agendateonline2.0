@@ -29,6 +29,7 @@ export default function AgendarTurno({
   const [mostrarBarberos, setMostrarBarberos] = useState(false);
   const [barberoSeleccionado, setBarberoSeleccionado] = useState<Empleado | null>(null);
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+  const [scrollHint, setScrollHint] = useState<"left" | "right" | null>("right");
 
   // 🔎 Filtramos imágenes válidas
   const trabajosValidos =
@@ -85,24 +86,22 @@ export default function AgendarTurno({
       {barberoSeleccionado && (
         <div className="mt-12 flex flex-col items-center">
           {/* Encabezado tipo panel en negro */}
-<div className="w-full max-w-3xl flex items-center justify-between bg-black text-white px-6 py-3 rounded-t-xl shadow mb-6">
-  <h2 className="text-lg md:text-xl font-bold">
-    Trabajos de {barberoSeleccionado.nombre}
-  </h2>
-  <button
-  onClick={() => {
-    setBarberoSeleccionado(null);
-    setThumbsSwiper(null); // 👈 resetear el swiper de thumbnails
-  }}
-  className="flex items-center gap-1 bg-white text-black px-3 py-1 rounded-lg shadow hover:bg-gray-100 transition"
->
-  <span>←</span>
-  <span className="text-sm font-medium">Volver</span>
-</button>
-
-</div>
-
-
+          <div className="w-full max-w-3xl flex items-center justify-between bg-black text-white px-6 py-3 rounded-t-xl shadow mb-6">
+            <h2 className="text-lg md:text-xl font-bold">
+              Trabajos de {barberoSeleccionado.nombre}
+            </h2>
+            <button
+              onClick={() => {
+                setBarberoSeleccionado(null);
+                setThumbsSwiper(null); // 👈 resetear el swiper de thumbnails
+                setScrollHint("right");
+              }}
+              className="flex items-center gap-1 bg-white text-black px-3 py-1 rounded-lg shadow hover:bg-gray-100 transition"
+            >
+              <span>←</span>
+              <span className="text-sm font-medium">Volver</span>
+            </button>
+          </div>
 
           {trabajosValidos.length > 0 ? (
             <>
@@ -116,6 +115,8 @@ export default function AgendarTurno({
                   }}
                   thumbs={{ swiper: thumbsSwiper }}
                   className="rounded-xl shadow"
+                  touchRatio={1}       // 👈 swipe en mobile
+                  simulateTouch={true} // 👈 habilita swipe
                 >
                   {trabajosValidos.map((foto, idx) => (
                     <SwiperSlide key={idx}>
@@ -137,30 +138,43 @@ export default function AgendarTurno({
                 </button>
               </div>
 
-              {/* Miniaturas centradas */}
-<div className="mt-6 w-full max-w-3xl flex justify-center">
-  <Swiper
-    onSwiper={setThumbsSwiper}
-    spaceBetween={10}
-    slidesPerView={Math.min(6, trabajosValidos.length)}
-    freeMode={true}
-    watchSlidesProgress={true}
-    modules={[Thumbs]}
-    className="inline-flex mx-auto"  // 👈 truco: que ocupe solo lo necesario
-  >
-    {trabajosValidos.map((foto, idx) => (
-      <SwiperSlide
-        key={idx}
-        className="!w-auto flex justify-center border-2 border-transparent rounded-md transition swiper-slide-thumb-active:border-black"
-      >
-        <img
-          src={foto}
-          alt={`Miniatura ${idx + 1}`}
-          className="h-20 w-28 object-cover rounded-md cursor-pointer"
-        />
-      </SwiperSlide>
-    ))}
-  </Swiper>
+              {/* Miniaturas desplazables + pista visual */}
+<div className="mt-6 w-full max-w-3xl flex flex-col items-center">
+  <div className="flex justify-center w-full">
+    <Swiper
+      onSwiper={setThumbsSwiper}
+      spaceBetween={10}
+      slidesPerView="auto"
+      freeMode={true}
+      watchSlidesProgress={true}
+      modules={[Thumbs]}
+      className="max-w-max" // 👈 solo ocupa lo necesario
+      onReachBeginning={() => setScrollHint("right")}
+      onReachEnd={() => setScrollHint("left")}
+      onFromEdge={() => setScrollHint(null)}
+    >
+      {trabajosValidos.map((foto, idx) => (
+        <SwiperSlide
+          key={idx}
+          style={{ width: "80px" }}
+          className="flex justify-center border-2 border-transparent rounded-md transition swiper-slide-thumb-active:border-black"
+        >
+          <img
+            src={foto}
+            alt={`Miniatura ${idx + 1}`}
+            className="h-20 w-28 object-cover rounded-md cursor-pointer"
+          />
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  </div>
+
+  {/* Pista visual SOLO en mobile */}
+  {scrollHint && (
+    <div className="mt-2 text-center text-sm text-gray-600 animate-pulse md:hidden">
+      {scrollHint === "right" ? "Deslizar →" : "← Deslizar"}
+    </div>
+  )}
 </div>
 
 
