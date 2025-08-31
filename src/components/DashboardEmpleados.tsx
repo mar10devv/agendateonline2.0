@@ -158,12 +158,17 @@ export default function DashboardEmpleados() {
   };
 
   if (estado === "cargando")
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-        <div className="w-10 h-10 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
-        <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
+      <div className="loader">
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
+        <div className="circle"></div>
       </div>
-    );
+      <p className="mt-6 text-lg font-medium">Cargando empleados...</p>
+    </div>
+  );
 
   if (estado === "sin-acceso") return <p className="text-red-600 text-center mt-10">{mensaje}</p>;
   if (!config) return null;
@@ -331,7 +336,7 @@ export default function DashboardEmpleados() {
                   type="button"
                   className="w-full bg-indigo-600 text-white px-5 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
                 >
-                  Configurar calendario
+                  Configurar día libre
                 </button>
               </div>
             ))}

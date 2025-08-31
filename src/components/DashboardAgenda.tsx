@@ -1,9 +1,9 @@
-// src/components/DashboardAgenda.tsx
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { obtenerConfigNegocio } from "../lib/firestore";
+import { useFechasAgenda } from "../lib/useFechasAgenda"; // 👈 usamos el hook compartido
 
 type Turno = {
   id: string;
@@ -11,7 +11,7 @@ type Turno = {
   email: string;
   servicio: string;
   fecha: string; // YYYY-MM-DD
-  hora: string;  // HH:mm
+  hora: string; // HH:mm
   estado: "pendiente" | "confirmado" | "cancelado";
   barbero: string;
 };
@@ -44,16 +44,8 @@ export default function DashboardAgenda() {
   };
   const horariosDisponibles = generarHorarios();
 
-  // 🔹 Generar los próximos 14 días
-  const generarDias = () => {
-    const hoy = new Date();
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(hoy);
-      d.setDate(hoy.getDate() + i);
-      return d.toISOString().split("T")[0];
-    });
-  };
-  const dias = generarDias();
+  // 🔹 Fechas sincronizadas (14 días)
+  const fechas = useFechasAgenda(14);
 
   // 🔹 Verifica usuario y carga config
   useEffect(() => {
@@ -77,12 +69,15 @@ export default function DashboardAgenda() {
             setConfig(negocioConfig);
             setBarberoSeleccionado(negocioConfig.empleadosData?.[0]?.nombre || "");
 
-            // ⚡ Aquí deberías cargar turnos desde Firestore:
-            // const q = query(collection(db, "Turnos"), where("negocioId", "==", usuario.uid))
-            // const snap = await getDocs(q)
-            // setTurnos(snap.docs.map(d => ({ id: d.id, ...d.data() } as Turno)))
+            // ⚡ Escuchar turnos en tiempo real
+            const turnosRef = collection(db, "Negocios", usuario.uid, "Turnos");
+            const unsubTurnos = onSnapshot(turnosRef, (snap) => {
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Turno[];
+              setTurnos(data);
+            });
 
             setEstado("listo");
+            return () => unsubTurnos();
           }
         } else {
           setEstado("sin-acceso");
@@ -113,7 +108,12 @@ export default function DashboardAgenda() {
   if (estado === "cargando")
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-        <div className="w-10 h-10 border-4 border-t-green-500 border-gray-300 rounded-full animate-spin"></div>
+        <div className="loader">
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+          <div className="circle"></div>
+        </div>
         <p className="mt-6 text-lg font-medium">Cargando agenda...</p>
       </div>
     );
@@ -159,21 +159,23 @@ export default function DashboardAgenda() {
 
         {/* Calendario 14 días */}
         <div className="grid grid-cols-7 gap-4 p-6">
-          {dias.map((d) => (
+          {fechas.map((d) => (
             <button
-              key={d}
-              onClick={() => setFechaSeleccionada(d)}
+              key={d.value}
+              onClick={() => setFechaSeleccionada(d.value)}
               className={`relative p-3 rounded-lg border ${
-                fechaSeleccionada === d ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-gray-50"
+                fechaSeleccionada === d.value
+                  ? "border-indigo-600 bg-indigo-50"
+                  : "border-gray-200 bg-gray-50"
               }`}
             >
-              <span className="block font-medium">{new Date(d).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span>
+              <span className="block font-medium">{d.label}</span>
               {/* Punto de ocupación */}
               <span
                 className={`absolute top-1 right-1 w-3 h-3 rounded-full ${
-                  ocupacionDia(d) === "verde"
+                  ocupacionDia(d.value) === "verde"
                     ? "bg-green-500"
-                    : ocupacionDia(d) === "amarillo"
+                    : ocupacionDia(d.value) === "amarillo"
                     ? "bg-yellow-500"
                     : "bg-red-500"
                 }`}
@@ -194,15 +196,15 @@ export default function DashboardAgenda() {
                 <div
                   key={h}
                   className={`p-4 rounded-lg shadow border ${
-                    turno
-                      ? "bg-red-50 border-red-200"
-                      : "bg-green-50 border-green-200"
+                    turno ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
                   }`}
                 >
                   <p className="font-medium">{h}</p>
                   {turno ? (
                     <div className="text-sm text-gray-700 mt-1">
-                      <p><strong>{turno.cliente}</strong> ({turno.email})</p>
+                      <p>
+                        <strong>{turno.cliente}</strong> ({turno.email})
+                      </p>
                       <p>{turno.servicio}</p>
                       <span
                         className={`px-2 py-1 text-xs rounded ${

@@ -7,30 +7,46 @@ import HeroBarberia from "../../components/barberia/HeroBarberia";
 import ServiciosBarberia from "../../components/barberia/ServiciosBarberia";
 import SobreNosotros from "../../components/barberia/SobreNosotros";
 import Resenas from "../../components/barberia/Resenas";
-import FooterBarberia from "../../components/barberia/FooterBarberia"
-import AgendarTurno from "../../components/barberia/AgendarTurno"
-
+import FooterBarberia from "../../components/barberia/FooterBarberia";
+import AgendarTurno from "../../components/barberia/AgendarTurno";
 
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { fuentesMap, fuentesStyle } from "../../lib/fonts";
+import { fuentesStyle } from "../../lib/fonts";
+
+// 📌 Definimos el tipo de negocio (campos que puede traer de Firestore)
+type Negocio = {
+  id: string;
+  nombre: string;
+  hoverColor?: string;
+  fuenteLogo?: string;
+  fuenteBotones?: string;
+  fuenteTexto?: string;
+  modoImagenes?: string;
+  bannerImages?: { url: string }[];
+  empleadosData?: any[];
+  eslogan?: string;
+  usarLogo?: boolean;
+  logoUrl?: string;
+};
 
 const { slug } = Astro.params;
 
-let negocio = null;
+let negocio: Negocio | null = null;
 const q = query(collection(db, "Negocios"), where("slug", "==", slug));
 const snap = await getDocs(q);
 
 if (!snap.empty) {
-  negocio = snap.docs[0].data();
+  const docSnap = snap.docs[0];
+  negocio = { id: docSnap.id, ...docSnap.data() } as Negocio; // 👈 hacemos el cast
 }
 
 const hoverColor = negocio?.hoverColor || "#3b82f6";
 const fuenteLogo = negocio?.fuenteLogo || "montserrat";
 const fuenteBotones = negocio?.fuenteBotones || "poppins";
 const fuenteTexto = negocio?.fuenteTexto || "raleway";
+const modoImagenes = (negocio?.modoImagenes as "defecto" | "personalizado") || "defecto";
 
-const modoImagenes = negocio?.modoImagenes || "defecto";
 
 const heroImages =
   modoImagenes === "personalizado" && negocio?.bannerImages?.length
@@ -86,49 +102,50 @@ const css = `
       fuenteTexto={fuenteTexto}
       fuenteBotones={fuenteBotones}
     />
+
     <!-- 🚀 Nueva sección Servicios -->
-<div id="servicios">
-  <ServiciosBarberia 
-    fuenteTexto={fuenteTexto} 
-    fuenteBotones={fuenteBotones} 
-    client:load 
-  />
-</div>
+    <div id="servicios">
+      <ServiciosBarberia 
+        fuenteTexto={fuenteTexto} 
+        fuenteBotones={fuenteBotones} 
+        client:load 
+      />
+    </div>
 
-<!-- 🚀 Nueva sección Sobre Nosotros -->
-<div id="sobre-nosotros" class="mt-10">
-  <SobreNosotros 
-    fuenteTexto={fuenteTexto} 
-    fuenteBotones={fuenteBotones}
-    client:load 
-  />
-</div>
+    <!-- 🚀 Nueva sección Sobre Nosotros -->
+    <div id="sobre-nosotros" class="mt-10">
+      <SobreNosotros 
+        fuenteTexto={fuenteTexto} 
+        fuenteBotones={fuenteBotones}
+        client:load 
+      />
+    </div>
 
-<!-- 🚀 Nueva sección Agendar Turno -->
-<div id="agendar-turno" class="mt-10">
-  <AgendarTurno 
-    empleados={negocio.empleadosData || []}
-    fuenteTexto={fuenteTexto} 
-    fuenteBotones={fuenteBotones}
-    client:load 
-  />
-</div>
+    <!-- 🚀 Nueva sección Agendar Turno -->
+    <div id="agendar-turno" class="mt-10">
+      <AgendarTurno 
+        empleados={negocio.empleadosData || []}
+        fuenteTexto={fuenteTexto} 
+        fuenteBotones={fuenteBotones}
+        negocioId={negocio.id}
+        client:load 
+      />
+    </div>
 
-<!-- ✅ Sección Reseñas -->
-<div id="reseñas" class="mt-10">
-  <Resenas 
-    fuenteTexto={fuenteTexto} 
-    fuenteBotones={fuenteBotones}
-    client:load 
-  />
-</div>
+    <!-- ✅ Sección Reseñas -->
+    <div id="reseñas" class="mt-10">
+      <Resenas 
+        fuenteTexto={fuenteTexto} 
+        fuenteBotones={fuenteBotones}
+        client:load 
+      />
+    </div>
 
-<!-- ✅ Footer -->
-<FooterBarberia 
-  fuenteTexto={fuenteTexto} 
-  fuenteBotones={fuenteBotones}
-  client:load 
-/>
-
+    <!-- ✅ Footer -->
+    <FooterBarberia 
+      fuenteTexto={fuenteTexto} 
+      fuenteBotones={fuenteBotones}
+      client:load 
+    />
   </BarberiaLayout>
 )}

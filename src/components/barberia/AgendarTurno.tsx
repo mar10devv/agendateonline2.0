@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/components/barberia/AgendarTurno.tsx
+import React, { useState, useEffect } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Thumbs } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
@@ -7,11 +8,12 @@ import "swiper/css/navigation";
 import "swiper/css/thumbs";
 import ArrowLeft from "../../assets/arrow-left.svg?url";
 import ArrowRight from "../../assets/arrow-right.svg?url";
+import { useFechasAgenda } from "../../lib/useFechasAgenda";
 
 // 🔹 Firebase
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../lib/firebase";
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, onSnapshot, getDocs } from "firebase/firestore";
 
 type Empleado = {
   nombre: string;
@@ -24,12 +26,14 @@ type Props = {
   fuenteTexto?: string;
   fuenteBotones?: string;
   empleados: Empleado[];
+  negocioId: string; // 👈 importante: el id del negocio dueño del slug
 };
 
 export default function AgendarTurno({
   fuenteTexto = "raleway",
   fuenteBotones = "poppins",
   empleados = [],
+  negocioId,
 }: Props) {
   const [mostrarBarberos, setMostrarBarberos] = useState(false);
   const [barberoSeleccionado, setBarberoSeleccionado] = useState<Empleado | null>(null);
@@ -41,6 +45,8 @@ export default function AgendarTurno({
   const [servicioSeleccionado, setServicioSeleccionado] = useState<string | null>(null);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
   const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(null);
+
+  const [turnoActivo, setTurnoActivo] = useState<any>(null);
 
   // 🔎 Filtramos imágenes válidas
   const trabajosValidos = barberoSeleccionado?.trabajos?.filter((t) => t && t.trim() !== "") || [];
@@ -61,20 +67,41 @@ export default function AgendarTurno({
   };
   const horariosDisponibles = generarHorarios();
 
-  // 🔹 Generar los próximos 14 días dinámicamente
-  const generarFechas = () => {
-    return Array.from({ length: 14 }).map((_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() + i);
-      const dayName = date.toLocaleDateString("es-ES", { weekday: "short" });
-      const dayNum = date.getDate().toString().padStart(2, "0");
-      const monthNum = (date.getMonth() + 1).toString().padStart(2, "0");
-      const formatted = `${date.getFullYear()}-${monthNum}-${dayNum}`;
-      return { label: `${dayName} ${dayNum}/${monthNum}`, value: formatted };
-    });
-  };
+  // ✅ Hook compartido para sincronizar fechas
+  const fechas = useFechasAgenda(14);
 
-  // 🔹 Guardar turno en Firestore
+  // 🔎 Escuchar si el usuario ya tiene un turno activo en este negocio
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubAuth = onAuthStateChanged(auth, (usuario) => {
+      if (usuario && negocioId) {
+        const hoyISO = new Date().toISOString().split("T")[0];
+
+        const q = query(
+  collection(db, "Negocios", negocioId, "Turnos"),
+  where("uidCliente", "==", usuario.email)
+);
+
+
+
+        const unsubTurnos = onSnapshot(q, (snap) => {
+          if (!snap.empty) {
+            setTurnoActivo({ id: snap.docs[0].id, ...snap.docs[0].data() });
+          } else {
+            setTurnoActivo(null);
+          }
+        });
+
+        return () => unsubTurnos();
+      } else {
+        setTurnoActivo(null);
+      }
+    });
+
+    return () => unsubAuth();
+  }, [negocioId]);
+
+  // 🔹 Guardar turno
   const guardarTurno = async () => {
     if (!barberoSeleccionado || !servicioSeleccionado || !fechaSeleccionada || !horarioSeleccionado) {
       alert("Completa todos los campos antes de confirmar el turno.");
@@ -89,9 +116,9 @@ export default function AgendarTurno({
         return;
       }
 
-      // Verificar si ya está ocupado ese horario
+      // Verificar disponibilidad
       const q = query(
-        collection(db, "Turnos"),
+        collection(db, "Negocios", negocioId, "Turnos"),
         where("barbero", "==", barberoSeleccionado.nombre),
         where("fecha", "==", fechaSeleccionada),
         where("hora", "==", horarioSeleccionado)
@@ -103,32 +130,30 @@ export default function AgendarTurno({
         return;
       }
 
-      // Guardar turno en Firestore
-      await addDoc(collection(db, "Turnos"), {
-        negocioId: usuario.uid, // UID del negocio
-        barbero: barberoSeleccionado.nombre,
-        servicio: servicioSeleccionado,
-        fecha: fechaSeleccionada,
-        hora: horarioSeleccionado,
-        cliente: usuario.displayName || "Cliente",
-        email: usuario.email || "",
-        estado: "pendiente",
-        creadoEn: new Date(),
-      });
+      // Guardar turno
+     await addDoc(collection(db, "Negocios", negocioId, "Turnos"), {
+  barbero: barberoSeleccionado.nombre,
+  servicio: servicioSeleccionado,
+  fecha: fechaSeleccionada,
+  hora: horarioSeleccionado,
+  cliente: usuario.displayName || "Cliente",
+  email: usuario.email || "",
+  uidCliente: usuario.email || "",   // 👈 guardar email
+  estado: "pendiente",
+  creadoEn: new Date(),
+});
+
 
       alert("✅ Turno reservado correctamente.");
-
-      // Reset flujo
       setPaso("imagenes");
       setServicioSeleccionado(null);
       setFechaSeleccionada(null);
       setHorarioSeleccionado(null);
       setBarberoSeleccionado(null);
       setMostrarBarberos(false);
-
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error al guardar turno:", e);
-      alert("❌ Hubo un error al reservar el turno.");
+      alert("❌ Hubo un error al reservar el turno: " + e.message);
     }
   };
 
@@ -178,12 +203,25 @@ export default function AgendarTurno({
       {!mostrarBarberos && !barberoSeleccionado && (
         <>
           <h2 className="text-3xl font-bold mb-6">Reserva turno con los mejores barberos</h2>
-          <button
-            onClick={() => setMostrarBarberos(true)}
-            className={`px-8 py-3 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
-          >
-            Reservar turno
-          </button>
+          {turnoActivo ? (
+            <button
+              onClick={() => {
+                alert(
+                  `Tu turno activo es el ${turnoActivo.fecha} a las ${turnoActivo.hora} con ${turnoActivo.barbero}`
+                );
+              }}
+              className={`px-8 py-3 rounded-lg transition bg-green-600 text-white hover:bg-green-700 ${fuenteBotones}`}
+            >
+              Ver mi turno
+            </button>
+          ) : (
+            <button
+              onClick={() => setMostrarBarberos(true)}
+              className={`px-8 py-3 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
+            >
+              Reservar turno
+            </button>
+          )}
         </>
       )}
 
@@ -367,7 +405,7 @@ export default function AgendarTurno({
           {paso === "fecha" && (
             <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center">
               <div className="grid grid-cols-7 gap-3">
-                {generarFechas().map((d, i) => (
+                {fechas.map((d, i) => (
                   <button
                     key={i}
                     onClick={() => setFechaSeleccionada(d.value)}
