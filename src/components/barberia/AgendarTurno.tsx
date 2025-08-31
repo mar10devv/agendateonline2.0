@@ -13,7 +13,7 @@ import { useFechasAgenda } from "../../lib/useFechasAgenda";
 // 🔹 Firebase
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../lib/firebase";
-import { collection, addDoc, query, where, onSnapshot, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, onSnapshot, getDocs, doc, setDoc } from "firebase/firestore";
 
 type Empleado = {
   nombre: string;
@@ -78,11 +78,9 @@ export default function AgendarTurno({
         const hoyISO = new Date().toISOString().split("T")[0];
 
         const q = query(
-  collection(db, "Negocios", negocioId, "Turnos"),
-  where("uidCliente", "==", usuario.email)
-);
-
-
+          collection(db, "Negocios", negocioId, "Turnos"),
+          where("uidCliente", "==", usuario.email)
+        );
 
         const unsubTurnos = onSnapshot(q, (snap) => {
           if (!snap.empty) {
@@ -130,19 +128,30 @@ export default function AgendarTurno({
         return;
       }
 
-      // Guardar turno
-     await addDoc(collection(db, "Negocios", negocioId, "Turnos"), {
-  barbero: barberoSeleccionado.nombre,
-  servicio: servicioSeleccionado,
-  fecha: fechaSeleccionada,
-  hora: horarioSeleccionado,
-  cliente: usuario.displayName || "Cliente",
-  email: usuario.email || "",
-  uidCliente: usuario.email || "",   // 👈 guardar email
-  estado: "pendiente",
-  creadoEn: new Date(),
-});
+      // Guardar turno en negocio
+      const turnoRef = await addDoc(collection(db, "Negocios", negocioId, "Turnos"), {
+        barbero: barberoSeleccionado.nombre,
+        servicio: servicioSeleccionado,
+        fecha: fechaSeleccionada,
+        hora: horarioSeleccionado,
+        cliente: usuario.displayName || "Cliente",
+        email: usuario.email || "",
+        uidCliente: usuario.email || "",
+        estado: "pendiente",
+        creadoEn: new Date(),
+      });
 
+      // 👇 Guardar copia en la agenda del usuario
+      await setDoc(doc(db, "Usuarios", usuario.uid, "Turnos", turnoRef.id), {
+        negocioId,
+        negocioNombre: "BarberStyle", // ⚠️ por ahora fijo, después lo hacemos dinámico
+        barbero: barberoSeleccionado.nombre,
+        servicio: servicioSeleccionado,
+        fecha: fechaSeleccionada,
+        hora: horarioSeleccionado,
+        estado: "pendiente",
+        creadoEn: new Date(),
+      });
 
       alert("✅ Turno reservado correctamente.");
       setPaso("imagenes");

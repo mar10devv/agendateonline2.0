@@ -15,9 +15,11 @@ type ClienteLink = { label: string; href: string; highlight?: boolean };
 
 // 👇 quitamos "Iniciar sesión o registrarse"
 const clientes: ClienteLink[] = [
+  { label: "Mi Agenda", href: "/agenda-usuario", highlight: true }, // 👈 nuevo
   { label: "Descargar la app", href: "/app" },
   { label: "Ayuda y servicio al cliente", href: "/ayuda" },
 ];
+
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -101,6 +103,7 @@ export default function Navbar() {
               </button>
             )}
 
+          
             {user && (
               <a
                 href={isPremium ? "/panel" : "/registrar-negocio"}
@@ -108,6 +111,7 @@ export default function Navbar() {
               >
                 {isPremium ? "Panel de control" : "Registrar negocio"}
               </a>
+              
             )}
 
             {/* Menú dropdown */}
@@ -172,70 +176,79 @@ export default function Navbar() {
       </div>
 
       {/* Opciones con animación stagger */}
-      <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
-        {checkingAuth ? (
-          <p className="text-sm text-gray-500 animate-fadeIn delay-200">Cargando...</p>
-        ) : !user ? (
-          <>
-            <button
-              onClick={handleLogin}
-              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
-            >
-              👉 Iniciar sesión
-            </button>
-            <a
-              href="/app"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-            >
-              📲 Descargar la app
-            </a>
-            <a
-              href="/ayuda"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
-            >
-              ❓ Ayuda y servicio al cliente
-            </a>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 animate-fadeIn delay-200"
-            >
-              🚪 Cerrar sesión
-            </button>
+<div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
+  {checkingAuth ? (
+    <p className="text-sm text-gray-500 animate-fadeIn delay-200">Cargando...</p>
+  ) : !user ? (
+    <>
+      <button
+        onClick={handleLogin}
+        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
+      >
+        👉 Iniciar sesión
+      </button>
+      <a
+        href="/app"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+      >
+        📲 Descargar la app
+      </a>
+      <a
+        href="/ayuda"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
+      >
+        ❓ Ayuda y servicio al cliente
+      </a>
+    </>
+  ) : (
+    <>
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 animate-fadeIn delay-200"
+      >
+        🚪 Cerrar sesión
+      </button>
 
-            {isPremium ? (
-              <a
-                href="/panel"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-              >
-                🛠 Panel de control
-              </a>
-            ) : (
-              <a
-                href="/registrar-negocio"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-              >
-                🏢 Registrar empresa
-              </a>
-            )}
+      {isPremium ? (
+        <a
+          href="/panel"
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+        >
+          🛠 Panel de control
+        </a>
+      ) : (
+        <a
+          href="/registrar-negocio"
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+        >
+          🏢 Registrar empresa
+        </a>
+      )}
 
-            <a
-              href="/app"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
-            >
-              📲 Descargar la app
-            </a>
-            <a
-              href="/ayuda"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-500"
-            >
-              ❓ Ayuda y servicio al cliente
-            </a>
-          </>
-        )}
-      </div>
+      {/* 👇 Nuevo link Mi Agenda */}
+      <a
+        href="/agenda-usuario"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-350"
+      >
+        📅 Mi Agenda
+      </a>
+
+      <a
+        href="/app"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
+      >
+        📲 Descargar la app
+      </a>
+      <a
+        href="/ayuda"
+        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-500"
+      >
+        ❓ Ayuda y servicio al cliente
+      </a>
+    </>
+  )}
+</div>
+
     </div>
   </div>
 )}
