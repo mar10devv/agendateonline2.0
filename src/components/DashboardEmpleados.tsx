@@ -49,10 +49,19 @@ export default function DashboardEmpleados() {
           if (negocioConfig) {
             setUser(usuario);
             setConfig({
-              ...negocioConfig,
-              empleados: negocioConfig.empleados || 1,
-              maxEmpleados: (negocioConfig as any).maxEmpleados || 1,
-            });
+  ...negocioConfig,
+  empleados: negocioConfig.empleados || 1,
+  maxEmpleados: (negocioConfig as any).maxEmpleados || negocioConfig.empleados || 1,
+  empleadosData: negocioConfig.empleadosData && negocioConfig.empleadosData.length > 0
+    ? negocioConfig.empleadosData
+    : Array.from({ length: negocioConfig.empleados || 1 }, () => ({
+        nombre: "",
+        fotoPerfil: "",
+        trabajos: Array(6).fill(""),
+        calendario: {},
+      })),
+});
+
             setEstado("listo");
           }
         } else {
