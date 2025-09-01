@@ -45,8 +45,8 @@ export default function AgendarTurno({
   const [servicioSeleccionado, setServicioSeleccionado] = useState<string | null>(null);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
   const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(null);
-
-const [turnoActivo, setTurnoActivo] = useState<any>(null);
+  const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
+  const [turnoActivo, setTurnoActivo] = useState<any>(null);
 
 // 👇 Nuevo estado para mostrar mensajes en el botón
 const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "error">("inicial");
@@ -103,6 +103,25 @@ const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "er
 
     return () => unsubAuth();
   }, [negocioId]);
+
+  // 🔎 Escuchar horarios ocupados para el barbero y la fecha seleccionada
+useEffect(() => {
+  if (!barberoSeleccionado || !fechaSeleccionada) return;
+
+  const q = query(
+    collection(db, "Negocios", negocioId, "Turnos"),
+    where("barbero", "==", barberoSeleccionado.nombre),
+    where("fecha", "==", fechaSeleccionada)
+  );
+
+  const unsub = onSnapshot(q, (snap) => {
+    const ocupados = snap.docs.map((d) => d.data().hora as string);
+    setHorariosOcupados(ocupados);
+  });
+
+  return () => unsub();
+}, [barberoSeleccionado, fechaSeleccionada, negocioId]);
+
 
   // 🔹 Guardar turno
   const guardarTurno = async () => {
@@ -475,19 +494,26 @@ setMostrarBarberos(false);
 {paso === "horarios" && fechaSeleccionada && (
   <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
     <div className="flex flex-wrap gap-3 justify-center">
-      {horariosDisponibles.map((h, i) => (
-        <button
-          key={i}
-          onClick={() => setHorarioSeleccionado(h)}
-          className={`px-4 py-2 rounded-lg ${
-            horarioSeleccionado === h
-              ? "bg-gray-800 text-white"
-              : "bg-black text-white hover:bg-gray-800"
-          }`}
-        >
-          {h}
-        </button>
-      ))}
+      {horariosDisponibles.map((h, i) => {
+        const ocupado = horariosOcupados.includes(h); // 👈 verificamos si está ocupado
+
+        return (
+          <button
+            key={i}
+            onClick={() => !ocupado && setHorarioSeleccionado(h)} // 👈 no dejar seleccionar ocupados
+            disabled={ocupado} // 👈 deshabilitamos botón si está ocupado
+            className={`px-4 py-2 rounded-lg ${
+              ocupado
+                ? "bg-red-600 text-white cursor-not-allowed" // 🔴 ocupados
+                : horarioSeleccionado === h
+                ? "bg-gray-800 text-white"
+                : "bg-black text-white hover:bg-gray-800"
+            }`}
+          >
+            {h}
+          </button>
+        );
+      })}
     </div>
 
     {horarioSeleccionado && (
@@ -502,13 +528,11 @@ setMostrarBarberos(false);
           Confirmar turno
         </button>
 
-        {/* 👇 Mensajes después de confirmar */}
         {estadoTurno === "exito" && (
           <p className="mt-4 text-green-600 font-semibold">
             ✅ Turno agendado con éxito
           </p>
         )}
-
         {estadoTurno === "error" && (
           <p className="mt-4 text-red-600 font-semibold">
             ❌ Hubo un error al agendar el turno
@@ -518,6 +542,7 @@ setMostrarBarberos(false);
     )}
   </div>
 )}
+
 
         </div>
       )}
