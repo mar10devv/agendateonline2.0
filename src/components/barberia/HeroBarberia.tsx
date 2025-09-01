@@ -77,24 +77,24 @@ export default function HeroBarberia({
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Texto */}
-      <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white z-10">
-        <h1
-          className={`text-4xl md:text-6xl font-bold ${fuentesMap[fuenteLogo]}`}
-        >
-          Bienvenido a {nombre}
-        </h1>
+<div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white z-10">
+  <h1 className="text-8xl sm:text-9xl md:text-9xl lg:text-9xl font-bold font-euphoria tracking-wide">
+  {nombre}
+</h1>
 
-        <p className={`mt-4 text-lg md:text-2xl ${fuentesMap[fuenteTexto]}`}>
-          {eslogan}
-        </p>
 
-        <a
-          href="#reservar"
-          className={`mt-6 inline-block px-6 py-3 rounded-xl font-semibold transition bg-yellow-500 text-black hover:bg-yellow-600 ${fuentesMap[fuenteBotones]}`}
-        >
-          Reservar cita
-        </a>
-      </div>
+  <p className={`mt-4 text-lg md:text-2xl ${fuentesMap[fuenteTexto]}`}>
+    {eslogan}
+  </p>
+
+  <a
+    href="#reservar"
+    className={`mt-6 inline-block px-6 py-3 rounded-xl font-semibold transition bg-yellow-500 text-black hover:bg-yellow-600 ${fuentesMap[fuenteBotones]}`}
+  >
+    Reservar cita
+  </a>
+</div>
+
     </section>
   );
 }

@@ -9,6 +9,7 @@ import SobreNosotros from "../../components/barberia/SobreNosotros";
 import Resenas from "../../components/barberia/Resenas";
 import FooterBarberia from "../../components/barberia/FooterBarberia";
 import AgendarTurno from "../../components/barberia/AgendarTurno";
+import UbicacionBarberia from "../../components/barberia/UbicacionBarberia";
 
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -28,6 +29,11 @@ type Negocio = {
   eslogan?: string;
   usarLogo?: boolean;
   logoUrl?: string;
+  ubicacion?: {
+    lat: number;
+    lng: number;
+    direccion?: string;
+  };
 };
 
 const { slug } = Astro.params;
@@ -131,6 +137,15 @@ const css = `
         client:load 
       />
     </div>
+
+    <!-- ✅ Sección Ubicación -->
+<div id="ubicacion" class="mt-10">
+  <UbicacionBarberia 
+    nombre={negocio.nombre}
+    ubicacion={negocio.ubicacion}
+    client:load
+  />
+</div>
 
     <!-- ✅ Sección Reseñas -->
     <div id="reseñas" class="mt-10">
