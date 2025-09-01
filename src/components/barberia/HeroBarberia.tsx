@@ -88,11 +88,14 @@ export default function HeroBarberia({
   </p>
 
   <a
-    href="#reservar"
-    className={`mt-6 inline-block px-6 py-3 rounded-xl font-semibold transition bg-yellow-500 text-black hover:bg-yellow-600 ${fuentesMap[fuenteBotones]}`}
-  >
-    Reservar cita
-  </a>
+  href="#agendar-turno"
+  className={`mt-6 inline-block px-8 py-3 rounded-lg font-semibold transition 
+              bg-black text-white hover:bg-gray-800 active:scale-95 shadow-sm
+              ${fuentesMap[fuenteBotones]}`}
+>
+  Reservar cita
+</a>
+
 </div>
 
     </section>
