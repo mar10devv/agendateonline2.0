@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, deleteDoc } from "firebase/firestore"; // 👈 deleteDoc
 import { db } from "../lib/firebase";
 import { obtenerConfigNegocio } from "../lib/firestore";
 import { useFechasAgenda } from "../lib/useFechasAgenda"; // 👈 usamos el hook compartido
@@ -14,6 +14,7 @@ type Turno = {
   hora: string; // HH:mm
   estado: "pendiente" | "confirmado" | "cancelado";
   barbero: string;
+  uidCliente?: string;
 };
 
 export default function DashboardAgenda() {
@@ -97,12 +98,29 @@ export default function DashboardAgenda() {
     (t) => t.barbero === barberoSeleccionado && t.fecha === fechaSeleccionada
   );
 
-  // 🔹 Calcular ocupación del día para colorear punto
-  const ocupacionDia = (fecha: string) => {
-    const turnosDia = turnos.filter((t) => t.barbero === barberoSeleccionado && t.fecha === fecha);
-    if (turnosDia.length === 0) return "verde";
-    if (turnosDia.length < horariosDisponibles.length / 2) return "amarillo";
-    return "rojo";
+  // 🔹 Función para borrar turno
+  const eliminarTurno = async (turno: Turno) => {
+    if (!user) return;
+
+    const confirmacion = window.confirm(
+      `¿Seguro que quieres eliminar el turno de ${turno.cliente} (${turno.hora})?`
+    );
+    if (!confirmacion) return;
+
+    try {
+      // 📌 Borrar turno del negocio
+      await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
+
+      // 📌 Borrar copia en el usuario (si existe uidCliente)
+      if (turno.uidCliente) {
+        await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
+      }
+
+      alert("✅ Turno eliminado con éxito");
+    } catch (error) {
+      console.error("Error al eliminar turno:", error);
+      alert("❌ Hubo un error al eliminar el turno");
+    }
   };
 
   if (estado === "cargando")
@@ -158,26 +176,22 @@ export default function DashboardAgenda() {
         </div>
 
         {/* Calendario 14 días */}
-<div className="p-6">
-  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-    {fechas.map((d) => (
-      <button
-        key={d.value}
-        onClick={() => setFechaSeleccionada(d.value)}
-        className={`relative py-2 px-6 text-sm font-bold rounded-full overflow-hidden transition-all duration-400 ease-in-out shadow-md
-          ${fechaSeleccionada === d.value
-            ? "text-white bg-gradient-to-r from-indigo-600 to-blue-400 scale-105"
-            : "text-black bg-white hover:scale-105 hover:text-white hover:shadow-lg active:scale-90"}
-          before:absolute before:top-0 before:-left-full before:w-full before:h-full 
-          before:bg-gradient-to-r before:from-indigo-600 before:to-blue-400 
-          before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-full 
-          hover:before:left-0`}
-      >
-        {d.label}
-      </button>
-    ))}
-  </div>
-</div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+            {fechas.map((d) => (
+              <button
+                key={d.value}
+                onClick={() => setFechaSeleccionada(d.value)}
+                className={`relative py-2 px-6 text-sm font-bold rounded-full overflow-hidden transition-all duration-400 ease-in-out shadow-md
+                  ${fechaSeleccionada === d.value
+                    ? "text-white bg-gradient-to-r from-indigo-600 to-blue-400 scale-105"
+                    : "text-black bg-white hover:scale-105 hover:text-white hover:shadow-lg active:scale-90"}`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Lista de horarios del día */}
         <div className="p-6">
@@ -212,6 +226,14 @@ export default function DashboardAgenda() {
                       >
                         {turno.estado}
                       </span>
+
+                      {/* 👇 Botón de eliminar */}
+                      <button
+                        onClick={() => eliminarTurno(turno)}
+                        className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2"
+                      >
+                        🗑️ Eliminar turno
+                      </button>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">Disponible</p>
