@@ -2,7 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../lib/firebase";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 
 // 🔹 Importar SVGs
 import MoreIcon from "../assets/more-svg.svg?url";
@@ -16,9 +23,8 @@ type Turno = {
   negocioNombre: string;
   barbero: string;
   servicio: string;
-  fecha: string;
-  hora: string;
-  estado: string;
+  fecha: string; // YYYY-MM-DD
+  hora: string; // HH:mm
 };
 
 export default function AgendaUsuario() {
@@ -35,13 +41,50 @@ export default function AgendaUsuario() {
         return;
       }
 
-      const q = query(collection(db, "Usuarios", usuario.uid, "Turnos"));
+      const q = query(
+        collection(db, "Usuarios", usuario.uid, "Turnos"),
+        orderBy("fecha", "desc"),
+        orderBy("hora", "desc")
+      );
 
-      const unsubTurnos = onSnapshot(q, (snap) => {
+      const unsubTurnos = onSnapshot(q, async (snap) => {
         const docs = snap.docs.map(
           (d) => ({ id: d.id, ...d.data() } as Turno)
         );
-        setTurnos(docs);
+
+        const ahora = new Date();
+
+        // separar futuros y pasados
+        const futuros: Turno[] = [];
+        const pasados: Turno[] = [];
+
+        docs.forEach((t) => {
+          const fechaHora = new Date(`${t.fecha}T${t.hora}`);
+          if (fechaHora >= ahora) {
+            futuros.push(t);
+          } else {
+            pasados.push(t);
+          }
+        });
+
+        // ordenar pasados (más recientes primero)
+        pasados.sort(
+          (a, b) =>
+            new Date(`${b.fecha}T${b.hora}`).getTime() -
+            new Date(`${a.fecha}T${a.hora}`).getTime()
+        );
+
+        // conservar solo 3 pasados
+        const conservar = pasados.slice(0, 3);
+        const borrar = pasados.slice(3);
+
+        // borrar de firestore los sobrantes
+        for (const turno of borrar) {
+          await deleteDoc(doc(db, "Usuarios", usuario.uid, "Turnos", turno.id));
+        }
+
+        // actualizar estado
+        setTurnos([...futuros, ...conservar]);
         setCargando(false);
       });
 
@@ -59,6 +102,13 @@ export default function AgendaUsuario() {
   const handleBorrar = (id: string) => {
     alert(`🗑 Borrar turno ${id}`);
     setMenuOpen(null);
+  };
+
+  // 👇 Calcula estado según fecha/hora
+  const calcularEstado = (t: Turno) => {
+    const ahora = new Date();
+    const fechaHora = new Date(`${t.fecha}T${t.hora}`);
+    return fechaHora >= ahora ? "Activo" : "Vencido";
   };
 
   return (
@@ -121,8 +171,17 @@ export default function AgendaUsuario() {
                   {t.hora}
                 </span>
               </div>
-              <p className="text-sm mt-2 text-gray-500 italic">
-                Estado: {t.estado}
+              <p className="text-sm mt-2 italic">
+                Estado:{" "}
+                <span
+                  className={
+                    calcularEstado(t) === "Activo"
+                      ? "text-green-600 font-medium"
+                      : "text-red-600 font-medium"
+                  }
+                >
+                  {calcularEstado(t)}
+                </span>
               </p>
             </li>
           ))}
