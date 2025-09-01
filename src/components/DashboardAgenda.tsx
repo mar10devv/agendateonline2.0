@@ -158,38 +158,33 @@ export default function DashboardAgenda() {
         </div>
 
         {/* Calendario 14 días */}
-        <div className="grid grid-cols-7 gap-4 p-6">
-          {fechas.map((d) => (
-            <button
-              key={d.value}
-              onClick={() => setFechaSeleccionada(d.value)}
-              className={`relative p-3 rounded-lg border ${
-                fechaSeleccionada === d.value
-                  ? "border-indigo-600 bg-indigo-50"
-                  : "border-gray-200 bg-gray-50"
-              }`}
-            >
-              <span className="block font-medium">{d.label}</span>
-              {/* Punto de ocupación */}
-              <span
-                className={`absolute top-1 right-1 w-3 h-3 rounded-full ${
-                  ocupacionDia(d.value) === "verde"
-                    ? "bg-green-500"
-                    : ocupacionDia(d.value) === "amarillo"
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-                }`}
-              ></span>
-            </button>
-          ))}
-        </div>
+<div className="p-6">
+  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+    {fechas.map((d) => (
+      <button
+        key={d.value}
+        onClick={() => setFechaSeleccionada(d.value)}
+        className={`relative py-2 px-6 text-sm font-bold rounded-full overflow-hidden transition-all duration-400 ease-in-out shadow-md
+          ${fechaSeleccionada === d.value
+            ? "text-white bg-gradient-to-r from-indigo-600 to-blue-400 scale-105"
+            : "text-black bg-white hover:scale-105 hover:text-white hover:shadow-lg active:scale-90"}
+          before:absolute before:top-0 before:-left-full before:w-full before:h-full 
+          before:bg-gradient-to-r before:from-indigo-600 before:to-blue-400 
+          before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-full 
+          hover:before:left-0`}
+      >
+        {d.label}
+      </button>
+    ))}
+  </div>
+</div>
 
         {/* Lista de horarios del día */}
         <div className="p-6">
           <h2 className="text-lg font-bold mb-4">
             Turnos para {new Date(fechaSeleccionada).toLocaleDateString("es-ES")}
           </h2>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {horariosDisponibles.map((h) => {
               const turno = turnosDelDia.find((t) => t.hora === h);
               return (
