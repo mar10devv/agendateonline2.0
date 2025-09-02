@@ -6,6 +6,9 @@ import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../lib/firebase";
+import ArrowLeft from "../../assets/arrow-left.svg?url";
+import ArrowRight from "../../assets/arrow-right.svg?url";
+
 import {
   collection,
   addDoc,
@@ -93,80 +96,98 @@ export default function Resenas({
   };
 
   return (
-    <section className="py-20 px-6 md:px-12 lg:px-24 bg-white">
+    <section className="py-5 px-6 md:px-12 lg:px-24 bg-white">
       {/* Encabezado */}
       <div className="mb-12">
         <span
           className={`uppercase text-sm tracking-widest text-black flex items-center ${fuentesMap[fuenteTexto]}`}
         >
           <span className="w-10 h-[2px] bg-black mr-2"></span>
-          Testimonios
+          Reseñas de Google
         </span>
         <h2
           className={`text-3xl md:text-4xl font-bold mt-4 ${fuentesMap[fuenteTexto]}`}
         >
-          Reseñas de Google
+          Comentarios de nuestros clientes!
         </h2>
       </div>
 
       {/* Carrusel */}
-      <Swiper
-        modules={[Navigation]}
-        navigation
-        spaceBetween={24}
-        slidesPerView={1}
-        breakpoints={{
-          640: { slidesPerView: 1 },
-          768: { slidesPerView: 2 },
-          1024: { slidesPerView: 3 },
-        }}
-      >
-        {reseñas.map((r, i) => (
-          <SwiperSlide key={r.id || i}>
-            <div className="bg-white border border-gray-200 rounded-lg shadow-md p-6 h-full flex flex-col">
-              {/* Header */}
-              <div className="flex items-center gap-3 mb-4">
-                {r.foto ? (
-                  <img
-                    src={r.foto}
-                    alt={r.nombre}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold text-white">
-                    {r.nombre[0]}
-                  </div>
-                )}
-                <div>
-                  <h3 className={`font-semibold ${fuentesMap[fuenteTexto]}`}>
-                    {r.nombre}
-                  </h3>
-                  <p className="text-xs text-gray-500">{r.fecha}</p>
-                </div>
-                <img
-                  src="https://www.gstatic.com/images/branding/product/1x/googlelogo_light_color_42dp.png"
-                  alt="Google"
-                  className="ml-auto w-6 h-6"
-                />
-              </div>
+<Swiper
+  modules={[Navigation]}
+  navigation={{
+    nextEl: ".swiper-button-next-custom",
+    prevEl: ".swiper-button-prev-custom",
+  }}
+  spaceBetween={24}
+  slidesPerView={1}
+  breakpoints={{
+    640: { slidesPerView: 1 },
+    768: { slidesPerView: 2 },
+    1024: { slidesPerView: 3 },
+  }}
+>
+  {reseñas.map((r, i) => (
+    <SwiperSlide key={r.id || i}>
+      <div className="relative w-72 bg-white rounded-2xl shadow-lg flex flex-col items-center overflow-hidden mx-auto">
+        {/* Cabecera decorativa */}
+        <div className="h-28 w-full bg-gradient-to-r from-black via-gray-800 to-gray-700"></div>
 
-              {/* Estrellas */}
-              <div className="flex text-yellow-500 mb-3">
-                {"★".repeat(r.estrellas)}
-                <span className="text-gray-300">
-                  {"★".repeat(5 - r.estrellas)}
-                </span>
-              </div>
-
-              <p
-                className={`text-gray-600 text-sm flex-grow ${fuentesMap[fuenteTexto]}`}
-              >
-                {r.comentario}
-              </p>
+        {/* Avatar */}
+        <div className="absolute top-14 w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-md">
+          {r.foto ? (
+            <img
+              src={r.foto}
+              alt={r.nombre}
+              className="w-20 h-20 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center text-xl font-bold text-white">
+              {r.nombre[0]}
             </div>
-          </SwiperSlide>
-        ))}
-      </Swiper>
+          )}
+        </div>
+
+        {/* Contenido */}
+        <div className="mt-20 flex flex-col items-center px-6 pb-6 text-center">
+          <h3 className={`font-semibold text-lg text-gray-800 ${fuentesMap[fuenteTexto]}`}>
+            {r.nombre}
+          </h3>
+          <p className="text-sm text-gray-500">{r.fecha}</p>
+
+          {/* Estrellas */}
+          <div className="flex justify-center mt-3">
+            {Array.from({ length: r.estrellas }).map((_, i) => (
+              <span key={i} className="text-yellow-400 text-lg">★</span>
+            ))}
+            {Array.from({ length: 5 - r.estrellas }).map((_, i) => (
+              <span key={i} className="text-gray-300 text-lg">★</span>
+            ))}
+          </div>
+
+          {/* Comentario */}
+          <p className={`mt-3 text-gray-700 text-sm ${fuentesMap[fuenteTexto]}`}>
+            {r.comentario}
+          </p>
+        </div>
+      </div>
+    </SwiperSlide>
+  ))}
+
+  {/* Flechas personalizadas */}
+  
+ {/* Flecha izquierda */}
+<div className="swiper-button-prev-custom absolute top-1/2 left-2 -translate-y-1/2 z-10 cursor-pointer bg-black shadow rounded-full p-2 hover:scale-110 transition">
+  <img src={ArrowLeft} alt="Anterior" className="w-5 h-5 invert" />
+</div>
+
+{/* Flecha derecha */}
+<div className="swiper-button-next-custom absolute top-1/2 right-2 -translate-y-1/2 z-10 cursor-pointer bg-black shadow rounded-full p-2 hover:scale-110 transition">
+  <img src={ArrowRight} alt="Siguiente" className="w-5 h-5 invert" />
+</div>
+
+</Swiper>
+
 
       {/* Caja de comentarios */}
       {user ? (
@@ -174,7 +195,7 @@ export default function Resenas({
           <h3
             className={`text-lg font-semibold mb-4 ${fuentesMap[fuenteTexto]}`}
           >
-            Dejá tu reseña
+            Dejá tu comentario
           </h3>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <textarea

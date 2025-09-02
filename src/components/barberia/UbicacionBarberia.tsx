@@ -23,15 +23,12 @@ export default function UbicacionBarberia({ nombre, ubicacion }: Props) {
   }
 
   return (
-    <section className="py-20 px-6 md:px-12 lg:px-24 bg-gray-50">
+    <section className="py-10 px-6 md:px-12 lg:px-24 bg-gray-50">
       <h2 className="text-3xl font-bold text-center mb-8">Ubicación</h2>
 
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6">
         {nombre && (
-          <p className="text-lg font-medium mb-1 text-center">{nombre}</p>
-        )}
-        {ubicacion.direccion && (
-          <p className="text-gray-700 mb-4 text-center">{ubicacion.direccion}</p>
+          <p className="text-lg font-medium mb-4 text-center">{nombre}</p>
         )}
 
         {/* Mapa Google embebido */}

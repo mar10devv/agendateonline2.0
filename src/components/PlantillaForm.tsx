@@ -407,48 +407,43 @@ export default function PlantillaForm() {
         </button>
 
         {/* Mini mapa */}
-        {config.ubicacion?.lat && config.ubicacion?.lng && (
-          <div className="mt-3 space-y-2">
-            <div className="p-3 bg-gray-100 rounded-md border text-gray-700">
-              <p className="text-sm font-medium">📍 Ubicación detectada:</p>
-              <p className="text-sm">{config.ubicacion.direccion}</p>
-            </div>
+{config.ubicacion?.lat && config.ubicacion?.lng && (
+  <div className="mt-3">
+    <div className="w-full h-64 rounded-md overflow-hidden border">
+      <MapContainer
+        key={`${config.ubicacion.lat}-${config.ubicacion.lng}`}
+        center={[config.ubicacion.lat, config.ubicacion.lng]}
+        zoom={16}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+        />
+        <Marker
+          position={[config.ubicacion.lat, config.ubicacion.lng]}
+          icon={customIcon}
+          draggable={true}
+          eventHandlers={{
+            dragend: (e) => {
+              const newPos = e.target.getLatLng();
+              setConfig((prev: any) => ({
+                ...prev,
+                ubicacion: {
+                  lat: newPos.lat,
+                  lng: newPos.lng,
+                },
+              }));
+            },
+          }}
+        >
+          <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+        </Marker>
+      </MapContainer>
+    </div>
+  </div>
+)}
 
-            <div className="w-full h-64 rounded-md overflow-hidden border">
-              <MapContainer
-                key={`${config.ubicacion.lat}-${config.ubicacion.lng}`}
-                center={[config.ubicacion.lat, config.ubicacion.lng]}
-                zoom={16}
-                style={{ width: "100%", height: "100%" }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                <Marker
-                  position={[config.ubicacion.lat, config.ubicacion.lng]}
-                  icon={customIcon}
-                  draggable={true}
-                  eventHandlers={{
-                    dragend: (e) => {
-                      const newPos = e.target.getLatLng();
-                      setConfig((prev: any) => ({
-                        ...prev,
-                        ubicacion: {
-                          lat: newPos.lat,
-                          lng: newPos.lng,
-                          direccion: `Lat: ${newPos.lat}, Lng: ${newPos.lng}`,
-                        },
-                      }));
-                    },
-                  }}
-                >
-                  <Popup>Mueve el pin si la ubicación no es correcta</Popup>
-                </Marker>
-              </MapContainer>
-            </div>
-          </div>
-        )}
 
         {/* Botones */}
 <div className="flex flex-col gap-2 mt-4">
