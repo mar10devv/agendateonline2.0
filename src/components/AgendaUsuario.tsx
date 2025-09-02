@@ -41,49 +41,31 @@ export default function AgendaUsuario() {
         return;
       }
 
-      const q = query(
-  collection(db, "Usuarios", usuario.uid, "Turnos")
-);
-
+      const q = query(collection(db, "Usuarios", usuario.uid, "Turnos"));
 
       const unsubTurnos = onSnapshot(q, async (snap) => {
         const docs = snap.docs.map(
           (d) => ({ id: d.id, ...d.data() } as Turno)
         );
 
-        const ahora = new Date();
-
-        // separar futuros y pasados
-        const futuros: Turno[] = [];
-        const pasados: Turno[] = [];
-
-        docs.forEach((t) => {
-          const fechaHora = new Date(`${t.fecha}T${t.hora}`);
-          if (fechaHora >= ahora) {
-            futuros.push(t);
-          } else {
-            pasados.push(t);
-          }
-        });
-
-        // ordenar pasados (más recientes primero)
-        pasados.sort(
+        // ✅ Ordenar todos por fecha+hora (más recientes primero)
+        const ordenados = docs.sort(
           (a, b) =>
-            new Date(`${b.fecha}T${b.hora}`).getTime() -
-            new Date(`${a.fecha}T${a.hora}`).getTime()
+            new Date(`${b.fecha}T${b.hora}:00`).getTime() -
+            new Date(`${a.fecha}T${a.hora}:00`).getTime()
         );
 
-        // conservar solo 3 pasados
-        const conservar = pasados.slice(0, 3);
-        const borrar = pasados.slice(3);
+        // ✅ Conservar solo los últimos 3
+        const conservar = ordenados.slice(0, 3);
 
-        // borrar de firestore los sobrantes
+        // ✅ Borrar del Firestore los que sobren
+        const borrar = ordenados.slice(3);
         for (const turno of borrar) {
           await deleteDoc(doc(db, "Usuarios", usuario.uid, "Turnos", turno.id));
         }
 
-        // actualizar estado
-        setTurnos([...futuros, ...conservar]);
+        // ✅ Actualizar estado solo con 3
+        setTurnos(conservar);
         setCargando(false);
       });
 
@@ -106,7 +88,7 @@ export default function AgendaUsuario() {
   // 👇 Calcula estado según fecha/hora
   const calcularEstado = (t: Turno) => {
     const ahora = new Date();
-    const fechaHora = new Date(`${t.fecha}T${t.hora}`);
+    const fechaHora = new Date(`${t.fecha}T${t.hora}:00`);
     return fechaHora >= ahora ? "Activo" : "Vencido";
   };
 
@@ -119,12 +101,12 @@ export default function AgendaUsuario() {
       ) : turnos.length === 0 ? (
         <p className="text-gray-600">No tienes turnos reservados.</p>
       ) : (
-        <ul className="space-y-4">
-          {turnos.map((t) => (
-            <li
-              key={t.id}
-              className="relative border rounded-xl p-5 bg-white shadow-md hover:shadow-lg transition"
-            >
+        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {turnos.map((t) => (
+    <li
+      key={t.id}
+      className="relative border rounded-xl p-5 bg-white shadow-md hover:shadow-lg transition"
+    >
               {/* Botón more */}
               <button
                 className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100"
@@ -158,7 +140,8 @@ export default function AgendaUsuario() {
                 {t.negocioNombre}
               </p>
               <p className="text-gray-700">
-                {t.servicio} con <span className="font-medium">{t.barbero}</span>
+                {t.servicio} con{" "}
+                <span className="font-medium">{t.barbero}</span>
               </p>
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                 <span className="flex items-center gap-1">

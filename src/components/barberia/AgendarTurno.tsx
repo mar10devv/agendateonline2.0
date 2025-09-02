@@ -26,7 +26,7 @@ type Props = {
   fuenteTexto?: string;
   fuenteBotones?: string;
   empleados: Empleado[];
-  negocioId: string; // 👈 importante: el id del negocio dueño del slug
+  negocioId: string;
 };
 
 export default function AgendarTurno({
@@ -48,10 +48,7 @@ export default function AgendarTurno({
   const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
   const [turnoActivo, setTurnoActivo] = useState<any>(null);
 
-// 👇 Nuevo estado para mostrar mensajes en el botón
-const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "error">("inicial");
-
-
+  const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "error">("inicial");
 
   // 🔎 Filtramos imágenes válidas
   const trabajosValidos = barberoSeleccionado?.trabajos?.filter((t) => t && t.trim() !== "") || [];
@@ -75,13 +72,11 @@ const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "er
   // ✅ Hook compartido para sincronizar fechas
   const fechas = useFechasAgenda(14);
 
-  // 🔎 Escuchar si el usuario ya tiene un turno activo en este negocio
+  // 🔎 Escuchar si el usuario ya tiene un turno en este negocio
   useEffect(() => {
     const auth = getAuth();
     const unsubAuth = onAuthStateChanged(auth, (usuario) => {
       if (usuario && negocioId) {
-        const hoyISO = new Date().toISOString().split("T")[0];
-
         const q = query(
           collection(db, "Negocios", negocioId, "Turnos"),
           where("uidCliente", "==", usuario.email)
@@ -104,24 +99,23 @@ const [estadoTurno, setEstadoTurno] = useState<"inicial" | "exito" | "ver" | "er
     return () => unsubAuth();
   }, [negocioId]);
 
-  // 🔎 Escuchar horarios ocupados para el barbero y la fecha seleccionada
-useEffect(() => {
-  if (!barberoSeleccionado || !fechaSeleccionada) return;
+  // 🔎 Escuchar horarios ocupados
+  useEffect(() => {
+    if (!barberoSeleccionado || !fechaSeleccionada) return;
 
-  const q = query(
-    collection(db, "Negocios", negocioId, "Turnos"),
-    where("barbero", "==", barberoSeleccionado.nombre),
-    where("fecha", "==", fechaSeleccionada)
-  );
+    const q = query(
+      collection(db, "Negocios", negocioId, "Turnos"),
+      where("barbero", "==", barberoSeleccionado.nombre),
+      where("fecha", "==", fechaSeleccionada)
+    );
 
-  const unsub = onSnapshot(q, (snap) => {
-    const ocupados = snap.docs.map((d) => d.data().hora as string);
-    setHorariosOcupados(ocupados);
-  });
+    const unsub = onSnapshot(q, (snap) => {
+      const ocupados = snap.docs.map((d) => d.data().hora as string);
+      setHorariosOcupados(ocupados);
+    });
 
-  return () => unsub();
-}, [barberoSeleccionado, fechaSeleccionada, negocioId]);
-
+    return () => unsub();
+  }, [barberoSeleccionado, fechaSeleccionada, negocioId]);
 
   // 🔹 Guardar turno
   const guardarTurno = async () => {
@@ -165,10 +159,10 @@ useEffect(() => {
         creadoEn: new Date(),
       });
 
-      // 👇 Guardar copia en la agenda del usuario
+      // Guardar copia en el usuario
       await setDoc(doc(db, "Usuarios", usuario.uid, "Turnos", turnoRef.id), {
         negocioId,
-        negocioNombre: "BarberStyle", // ⚠️ por ahora fijo, después lo hacemos dinámico
+        negocioNombre: "BarberStyle",
         barbero: barberoSeleccionado.nombre,
         servicio: servicioSeleccionado,
         fecha: fechaSeleccionada,
@@ -177,21 +171,20 @@ useEffect(() => {
         creadoEn: new Date(),
       });
 
-      setEstadoTurno("exito"); // 👈 marcamos éxito
-setPaso("imagenes");
-setServicioSeleccionado(null);
-setFechaSeleccionada(null);
-setHorarioSeleccionado(null);
-setBarberoSeleccionado(null);
-setMostrarBarberos(false);
-} catch (e: any) {
-  console.error("Error al guardar turno:", e);
-  setEstadoTurno("error"); // 👈 opcional, si querés mostrar otro mensaje en botón
-}
-
+      setEstadoTurno("exito");
+      setPaso("imagenes");
+      setServicioSeleccionado(null);
+      setFechaSeleccionada(null);
+      setHorarioSeleccionado(null);
+      setBarberoSeleccionado(null);
+      setMostrarBarberos(false);
+    } catch (e: any) {
+      console.error("Error al guardar turno:", e);
+      setEstadoTurno("error");
+    }
   };
 
-  // 🔹 Barra superior persistente
+  // 🔹 Barra superior
   const renderBarra = () => {
     if (!barberoSeleccionado) return null;
     return (
@@ -231,52 +224,55 @@ setMostrarBarberos(false);
     );
   };
 
+// 👇 Verificamos si el turnoActivo sigue vigente (hora local)
+let turnoActivoVigente = false;
+
+if (turnoActivo?.fecha && turnoActivo?.hora) {
+  const [year, month, day] = turnoActivo.fecha.split("-").map(Number);
+  const [hours, minutes] = turnoActivo.hora.split(":").map(Number);
+
+  // ⚡ Crear fecha en hora local (no UTC)
+  const fechaHoraTurno = new Date(year, month - 1, day, hours, minutes);
+
+  turnoActivoVigente = fechaHoraTurno.getTime() >= Date.now();
+}
+
+
   return (
-    <section
-  className={`py-20 px-6 md:px-12 lg:px-24 bg-gray-50 text-center ${fuenteTexto}`}
+  <section
+    className={`py-20 px-6 md:px-12 lg:px-24 bg-gray-50 text-center ${fuenteTexto}`}
     style={{ minHeight: "400px" }}
->
+  >
+    {/* Vista inicial */}
+    {!mostrarBarberos && !barberoSeleccionado && (
+      <>
+        <h2 className="text-3xl font-bold mb-6">Reserva turno con los mejores barberos</h2>
 
+        {estadoTurno === "exito" && (
+          <p className="mb-4 text-green-600 font-semibold">✅ Tu turno fue agendado con éxito</p>
+        )}
+        {estadoTurno === "error" && (
+          <p className="mb-4 text-red-600 font-semibold">❌ Hubo un error al agendar el turno</p>
+        )}
 
-      {/* Vista inicial */}
-{!mostrarBarberos && !barberoSeleccionado && (
-  <>
-    <h2 className="text-3xl font-bold mb-6">Reserva turno con los mejores barberos</h2>
+        {turnoActivo && turnoActivoVigente ? (
+  <a
+    href="/agenda-usuario"
+    className={`px-8 py-3 rounded-lg transition bg-green-600 text-white hover:bg-green-700 ${fuenteBotones}`}
+  >
+    Ver mi turno
+  </a>
+) : (
 
-    {/* 👇 Mensaje si se acaba de agendar */}
-    {estadoTurno === "exito" && (
-      <p className="mb-4 text-green-600 font-semibold">
-        ✅ Tu turno fue agendado con éxito
-      </p>
-    )}
-    {estadoTurno === "error" && (
-      <p className="mb-4 text-red-600 font-semibold">
-        ❌ Hubo un error al agendar el turno
-      </p>
-    )}
-
-    {turnoActivo ? (
-      <button
-        onClick={() => {
-          alert(
-            `Tu turno activo es el ${turnoActivo.fecha} a las ${turnoActivo.hora} con ${turnoActivo.barbero}`
-          );
-        }}
-        className={`px-8 py-3 rounded-lg transition bg-green-600 text-white hover:bg-green-700 ${fuenteBotones}`}
-      >
-        Ver mi turno
-      </button>
-    ) : (
-      <button
-        onClick={() => setMostrarBarberos(true)}
-        className={`px-8 py-3 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
-      >
-        Reservar turno
-      </button>
-    )}
-  </>
-)}
-
+          <button
+            onClick={() => setMostrarBarberos(true)}
+            className={`px-8 py-3 rounded-lg transition bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
+          >
+            Agendar turno
+          </button>
+        )}
+      </>
+      )}
 
       {/* Lista de barberos */}
       {mostrarBarberos && !barberoSeleccionado && (
@@ -306,244 +302,169 @@ setMostrarBarberos(false);
         </div>
       )}
 
-      {/* Flujo dentro de barbero seleccionado */}
+      {/* Flujo pasos */}
       {barberoSeleccionado && (
         <div className="mt-12 flex flex-col items-center w-full">
           {renderBarra()}
 
           {/* Paso imágenes */}
-{paso === "imagenes" && (
-  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-    {trabajosValidos.length > 0 ? (
-      <>
-        {/* Carrusel */}
-        <div className="relative w-full">
-          <Swiper
-            modules={[Navigation, Thumbs]}
-            navigation={{ prevEl: ".custom-prev", nextEl: ".custom-next" }}
-            thumbs={{ swiper: thumbsSwiper }}
-            className="rounded-xl shadow"
-            touchRatio={1}
-            simulateTouch={true}
-          >
-            {trabajosValidos.map((foto, idx) => (
-              <SwiperSlide key={idx}>
-                <img src={foto} alt={`Trabajo ${idx + 1}`} className="w-full h-[400px] object-cover rounded-xl" />
-              </SwiperSlide>
-            ))}
-          </Swiper>
-          <button className="custom-prev absolute top-1/2 left-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
-            <img src={ArrowLeft} alt="Anterior" className="w-6 h-6" />
-          </button>
-          <button className="custom-next absolute top-1/2 right-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
-            <img src={ArrowRight} alt="Siguiente" className="w-6 h-6" />
-          </button>
-        </div>
-        {/* Miniaturas */}
-        <div className="mt-6 w-full flex flex-col items-center">
-          <div className="flex justify-center w-full">
-            <Swiper
-              onSwiper={setThumbsSwiper}
-              spaceBetween={10}
-              slidesPerView="auto"
-              freeMode={true}
-              watchSlidesProgress={true}
-              modules={[Thumbs]}
-              className="max-w-max"
-              onReachBeginning={() => setScrollHint("right")}
-              onReachEnd={() => setScrollHint("left")}
-              onFromEdge={() => setScrollHint(null)}
-            >
-              {trabajosValidos.map((foto, idx) => (
-                <SwiperSlide
-                  key={idx}
-                  style={{ width: "80px" }}
-                  className="flex justify-center border-2 border-transparent rounded-md transition swiper-slide-thumb-active:border-black"
-                >
-                  <img src={foto} alt={`Miniatura ${idx + 1}`} className="h-20 w-28 object-cover rounded-md cursor-pointer" />
-                </SwiperSlide>
-              ))}
-            </Swiper>
-          </div>
-          {scrollHint && (
-            <div className="mt-2 text-center text-sm text-gray-600 animate-pulse md:hidden">
-              {scrollHint === "right" ? "Deslizar →" : "← Deslizar"}
+          {paso === "imagenes" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+              {trabajosValidos.length > 0 ? (
+                <>
+                  <div className="relative w-full">
+                    <Swiper
+                      modules={[Navigation, Thumbs]}
+                      navigation={{ prevEl: ".custom-prev", nextEl: ".custom-next" }}
+                      thumbs={{ swiper: thumbsSwiper }}
+                      className="rounded-xl shadow"
+                      touchRatio={1}
+                      simulateTouch={true}
+                    >
+                      {trabajosValidos.map((foto, idx) => (
+                        <SwiperSlide key={idx}>
+                          <img src={foto} alt={`Trabajo ${idx + 1}`} className="w-full h-[400px] object-cover rounded-xl" />
+                        </SwiperSlide>
+                      ))}
+                    </Swiper>
+                    <button className="custom-prev absolute top-1/2 left-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
+                      <img src={ArrowLeft} alt="Anterior" className="w-6 h-6" />
+                    </button>
+                    <button className="custom-next absolute top-1/2 right-4 transform -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-2 shadow">
+                      <img src={ArrowRight} alt="Siguiente" className="w-6 h-6" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-600">Este barbero aún no tiene trabajos subidos.</p>
+              )}
+              <button
+                onClick={() => setPaso("pregunta")}
+                className={`mt-8 px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
+              >
+                Continuar
+              </button>
             </div>
           )}
-        </div>
-      </>
-    ) : (
-      <p className="text-gray-600">Este barbero aún no tiene trabajos subidos.</p>
-    )}
-    <button
-      onClick={() => setPaso("pregunta")}
-      className={`mt-8 px-6 py-3 rounded-lg bg-black text-white hover:bg-gray-800 ${fuenteBotones}`}
-    >
-      Continuar
-    </button>
-  </div>
-)}
 
-{/* Paso pregunta */}
-{paso === "pregunta" && (
-  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-    <p className="text-lg font-medium mb-4">¿Vienes solo o con amigos?</p>
-    <div className="flex gap-4 mb-4">
-      <button
-        onClick={() => {
-          setConAmigos("solo");
-          setPaso("precios");
-        }}
-        className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
-      >
-        Solo
-      </button>
-      <button
-        onClick={() => setConAmigos("amigos")}
-        className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
-      >
-        Con amigos
-      </button>
-    </div>
-    {conAmigos === "amigos" && (
-      <div className="mt-4 flex items-center">
-        <label className="block mr-2 font-medium">¿Cuántos amigos?</label>
-        <select
-          value={cantidadAmigos}
-          onChange={(e) => setCantidadAmigos(parseInt(e.target.value))}
-          className="px-3 py-2 border rounded-lg"
-        >
-          {[1, 2, 3, 4].map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-        <button
-          onClick={() => setPaso("precios")}
-          className="ml-4 px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
-        >
-          Siguiente
-        </button>
-      </div>
-    )}
-  </div>
-)}
+          {/* Paso pregunta */}
+          {paso === "pregunta" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+              <p className="text-lg font-medium mb-4">¿Vienes solo o con amigos?</p>
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => {
+                    setConAmigos("solo");
+                    setPaso("precios");
+                  }}
+                  className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Solo
+                </button>
+                <button
+                  onClick={() => setConAmigos("amigos")}
+                  className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Con amigos
+                </button>
+              </div>
+            </div>
+          )}
 
-{/* Paso precios */}
-{paso === "precios" && (
-  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-    <div className="flex flex-col gap-3 w-full">
-      {[
-        "Corte de pelo — $400",
-        "Corte + Barba — $500",
-        "Corte + Barba + Cejas — $550",
-        "Corte + Tinta — $800",
-        "Tinta — $600",
-      ].map((serv, i) => (
-        <button
-          key={i}
-          onClick={() => {
-            setServicioSeleccionado(serv);
-            setPaso("fecha");
-          }}
-          className="px-4 py-3 rounded-lg bg-black text-white hover:bg-gray-800"
-        >
-          {serv}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
+          {/* Paso precios */}
+          {paso === "precios" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+              <div className="flex flex-col gap-3 w-full">
+                {[
+                  "Corte de pelo — $400",
+                  "Corte + Barba — $500",
+                  "Corte + Barba + Cejas — $550",
+                  "Corte + Tinta — $800",
+                  "Tinta — $600",
+                ].map((serv, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setServicioSeleccionado(serv);
+                      setPaso("fecha");
+                    }}
+                    className="px-4 py-3 rounded-lg bg-black text-white hover:bg-gray-800"
+                  >
+                    {serv}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-{/* Paso fecha */}
-{paso === "fecha" && (
-  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-      {fechas.map((d) => (
-        <button
-          key={d.value}
-          onClick={() => setFechaSeleccionada(d.value)}
-          className={`relative py-2 px-6 text-sm font-bold rounded-full overflow-hidden transition-all duration-400 ease-in-out shadow-md
-            ${
-              fechaSeleccionada === d.value
-                ? "text-white bg-gradient-to-r from-gray-900 to-black scale-105"
-                : "text-black bg-gray-100 hover:scale-105 hover:text-white hover:shadow-lg active:scale-90"
-            }
-            before:absolute before:top-0 before:-left-full before:w-full before:h-full 
-            before:bg-gradient-to-r before:from-gray-900 before:to-black
-            before:transition-all before:duration-500 before:ease-in-out before:z-[-1] before:rounded-full 
-            hover:before:left-0`}
-        >
-          {d.label}
-        </button>
-      ))}
-    </div>
+          {/* Paso fecha */}
+          {paso === "fecha" && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                {fechas.map((d) => (
+                  <button
+                    key={d.value}
+                    onClick={() => setFechaSeleccionada(d.value)}
+                    className={`py-2 px-6 rounded-full ${
+                      fechaSeleccionada === d.value
+                        ? "text-white bg-black scale-105"
+                        : "text-black bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              {fechaSeleccionada && (
+                <button
+                  onClick={() => setPaso("horarios")}
+                  className="mt-6 px-6 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                >
+                  Ver horarios
+                </button>
+              )}
+            </div>
+          )}
 
-    {fechaSeleccionada && (
-      <button
-        onClick={() => setPaso("horarios")}
-        className="mt-6 px-6 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
-      >
-        Ver horarios
-      </button>
-    )}
-  </div>
-)}
-
-
-{/* Paso horarios */}
-{paso === "horarios" && fechaSeleccionada && (
-  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-    <div className="flex flex-wrap gap-3 justify-center">
-      {horariosDisponibles.map((h, i) => {
-        const ocupado = horariosOcupados.includes(h); // 👈 verificamos si está ocupado
-
-        return (
-          <button
-            key={i}
-            onClick={() => !ocupado && setHorarioSeleccionado(h)} // 👈 no dejar seleccionar ocupados
-            disabled={ocupado} // 👈 deshabilitamos botón si está ocupado
-            className={`px-4 py-2 rounded-lg ${
-              ocupado
-                ? "bg-red-600 text-white cursor-not-allowed" // 🔴 ocupados
-                : horarioSeleccionado === h
-                ? "bg-gray-800 text-white"
-                : "bg-black text-white hover:bg-gray-800"
-            }`}
-          >
-            {h}
-          </button>
-        );
-      })}
-    </div>
-
-    {horarioSeleccionado && (
-      <>
-        <p className="mt-4 font-medium">
-          Has seleccionado: {servicioSeleccionado} el {fechaSeleccionada} a las {horarioSeleccionado}
-        </p>
-        <button
-          onClick={guardarTurno}
-          className="mt-6 px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700"
-        >
-          Confirmar turno
-        </button>
-
-        {estadoTurno === "exito" && (
-          <p className="mt-4 text-green-600 font-semibold">
-            ✅ Turno agendado con éxito
-          </p>
-        )}
-        {estadoTurno === "error" && (
-          <p className="mt-4 text-red-600 font-semibold">
-            ❌ Hubo un error al agendar el turno
-          </p>
-        )}
-      </>
-    )}
-  </div>
-)}
-
-
+          {/* Paso horarios */}
+          {paso === "horarios" && fechaSeleccionada && (
+            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+              <div className="flex flex-wrap gap-3 justify-center">
+                {horariosDisponibles.map((h, i) => {
+                  const ocupado = horariosOcupados.includes(h);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => !ocupado && setHorarioSeleccionado(h)}
+                      disabled={ocupado}
+                      className={`px-4 py-2 rounded-lg ${
+                        ocupado
+                          ? "bg-red-600 text-white cursor-not-allowed"
+                          : horarioSeleccionado === h
+                          ? "bg-gray-800 text-white"
+                          : "bg-black text-white hover:bg-gray-800"
+                      }`}
+                    >
+                      {h}
+                    </button>
+                  );
+                })}
+              </div>
+              {horarioSeleccionado && (
+                <>
+                  <p className="mt-4 font-medium">
+                    Has seleccionado: {servicioSeleccionado} el {fechaSeleccionada} a las {horarioSeleccionado}
+                  </p>
+                  <button
+                    onClick={guardarTurno}
+                    className="mt-6 px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Confirmar turno
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
