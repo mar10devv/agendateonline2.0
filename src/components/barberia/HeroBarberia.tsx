@@ -78,7 +78,7 @@ export default function HeroBarberia({
 
       {/* Texto */}
 <div className="absolute inset-0 flex flex-col justify-center items-center text-center text-white z-10">
-  <h1 className="text-8xl sm:text-9xl md:text-9xl lg:text-9xl font-bold font-euphoria tracking-wide">
+  <h1 className="text-7xl sm:text-9xl md:text-9xl lg:text-9xl font-bold font-euphoria tracking-wide">
   {nombre}
 </h1>
 

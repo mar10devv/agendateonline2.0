@@ -1,0 +1,323 @@
+[33mcommit ca647c4421f41db0f361e680372d910e183247c8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Tue Sep 2 00:45:44 2025 -0300
+
+    se esta aplicando un sistema de verificacion cada 5minutos
+
+[33mcommit 1d8f63e5a6904bd0540027cfe90599dfe8d3027f[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Tue Sep 2 00:26:43 2025 -0300
+
+    se arreglo bug de agendar, historial largo en AgendaUsuario
+
+[33mcommit c6bcd4033daa7231035972e3b086973d7656bc16[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 23:39:40 2025 -0300
+
+    se arreglo el bug de mi agenda no mostraba los turnos guardados
+
+[33mcommit a82cd7782b3b56f0ba61f5acdcc2c35399ab78c3[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 13:23:40 2025 -0300
+
+    se reparo bug de no poder agregar empleados
+
+[33mcommit b42ddbea28d4d5d4548a46d263f77f6a847e70c4[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 12:50:44 2025 -0300
+
+    se agrego panel notificaciones
+
+[33mcommit ee9ee0da4d2816b2dc133b233077a2171499ae04[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 12:14:37 2025 -0300
+
+    se modifico agenda del cliente
+
+[33mcommit fc6999b6c58b2f8968582260e4375927ec573ec5[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 11:56:11 2025 -0300
+
+    se agrego boton rojo en caso de que el turno este ocupado
+
+[33mcommit d921e5d3036ebf0e03ee2ff49476dbe74455be44[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 11:29:12 2025 -0300
+
+    probando borrar turnos #1
+
+[33mcommit 0c07796788527882cf4634f9207ed02a2d3725a6[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 11:23:01 2025 -0300
+
+    se esta implementando borrar turno
+
+[33mcommit cadb24ec7aafe7b1e035d4d6db2882fa8d1033bc[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 10:16:13 2025 -0300
+
+    cambios en el texto
+
+[33mcommit 576ddb0265b24e363d8357c9c88fee02813aa8fb[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Mon Sep 1 09:41:45 2025 -0300
+
+    se aplicaron cambios responsives en dashboardagenda
+
+[33mcommit 578917a5c37271d39519b25ab470451c793b6df5[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sun Aug 31 12:18:33 2025 -0300
+
+    se esta implemendando agenda del usuario
+
+[33mcommit 9df14aa1a09b31b3795762add2a5cea21cfa3937[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sun Aug 31 11:17:17 2025 -0300
+
+    ajustando agenda
+
+[33mcommit 76a432314bb5660e89552087d36e048ad5975d87[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sun Aug 31 00:40:43 2025 -0300
+
+    agregando agenda y turnos a firebase
+
+[33mcommit 319a89ca39816b3fa8be37a206626579090030e1[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sat Aug 30 23:26:52 2025 -0300
+
+    se agrego script para que refresque al inicio
+
+[33mcommit 088f5c3fb5ad42ce3a35e03c768b1f6361301862[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sat Aug 30 23:20:21 2025 -0300
+
+    ahora desliza con el dedo las img
+
+[33mcommit 0c9ac89ddecba80e8055a9ab9e886f20ac83e11d[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sat Aug 30 12:37:44 2025 -0300
+
+    se arreglo margen entre secciones
+
+[33mcommit d561f6737647e993601bfa7e4cc031a6cc54fbe2[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sat Aug 30 12:34:42 2025 -0300
+
+    se arreglo bug de fotos
+
+[33mcommit 28c09d10710a61e99c83e6d823740b7579f94d48[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Sat Aug 30 12:22:33 2025 -0300
+
+    se agrego seccion de reserva
+
+[33mcommit f06fa93829de3ede6f98e37661bd99002ae30244[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 13:18:58 2025 -0300
+
+    se ajusto el titulo su tamaño
+
+[33mcommit b99b4ab085a09fbe75fc6f90bdaba953eb8757c4[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 13:13:57 2025 -0300
+
+    se arreglo bug de animacion
+
+[33mcommit fd65f2cb395a1de6f2e12e410e314a5e53c50003[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 13:03:46 2025 -0300
+
+    se soluciono bug de slug
+
+[33mcommit 3478ee5fe948b870c6217ce914e58c211fd509e8[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 12:55:31 2025 -0300
+
+    se agregaron animaciones a las secciones
+
+[33mcommit 6aa6cf8537e905efbc75bb502f96bc1fe9a57e6c[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 11:04:22 2025 -0300
+
+    se agregaron secciones nuevas
+
+[33mcommit dbef3caab574845481ae89b4e8612e7a46b60785[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 09:16:10 2025 -0300
+
+    cambiamos las fotos que se suban en local y luego a fire base y imgbb
+
+[33mcommit f81c311c61ab281afab352929e49ef9cb1b9d8a8[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Fri Aug 29 00:12:20 2025 -0300
+
+    se arreglo el problema de secciones!
+
+[33mcommit 04ce4bcb52b36a65237696af771128471563fb33[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 23:50:26 2025 -0300
+
+    antes de hacer cagada subo este push
+
+[33mcommit dcd45ea032ddb9061fddc10ede778032ff5fd6f5[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 17:42:20 2025 -0300
+
+    se estan arreglando los margenes de panel/empleados
+
+[33mcommit d16a53943182dbe1a02796f26378f70b999c7b1e[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 17:22:21 2025 -0300
+
+    lo esencial funciona
+
+[33mcommit 4210120825dd72d577544264557cc9f2a9ee8527[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 17:06:06 2025 -0300
+
+    se solicionaron errores en el panel de personalizar
+
+[33mcommit 3e5b3853273166bed0bfd453460b7e76cc9eac55[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 16:33:41 2025 -0300
+
+    intentando arreglar en movile la ubi
+
+[33mcommit 43f43057c8e025f4e164af19fead68630af6ef09[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 16:26:33 2025 -0300
+
+    se esta arreglando el boton de ubicacion
+
+[33mcommit 28ac57deb9344983113d133386859210c7d66634[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 16:11:24 2025 -0300
+
+    se agrego minimapa y ubicacion
+
+[33mcommit 984bf924c23822c281f50edcf6cac98341682c7d[m
+Author: mar10devv <mar10devcontacto@gmail.com>
+Date:   Thu Aug 28 15:35:26 2025 -0300
+
+    feat: cambios en panel y ubicación
+
+[33mcommit dac0e8fb9f93d5e06a15a9aaad07a3f833bc6149[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Tue Aug 26 21:49:07 2025 -0300
+
+    se puede editar el slogan y las fuentes
+
+[33mcommit 97f811e39fcfdc4fea8cbfcf845baaea6e7afce7[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Mon Aug 25 21:34:53 2025 -0300
+
+    se agregaron fonts para el usuario
+
+[33mcommit 5d9770869eea53705e4e10124cdaf25b73ba2e60[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Mon Aug 25 21:01:47 2025 -0300
+
+    se agregaron nuevo botones y iconos al panel de control
+
+[33mcommit d6ef40dc71f7662e1d85719e767fb1f6c39b7345[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Sat Aug 23 00:49:00 2025 -0300
+
+    se hicieron cambios en el panel
+
+[33mcommit 13e083168f72d1ff016bbe9624541ed289cc66b6[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Sat Aug 23 00:16:00 2025 -0300
+
+    cambios en el panel
+
+[33mcommit 7b18157d29f058794a5477f27413acaad6acfb5a[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 13:23:45 2025 -0300
+
+    se esta haciendo la plantilla de barberia
+
+[33mcommit 4c6910eb5fa1f120aea6e9b3e1d83cf6f52a2783[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:20:06 2025 -0300
+
+    en local funciona
+
+[33mcommit e759354f8a94c5d727bb36dac10f1e5903e87771[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:14:02 2025 -0300
+
+    otra vez
+
+[33mcommit ce6ef3130d0c331137fa1c6c0f4bd7282b31faf4[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:10:22 2025 -0300
+
+    probando
+
+[33mcommit 7b2365ffb9dfe99491276fb98fa595d32a4e40a5[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:07:58 2025 -0300
+
+    otra prueba
+
+[33mcommit 8c8441ea3b207d1569ba2ee9712df706288322cb[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:04:37 2025 -0300
+
+    probando otra vez
+
+[33mcommit 7e3260ada100f9ca5dea617138330a344c863571[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 12:03:29 2025 -0300
+
+    probando
+
+[33mcommit 79029407bc9d492f18d4d9c442529ffc3f5381bd[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 11:56:48 2025 -0300
+
+    probando despliegue
+
+[33mcommit ccab5ef5b7f6ce1a81af92e126eaf06e148c6e69[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 11:51:17 2025 -0300
+
+    probando si funca
+
+[33mcommit 6a884c951d0a327e772e3375fb114cbc86224f3b[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 11:41:12 2025 -0300
+
+    se agrego panel de empleados y animaciones
+
+[33mcommit acbd6f0b28f69a809165d682736abcca2e8c7d9f[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 01:26:10 2025 -0300
+
+    reparando lo responsive
+
+[33mcommit f5184c8630e48022ee3ce43e1e4364c8283182d5[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 01:17:55 2025 -0300
+
+    dandole vida al panel de control
+
+[33mcommit 26b41d5de8d09a55a4fc54737b2fa20c2cb638d8[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Fri Aug 22 00:10:34 2025 -0300
+
+    se mejoro el menu mobile y se agrego animaciones
+
+[33mcommit 55e02c717f687e079cf7709142ae1fa6f1d0737c[m
+Author: Mar10dev <martinmartinezcontacto@gmail.com>
+Date:   Thu Aug 21 23:44:22 2025 -0300
+
+    primer commit
+
+[33mcommit 68507e9e428663c3e8d1427999d25664264cbead[m
+Author: houston[bot] <astrobot-houston@users.noreply.github.com>
+Date:   Thu Aug 21 23:28:46 2025 -0300
+
+    Initial commit from Astro
