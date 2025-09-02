@@ -1,11 +1,20 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import "../styles/global.css";
+import NavBar from "../components/Navbar.tsx";
+import HeroInicio from "../components/HeroInicio.tsx";
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const { title = "Agéndate" } = Astro.props;
 ---
-
-<Layout>
-	<Welcome />
-</Layout>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" /> <!-- 👈 FALTA -->
+    <title>{title}</title>
+  </head>
+  <body class="bg-neutral-50 text-neutral-900">
+    <NavBar client:load />
+<HeroInicio client:load />
+<slot />
+    
+  </body>
+</html>

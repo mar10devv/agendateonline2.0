@@ -72,16 +72,18 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-[9999] bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      <header className="fixed top-0 left-0 w-full z-[9999] bg-transparent">
+
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <a
-              href="/"
-              className="text-3xl font-bold tracking-tight text-neutral-900 font-inter"
-            >
-              AgéndateOnline
-            </a>
+  href="/"
+  className="text-3xl font-bold tracking-tight text-white font-inter"
+>
+  AgéndateOnline
+</a>
+
 
             {/* Desktop */}
             <nav className="hidden md:flex items-center gap-3">
@@ -97,14 +99,15 @@ export default function Navbar() {
                     onClick={() => setNotifOpen(true)}
                   >
                     <img
-                      src={user.photoURL ?? ""}
-                      alt="Usuario"
-                      className="h-8 w-8 rounded-full"
-                      referrerPolicy="no-referrer"
-                    />
+  src={user.photoURL ?? ""}
+  alt="Usuario"
+  className="h-8 w-8 rounded-full border-2 border-white"
+  referrerPolicy="no-referrer"
+/>
+
                     {notificaciones.length > 0 && (
-                      <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-gray-500" />
-                    )}
+  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-yellow-400" />
+)}
                   </div>
                 </>
               ) : (
