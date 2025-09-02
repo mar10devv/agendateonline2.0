@@ -70,18 +70,22 @@ export default function NavbarBarberia({
         </div>
 
         {/* Links desktop */}
-        <nav className="hidden lg:flex space-x-6 items-center">
-          <a href="#" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Inicio</a>
-          <a href="#nosotros" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Sobre nosotros</a>
-          <a href="#cursos" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Cursos</a>
-          <a href="#contacto" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Contacto</a>
-          <a
-            href="#reservar"
-            className={`bg-[var(--hoverColor)] text-white px-4 py-2 rounded-md font-semibold hover:opacity-90 transition ${fuentesMap[fuenteBotones]}`}
-          >
-            Reservar cita
-          </a>
-        </nav>
+<nav className="hidden lg:flex space-x-6 items-center">
+  <a href="#" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Inicio</a>
+  <a href="#sobre-nosotros" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>
+  Sobre nosotros
+</a>
+
+  <a href="#cursos" className={`hover:text-[var(--hoverColor)] ${fuentesMap[fuenteTexto]}`}>Cursos</a>
+  <a
+  href="#agendar-turno"
+  className={`bg-white text-black px-4 py-2 rounded-md font-semibold hover:bg-gray-200 transition ${fuentesMap[fuenteBotones]}`}
+>
+  Reservar cita
+</a>
+
+</nav>
+
 
         {/* Botón hamburguesa móvil */}
         <div className="lg:hidden">
@@ -136,11 +140,21 @@ export default function NavbarBarberia({
 
             {/* Links móvil */}
             <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
-              <a href="#" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>🏠 Inicio</a>
-              <a href="#nosotros" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>👤 Sobre nosotros</a>
-              <a href="#cursos" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>🎓 Cursos</a>
-              <a href="#contacto" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>📞 Contacto</a>
-              <a href="#reservar" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteBotones]}`}>📅 Reservar cita</a>
+              <a href="#" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>
+  🏠 Inicio
+</a>
+<a href="#sobre-nosotros" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>
+  👤 Sobre nosotros
+</a>
+<a href="#cursos" className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${fuentesMap[fuenteTexto]}`}>
+  🎓 Cursos
+</a>
+<a
+  href="#agendar-turno"
+  className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold bg-black text-white rounded-md ${fuentesMap[fuenteBotones]}`}
+>
+  📅 Reservar cita
+</a>
 
               <hr className="my-3" />
 

@@ -64,12 +64,13 @@ export default function HeroBarberia({
           }`}
         >
           <img
-            src={img}
-            alt={`slide-${i}`}
-            className={`w-full h-full object-cover transition-transform duration-[6000ms] ease-in-out ${
-              i === current && zoom ? "scale-110" : "scale-100"
-            }`}
-          />
+  src={img}
+  alt={`slide-${i}`}
+  className={`w-full h-full object-cover transition-transform duration-[6000ms] ease-in-out 
+    ${i === current && zoom ? "scale-110" : "scale-100"} 
+    brightness-75 contrast-125 saturate-125`}
+/>
+
         </div>
       ))}
 
