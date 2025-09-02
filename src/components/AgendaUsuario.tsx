@@ -42,10 +42,9 @@ export default function AgendaUsuario() {
       }
 
       const q = query(
-        collection(db, "Usuarios", usuario.uid, "Turnos"),
-        orderBy("fecha", "desc"),
-        orderBy("hora", "desc")
-      );
+  collection(db, "Usuarios", usuario.uid, "Turnos")
+);
+
 
       const unsubTurnos = onSnapshot(q, async (snap) => {
         const docs = snap.docs.map(
