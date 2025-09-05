@@ -1,6 +1,6 @@
 ---
 // src/pages/panel.astro
-import "../../styles/global.css";
+import "../styles/global.css";
 import Dashboard from "../../components/ControlPanel/PanelDeControlPrincipal";
 ---
 
@@ -12,10 +12,7 @@ import Dashboard from "../../components/ControlPanel/PanelDeControlPrincipal";
   </head>
   <body class="bg-gray-100 min-h-screen">
     <main class="w-full flex justify-center">
-  <Dashboard client:load />
-</main>
-
-
-
+      <Dashboard client:only="react" />
+    </main>
   </body>
 </html>

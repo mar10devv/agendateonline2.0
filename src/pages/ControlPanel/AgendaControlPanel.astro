@@ -1,6 +1,6 @@
 ---
 import "../../styles/global.css";
-import DashboardAgenda from "../../components/ControlPanel/AgendaDelNegocio.tsx"
+import DashboardAgenda from "../../components/ControlPanel/AgendaDelNegocio";
 ---
 
 <html lang="es">
@@ -11,7 +11,7 @@ import DashboardAgenda from "../../components/ControlPanel/AgendaDelNegocio.tsx"
   </head>
   <body class="bg-gray-100 min-h-screen">
     <main class="w-full flex justify-center">
-      <DashboardAgenda client:load />
+      <DashboardAgenda client:only="react" />
     </main>
   </body>
 </html>
