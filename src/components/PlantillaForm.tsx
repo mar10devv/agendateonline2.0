@@ -45,6 +45,8 @@ export default function PlantillaForm() {
     bannerImages: [] as BannerImage[],
     modoImagenes: "defecto",
     ubicacion: null,
+    telefono: "",   // 👈 nuevo
+    emailContacto: "",     // 👈 nuevo
   });
   const [estado, setEstado] = useState<"cargando" | "listo" | "guardando" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
@@ -237,6 +239,53 @@ export default function PlantillaForm() {
             Eslogan de la web
           </label>
         </div>
+
+        {/* Teléfono */}
+<div className="relative">
+  <input
+    name="telefono"
+    value={config.telefono}
+    onChange={handleChange}
+    className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
+               focus:outline-none focus:ring-2 focus:ring-pink-500 
+               transition-all placeholder-transparent"
+    placeholder="Teléfono de contacto"
+  />
+  <label
+    className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
+      config.telefono
+        ? "-translate-y-6 scale-90 text-gray-700"
+        : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+    } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
+  >
+    Teléfono de contacto
+  </label>
+</div>
+
+{/* Email de contacto */}
+<div className="relative">
+  <input
+    type="email"
+    name="emailContacto"
+    value={config.emailContacto}
+    onChange={handleChange}
+    className="peer w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-md 
+               focus:outline-none focus:ring-2 focus:ring-pink-500 
+               transition-all placeholder-transparent"
+    placeholder="Correo de contacto"
+  />
+  <label
+    className={`absolute left-3 top-2.5 text-gray-500 font-medium transition-all ${
+      config.emailContacto
+        ? "-translate-y-6 scale-90 text-gray-700"
+        : "peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+    } peer-focus:-translate-y-6 peer-focus:scale-90 peer-focus:text-gray-700`}
+  >
+    Correo de contacto
+  </label>
+</div>
+
+
 
         {/* Fuentes */}
         <div>

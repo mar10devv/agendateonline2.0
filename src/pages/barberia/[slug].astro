@@ -34,7 +34,10 @@ type Negocio = {
     lng: number;
     direccion?: string;
   };
+  telefono?: string;  // 👈 agregado
+  emailContacto?: string;    // 👈 agregado
 };
+
 
 const { slug } = Astro.params;
 
@@ -157,10 +160,17 @@ const css = `
     </div>
 
     <!-- ✅ Footer -->
-    <FooterBarberia 
-      fuenteTexto={fuenteTexto} 
-      fuenteBotones={fuenteBotones}
-      client:load 
-    />
+<FooterBarberia 
+  nombre={negocio.nombre}
+  eslogan={negocio.eslogan}
+  fuenteTexto={fuenteTexto}
+  fuenteBotones={fuenteBotones}
+  telefono={negocio?.telefono}
+  emailContacto={negocio?.emailContacto}
+  lat={negocio?.ubicacion?.lat}
+  lng={negocio?.ubicacion?.lng}
+  client:load
+/>
+
   </BarberiaLayout>
 )}
