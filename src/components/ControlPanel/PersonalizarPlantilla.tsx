@@ -1,9 +1,9 @@
 // src/components/PlantillaForm.tsx
 import { useEffect, useState } from "react";
-import { obtenerConfigNegocio, guardarConfigNegocio } from "../lib/firestore";
+import { obtenerConfigNegocio, guardarConfigNegocio } from "../../lib/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db } from "../../lib/firebase";
 
 // 📂 Leaflet
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";

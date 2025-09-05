@@ -1,7 +1,7 @@
 // src/components/AgendaUsuario.tsx
 import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { db } from "../lib/firebase";
+import { db } from "../../lib/firebase";
 import {
   collection,
   onSnapshot,
@@ -12,11 +12,11 @@ import {
 } from "firebase/firestore";
 
 // 🔹 Importar SVGs
-import MoreIcon from "../assets/more-svg.svg?url";
-import CalendarioIcon from "../assets/calendario-svg.svg?url";
-import RelojIcon from "../assets/reloj-svg.svg?url";
-import PapeleraIcon from "../assets/papelera-svg.svg?url";
-import EditarIcon from "../assets/editar-svg.svg?url";
+import MoreIcon from "../../assets/more-svg.svg?url";
+import CalendarioIcon from "../../assets/calendario-svg.svg?url";
+import RelojIcon from "../../assets/reloj-svg.svg?url";
+import PapeleraIcon from "../../assets/papelera-svg.svg?url";
+import EditarIcon from "../../assets/editar-svg.svg?url";
 
 type Turno = {
   id: string;

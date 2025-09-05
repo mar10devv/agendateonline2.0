@@ -7,14 +7,14 @@ import {
   browserLocalPersistence,
   type User,
 } from "firebase/auth";
-import { auth, googleProvider, db } from "../lib/firebase";
+import { auth, googleProvider, db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import Menu from "../components/Menu";
+import Menu from "./Menu";
 
 type ClienteLink = { label: string; href: string; highlight?: boolean };
 
 const baseLinks: ClienteLink[] = [
-  { label: "Mi Agenda", href: "/agenda-usuario", highlight: true },
+  { label: "Mi Agenda", href: "/Usuarios/AgendaDelUsuario", highlight: true },
   { label: "Descargar la app", href: "/app" },
   { label: "Ayuda y servicio al cliente", href: "/ayuda" },
 ];
@@ -67,7 +67,7 @@ export default function Navbar() {
   // 🔹 Links dinámicos
   const linksMenu: ClienteLink[] = [...baseLinks];
   if (isPremium) {
-    linksMenu.splice(1, 0, { label: "Mi Panel", href: "/panel", highlight: true });
+    linksMenu.splice(1, 0, { label: "Mi Panel", href: "/ControlPanel/PanelDeControlPrincipal", highlight: true });
   }
 
   return (

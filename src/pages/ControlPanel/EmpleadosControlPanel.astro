@@ -1,18 +1,18 @@
 ---
 import "../styles/global.css";
-import PlantillaForm from "../components/PlantillaForm.tsx";
+import DashboardEmpleados from "../../components/ControlPanel/PersonalizarEmpleados";
 ---
 
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Panel - Plantilla</title>
+    <title>Panel de empleados</title>
   </head>
   <body class="bg-gray-100 min-h-screen">
-    <main class="container mx-auto px-4 py-8">
-      <!-- 👇 Cambio clave -->
-      <PlantillaForm client:only="react" />
-    </main>
+    <main class="w-full py-6">
+  <DashboardEmpleados client:load />
+</main>
+
   </body>
 </html>

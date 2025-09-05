@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { guardarConfigNegocio, obtenerConfigNegocio } from "../lib/firestore";
+import { db } from "../../lib/firebase";
+import { guardarConfigNegocio, obtenerConfigNegocio } from "../../lib/firestore";
 
 // 🚀 Subida a ImgBB
 const subirImagenImgBB = async (file: File): Promise<{ url: string; deleteUrl: string } | null> => {

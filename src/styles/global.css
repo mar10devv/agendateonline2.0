@@ -69,3 +69,19 @@
   70%,75% { transform: scale(1.3) rotate(270deg); }
   95%,100% { transform: scale(1) rotate(360deg); }
 }
+
+/* ================= Scroll personalizado ================= */
+
+/* Quitar scrollbar pero mantener scroll táctil */
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+/* Asegurar que en móvil se pueda desplazar horizontal con el dedo */
+.touch-pan-x {
+  touch-action: pan-x;
+}

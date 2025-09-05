@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, onSnapshot, deleteDoc } from "firebase/firestore"; // 👈 deleteDoc
-import { db } from "../lib/firebase";
-import { obtenerConfigNegocio } from "../lib/firestore";
-import { useFechasAgenda } from "../lib/useFechasAgenda"; // 👈 usamos el hook compartido
+import { db } from "../../lib/firebase";
+import { obtenerConfigNegocio } from "../../lib/firestore";
+import { useFechasAgenda } from "../../lib/useFechasAgenda"; // 👈 usamos el hook compartido
 
 type Turno = {
   id: string;
@@ -28,6 +28,32 @@ export default function DashboardAgenda() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
     new Date().toISOString().split("T")[0] // hoy
   );
+
+  // ref para scroll horizontal
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  // 🔹 Manejo del drag con mouse
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    isDown.current = true;
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseLeaveOrUp = () => {
+    isDown.current = false;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDown.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5; // velocidad de arrastre
+    scrollRef.current.scrollLeft = scrollLeft.current - walk;
+  };
 
   // 🔹 Generar horarios del día
   const generarHorarios = () => {
@@ -108,14 +134,10 @@ export default function DashboardAgenda() {
     if (!confirmacion) return;
 
     try {
-      // 📌 Borrar turno del negocio
       await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
-
-      // 📌 Borrar copia en el usuario (si existe uidCliente)
       if (turno.uidCliente) {
         await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
       }
-
       alert("✅ Turno eliminado con éxito");
     } catch (error) {
       console.error("Error al eliminar turno:", error);
@@ -147,9 +169,8 @@ export default function DashboardAgenda() {
         {/* Encabezado */}
         <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
           <h1 className="text-xl md:text-2xl font-bold">Agenda de turnos</h1>
-
           <button
-            onClick={() => (window.location.href = "/panel")}
+            onClick={() => (window.location.href = "/ControlPanel/PanelDeControlPrincipal")}
             className="flex items-center gap-2 bg-white text-indigo-700 px-4 py-2 rounded-lg shadow hover:bg-indigo-50 transition"
           >
             <span className="text-lg">←</span>
@@ -175,21 +196,66 @@ export default function DashboardAgenda() {
           </div>
         </div>
 
-        {/* Calendario 14 días */}
+        {/* 📅 Calendario estilo cuadrícula responsive */}
         <div className="p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-            {fechas.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setFechaSeleccionada(d.value)}
-                className={`relative py-2 px-6 text-sm font-bold rounded-full overflow-hidden transition-all duration-400 ease-in-out shadow-md
-                  ${fechaSeleccionada === d.value
-                    ? "text-white bg-gradient-to-r from-indigo-600 to-blue-400 scale-105"
-                    : "text-black bg-white hover:scale-105 hover:text-white hover:shadow-lg active:scale-90"}`}
-              >
-                {d.label}
-              </button>
-            ))}
+          {/* Encabezado mes */}
+          <div className="flex items-center justify-between mb-4">
+            <button className="px-2 py-1 text-gray-600 hover:text-black">←</button>
+            <h2 className="text-xl font-bold capitalize">
+              {new Date(fechaSeleccionada).toLocaleString("es-ES", {
+                month: "long",
+                year: "numeric",
+              })}
+            </h2>
+            <button className="px-2 py-1 text-gray-600 hover:text-black">→</button>
+          </div>
+
+          {/* Días de la semana */}
+          <div className="hidden sm:grid grid-cols-7 text-center font-medium text-gray-600 mb-2">
+            <span>Dom</span>
+            <span>Lun</span>
+            <span>Mar</span>
+            <span>Mié</span>
+            <span>Jue</span>
+            <span>Vie</span>
+            <span>Sáb</span>
+          </div>
+
+          {/* Fechas: scroll horizontal en móvil, draggable en desktop */}
+          <div
+            ref={scrollRef}
+            className="flex sm:grid sm:grid-cols-7 gap-2 overflow-x-auto sm:overflow-visible no-scrollbar pb-2 scroll-smooth snap-x snap-mandatory touch-pan-x cursor-grab"
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseLeaveOrUp}
+            onMouseUp={handleMouseLeaveOrUp}
+            onMouseMove={handleMouseMove}
+          >
+            {fechas.map((d) => {
+              const turnosDeEseDia = turnos.filter((t) => t.fecha === d.value);
+              const tieneConfirmados = turnosDeEseDia.some((t) => t.estado === "confirmado");
+              const tienePendientes = turnosDeEseDia.some((t) => t.estado === "pendiente");
+              const estaSeleccionado = fechaSeleccionada === d.value;
+
+              return (
+                <button
+                  key={d.value}
+                  onClick={() => setFechaSeleccionada(d.value)}
+                  className={`flex-shrink-0 h-16 w-16 sm:h-20 sm:w-full flex items-center justify-center 
+                              rounded-lg font-bold transition-all duration-200 relative snap-start
+                    ${
+                      estaSeleccionado
+                        ? "bg-indigo-500 text-white scale-105"
+                        : tieneConfirmados
+                        ? "bg-green-500 text-white"
+                        : tienePendientes
+                        ? "bg-yellow-400 text-white"
+                        : "bg-white text-gray-800 border hover:bg-indigo-100"
+                    }`}
+                >
+                  {new Date(d.value).getDate()}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -227,7 +293,6 @@ export default function DashboardAgenda() {
                         {turno.estado}
                       </span>
 
-                      {/* 👇 Botón de eliminar */}
                       <button
                         onClick={() => eliminarTurno(turno)}
                         className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2"

@@ -1,17 +1,17 @@
 // src/components/DashboardTemp.tsx
 import { useEffect, useState } from "react";
-import { obtenerConfigNegocio } from "../lib/firestore";
+import { obtenerConfigNegocio } from "../../lib/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDoc, setDoc, doc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db } from "../../lib/firebase";
 
 // ✅ Importamos íconos como URL
-import CalendarioIcon from "../assets/calendario-svg.svg?url";
-import PersonalIcon from "../assets/personal-svg.svg?url";
-import PlantillaIcon from "../assets/plantilla-svg.svg?url";
-import EstadisticasIcon from "../assets/estadisticas-svg.svg?url";
-import SoporteIcon from "../assets/soporte-tecnico-svg.svg?url";
-import MejorarPlan from "../assets/rayo-svg.svg?url";
+import CalendarioIcon from "../../assets/calendario-svg.svg?url";
+import PersonalIcon from "../../assets/personal-svg.svg?url";
+import PlantillaIcon from "../../assets/plantilla-svg.svg?url";
+import EstadisticasIcon from "../../assets/estadisticas-svg.svg?url";
+import SoporteIcon from "../../assets/soporte-tecnico-svg.svg?url";
+import MejorarPlan from "../../assets/rayo-svg.svg?url";
 
 // 🔨 función para crear slug a partir del nombre
 function generarSlug(nombre: string) {
@@ -140,7 +140,7 @@ useEffect(() => {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {/* Card Agenda */}
             <a
-  href="/panel-agenda"
+  href="/ControlPanel/AgendaControlPanel"
   className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
 >
   <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
