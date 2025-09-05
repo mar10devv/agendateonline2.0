@@ -1,4 +1,35 @@
 // src/lib/animaciones.ts
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+// 👇 Registrar solo en cliente (no en SSR)
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+// 👇 animación contador con scroll
+export function animateCounterOnScroll(el: HTMLElement, final: number, duration: number = 2) {
+  if (!el) return;
+
+  gsap.fromTo(
+    el,
+    { innerText: 0 },
+    {
+      innerText: final,
+      duration,
+      ease: "power1.out",
+      snap: { innerText: 1 },
+      onUpdate: function () {
+        el.innerText = Math.floor(Number(el.innerText)).toLocaleString();
+      },
+      scrollTrigger: {
+        trigger: el,
+        start: "top 80%", // empieza cuando entra en viewport
+        once: true,       // solo una vez
+      },
+    }
+  );
+}
 
 // Animaciones CSS (Animate.css)
 export const cssAnimaciones = {
@@ -6,26 +37,3 @@ export const cssAnimaciones = {
   rubberBand: "animate__animated animate__rubberBand",
 };
 
-// Animación GSAP con SplitText
-import SplitText from "../components/animaciones/SplitText";
-
-export const gsapAnimaciones = {
-  splitText: (texto: string) => (
-    <SplitText
-      text={texto}
-      className="text-2xl font-semibold text-center"
-      delay={100}
-      duration={0.6}
-      ease="power3.out"
-      splitType="chars"
-      from={{ opacity: 0, y: 40 }}
-      to={{ opacity: 1, y: 0 }}
-      threshold={0.1}
-      rootMargin="-100px"
-      textAlign="center"
-      onLetterAnimationComplete={() => {
-        console.log("All letters have animated!");
-      }}
-    />
-  ),
-};

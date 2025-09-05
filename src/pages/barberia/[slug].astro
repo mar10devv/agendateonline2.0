@@ -34,8 +34,10 @@ type Negocio = {
     lng: number;
     direccion?: string;
   };
-  telefono?: string;  // 👈 agregado
-  emailContacto?: string;    // 👈 agregado
+  telefono?: string;
+  emailContacto?: string;
+  sobreNosotrosImages?: { url: string; deleteUrl?: string }[];
+  modoSobreNosotros?: "defecto" | "personalizado";
 };
 
 
@@ -121,14 +123,18 @@ const css = `
       />
     </div>
 
-    <!-- 🚀 Nueva sección Sobre Nosotros -->
-    <div id="sobre-nosotros" class="mt-10">
-      <SobreNosotros 
-        fuenteTexto={fuenteTexto} 
-        fuenteBotones={fuenteBotones}
-        client:load 
-      />
-    </div>
+ <!-- 🚀 Nueva sección Sobre Nosotros -->
+<div id="sobre-nosotros" class="mt-10">
+  <SobreNosotros 
+    fuenteTexto={fuenteTexto} 
+    fuenteBotones={fuenteBotones}
+    sobreNosotrosImages={negocio?.sobreNosotrosImages || []}
+    modoSobreNosotros={negocio?.modoSobreNosotros || "defecto"}
+    client:load 
+  />
+</div>
+
+
 
     <!-- 🚀 Nueva sección Agendar Turno -->
     <div id="agendar-turno" class="mt-10">
