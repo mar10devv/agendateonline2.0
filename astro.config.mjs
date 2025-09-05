@@ -4,9 +4,11 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import tailwind from "@astrojs/tailwind";
 import netlify from "@astrojs/netlify";
+import vercel from "@astrojs/vercel/serverless"; 
+// 👉 podés usar "@astrojs/vercel/static" si NO usás SSR
 
-// Detecta si estás en Netlify
 const isNetlify = process.env.NETLIFY === "true";
+const isVercel = process.env.VERCEL === "1";
 
 export default defineConfig({
   integrations: [
@@ -15,7 +17,10 @@ export default defineConfig({
       applyBaseStyles: true,
     }),
   ],
-  // 👇 Si estás en local = static. En Netlify = server con adapter
-  output: isNetlify ? "server" : "static",
-  adapter: isNetlify ? netlify() : undefined,
+  output: (isNetlify || isVercel) ? "server" : "static",
+  adapter: isNetlify
+    ? netlify()
+    : isVercel
+    ? vercel({})
+    : undefined,
 });
