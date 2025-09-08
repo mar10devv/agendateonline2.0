@@ -150,7 +150,7 @@ useEffect(() => {
 
             {/* Card Personal */}
             <a
-              href="/panel-empleados"
+              href="/ControlPanel/EmpleadosControlPanel"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
               <img src={PersonalIcon} alt="Personal" className="w-12 h-12 mb-3" />
@@ -159,7 +159,7 @@ useEffect(() => {
 
             {/* Card Plantilla */}
             <a
-              href="/panel-plantilla"
+              href="/ControlPanel/PersonalizarControlPanel"
               className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
             >
               <img src={PlantillaIcon} alt="Plantilla" className="w-12 h-12 mb-3" />

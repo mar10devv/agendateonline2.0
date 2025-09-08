@@ -190,7 +190,7 @@ export default function DashboardEmpleados() {
           <h1 className="text-xl md:text-2xl font-bold">Panel de empleados</h1>
 
           <button
-            onClick={() => (window.location.href = "/panel")}
+            onClick={() => (window.location.href = "/ControlPanel/PanelDeControlPrincipal")}
             className="flex items-center gap-2 bg-white text-green-700 px-4 py-2 rounded-lg shadow hover:bg-green-50 transition"
           >
             <span className="text-lg">←</span>
@@ -345,7 +345,7 @@ export default function DashboardEmpleados() {
                   type="button"
                   className="w-full bg-indigo-600 text-white px-5 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
                 >
-                  Configurar día libre
+                  Configurar
                 </button>
               </div>
             ))}
