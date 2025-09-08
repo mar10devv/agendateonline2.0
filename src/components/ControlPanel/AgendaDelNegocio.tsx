@@ -1,9 +1,10 @@
+// src/components/ControlPanel/DashboardAgenda.tsx
 import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, onSnapshot, deleteDoc } from "firebase/firestore"; // 👈 deleteDoc
+import { doc, getDoc, collection, onSnapshot, deleteDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { obtenerConfigNegocio } from "../../lib/firestore";
-import { useFechasAgenda } from "../../lib/useFechasAgenda"; // 👈 usamos el hook compartido
+import { useCalendario } from "../../lib/useCalendario"; // 👈 nuevo hook
 
 type Turno = {
   id: string;
@@ -25,9 +26,14 @@ export default function DashboardAgenda() {
   const [mensaje, setMensaje] = useState("");
 
   const [barberoSeleccionado, setBarberoSeleccionado] = useState<string>("");
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
-    new Date().toISOString().split("T")[0] // hoy
-  );
+
+  // ✅ Fecha local de hoy en formato YYYY-MM-DD (no UTC)
+  const hoyLocal = new Date();
+  const fechaLocal = `${hoyLocal.getFullYear()}-${String(
+    hoyLocal.getMonth() + 1
+  ).padStart(2, "0")}-${String(hoyLocal.getDate()).padStart(2, "0")}`;
+
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(fechaLocal);
 
   // ref para scroll horizontal
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -54,25 +60,6 @@ export default function DashboardAgenda() {
     const walk = (x - startX.current) * 1.5; // velocidad de arrastre
     scrollRef.current.scrollLeft = scrollLeft.current - walk;
   };
-
-  // 🔹 Generar horarios del día
-  const generarHorarios = () => {
-    const horarios: string[] = [];
-    let hora = 10;
-    let minuto = 30;
-    while (hora < 21 || (hora === 21 && minuto <= 30)) {
-      const h = hora.toString().padStart(2, "0");
-      const m = minuto.toString().padStart(2, "0");
-      horarios.push(`${h}:${m}`);
-      hora++;
-      minuto = 30;
-    }
-    return horarios;
-  };
-  const horariosDisponibles = generarHorarios();
-
-  // 🔹 Fechas sincronizadas (14 días)
-  const fechas = useFechasAgenda(14);
 
   // 🔹 Verifica usuario y carga config
   useEffect(() => {
@@ -118,6 +105,16 @@ export default function DashboardAgenda() {
 
     return () => unsub();
   }, []);
+
+  // 🔹 Lógica del calendario con hook unificado
+  const calendarioBarbero = config?.empleadosData?.find(
+    (e: any) => e.nombre === barberoSeleccionado
+  )?.calendario;
+
+  const { diasDisponibles, horariosDisponibles } = useCalendario(
+    calendarioBarbero,
+    14
+  );
 
   // 🔹 Turnos filtrados del día y barbero
   const turnosDelDia = turnos.filter(
@@ -198,18 +195,6 @@ export default function DashboardAgenda() {
 
         {/* 📅 Calendario estilo cuadrícula responsive */}
         <div className="p-6">
-          {/* Encabezado mes */}
-          <div className="flex items-center justify-between mb-4">
-            <button className="px-2 py-1 text-gray-600 hover:text-black">←</button>
-            <h2 className="text-xl font-bold capitalize">
-              {new Date(fechaSeleccionada).toLocaleString("es-ES", {
-                month: "long",
-                year: "numeric",
-              })}
-            </h2>
-            <button className="px-2 py-1 text-gray-600 hover:text-black">→</button>
-          </div>
-
           {/* Días de la semana */}
           <div className="hidden sm:grid grid-cols-7 text-center font-medium text-gray-600 mb-2">
             <span>Dom</span>
@@ -221,16 +206,16 @@ export default function DashboardAgenda() {
             <span>Sáb</span>
           </div>
 
-          {/* Fechas: scroll horizontal en móvil, draggable en desktop */}
+          {/* Fechas con scroll en móvil */}
           <div
             ref={scrollRef}
-            className="flex sm:grid sm:grid-cols-7 gap-2 overflow-x-auto sm:overflow-visible no-scrollbar pb-2 scroll-smooth snap-x snap-mandatory touch-pan-x cursor-grab"
+            className="flex sm:grid sm:grid-cols-7 gap-2 overflow-x-auto no-scrollbar pb-2 cursor-grab"
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeaveOrUp}
             onMouseUp={handleMouseLeaveOrUp}
             onMouseMove={handleMouseMove}
           >
-            {fechas.map((d) => {
+            {diasDisponibles.map((d) => {
               const turnosDeEseDia = turnos.filter((t) => t.fecha === d.value);
               const tieneConfirmados = turnosDeEseDia.some((t) => t.estado === "confirmado");
               const tienePendientes = turnosDeEseDia.some((t) => t.estado === "pendiente");
@@ -240,6 +225,7 @@ export default function DashboardAgenda() {
                 <button
                   key={d.value}
                   onClick={() => setFechaSeleccionada(d.value)}
+                  disabled={d.disabled}
                   className={`flex-shrink-0 h-16 w-16 sm:h-20 sm:w-full flex items-center justify-center 
                               rounded-lg font-bold transition-all duration-200 relative snap-start
                     ${
@@ -249,10 +235,12 @@ export default function DashboardAgenda() {
                         ? "bg-green-500 text-white"
                         : tienePendientes
                         ? "bg-yellow-400 text-white"
+                        : d.disabled
+                        ? "bg-gray-200 text-gray-400"
                         : "bg-white text-gray-800 border hover:bg-indigo-100"
                     }`}
                 >
-                  {new Date(d.value).getDate()}
+                  {d.date.getDate()}
                 </button>
               );
             })}
@@ -262,51 +250,69 @@ export default function DashboardAgenda() {
         {/* Lista de horarios del día */}
         <div className="p-6">
           <h2 className="text-lg font-bold mb-4">
-            Turnos para {new Date(fechaSeleccionada).toLocaleDateString("es-ES")}
+            {(() => {
+              const [year, month, day] = fechaSeleccionada.split("-").map(Number);
+              const fechaLocal = new Date(year, month - 1, day);
+              return `Turnos para ${fechaLocal.toLocaleDateString("es-ES", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}`;
+            })()}
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {horariosDisponibles.map((h) => {
-              const turno = turnosDelDia.find((t) => t.hora === h);
-              return (
-                <div
-                  key={h}
-                  className={`p-4 rounded-lg shadow border ${
-                    turno ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
-                  }`}
-                >
-                  <p className="font-medium">{h}</p>
-                  {turno ? (
-                    <div className="text-sm text-gray-700 mt-1">
-                      <p>
-                        <strong>{turno.cliente}</strong> ({turno.email})
-                      </p>
-                      <p>{turno.servicio}</p>
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          turno.estado === "pendiente"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : turno.estado === "confirmado"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {turno.estado}
-                      </span>
 
-                      <button
-                        onClick={() => eliminarTurno(turno)}
-                        className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2"
-                      >
-                        🗑️ Eliminar turno
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 mt-1">Disponible</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {!calendarioBarbero || !calendarioBarbero.inicio || !calendarioBarbero.fin ? (
+            <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
+              <p className="text-yellow-700 font-medium mb-3">
+                ⚠️ Primero debe configurar el horario y días libres de este empleado.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {horariosDisponibles.map((h) => {
+                const turno = turnosDelDia.find((t) => t.hora === h);
+                return (
+                  <div
+                    key={h}
+                    className={`p-4 rounded-lg shadow border ${
+                      turno ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                    }`}
+                  >
+                    <p className="font-medium">{h}</p>
+                    {turno ? (
+                      <div className="text-sm text-gray-700 mt-1">
+                        <p>
+                          <strong>{turno.cliente}</strong> ({turno.email})
+                        </p>
+                        <p>{turno.servicio}</p>
+                        <span
+                          className={`px-2 py-1 text-xs rounded ${
+                            turno.estado === "pendiente"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : turno.estado === "confirmado"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {turno.estado}
+                        </span>
+
+                        <button
+                          onClick={() => eliminarTurno(turno)}
+                          className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2"
+                        >
+                          🗑️ Eliminar turno
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 mt-1">Disponible</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

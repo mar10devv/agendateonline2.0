@@ -9,18 +9,27 @@ import "swiper/css/thumbs";
 import ArrowLeft from "../../assets/arrow-left.svg?url";
 import ArrowRight from "../../assets/arrow-right.svg?url";
 import { useFechasAgenda } from "../../lib/useFechasAgenda";
+import Calendario from "../Calendario";
+
 
 // 🔹 Firebase
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../lib/firebase";
 import { collection, addDoc, query, where, onSnapshot, getDocs, doc, setDoc } from "firebase/firestore";
 
+type CalendarioEmpleado = {
+  inicio: string;
+  fin: string;
+  diasLibres: string[];
+};
+
 type Empleado = {
   nombre: string;
   fotoPerfil: string;
   trabajos?: string[];
-  calendario?: Record<string, any>;
+  calendario?: CalendarioEmpleado | null;
 };
+
 
 type Props = {
   fuenteTexto?: string;
@@ -401,73 +410,35 @@ if (turnoActivo?.fecha && turnoActivo?.hora) {
           )}
 
           {/* Paso fecha */}
-          {paso === "fecha" && (
-            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-                {fechas.map((d) => (
-                  <button
-                    key={d.value}
-                    onClick={() => setFechaSeleccionada(d.value)}
-                    className={`py-2 px-6 rounded-full ${
-                      fechaSeleccionada === d.value
-                        ? "text-white bg-black scale-105"
-                        : "text-black bg-gray-100 hover:bg-gray-200"
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-              {fechaSeleccionada && (
-                <button
-                  onClick={() => setPaso("horarios")}
-                  className="mt-6 px-6 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
-                >
-                  Ver horarios
-                </button>
-              )}
-            </div>
-          )}
+          {/* Paso fecha con calendario nuevo */}
+{paso === "fecha" && barberoSeleccionado && (
+  <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
+    <Calendario
+  calendario={barberoSeleccionado.calendario}
+  onSeleccionarTurno={(fecha: Date, hora: string) => {
+    setFechaSeleccionada(fecha.toISOString().split("T")[0]); // YYYY-MM-DD
+    setHorarioSeleccionado(hora);
+  }}
+/>
 
-          {/* Paso horarios */}
-          {paso === "horarios" && fechaSeleccionada && (
-            <div className="w-full max-w-3xl bg-white p-6 rounded-b-xl shadow flex flex-col items-center justify-center min-h-[500px]">
-              <div className="flex flex-wrap gap-3 justify-center">
-                {horariosDisponibles.map((h, i) => {
-                  const ocupado = horariosOcupados.includes(h);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => !ocupado && setHorarioSeleccionado(h)}
-                      disabled={ocupado}
-                      className={`px-4 py-2 rounded-lg ${
-                        ocupado
-                          ? "bg-red-600 text-white cursor-not-allowed"
-                          : horarioSeleccionado === h
-                          ? "bg-gray-800 text-white"
-                          : "bg-black text-white hover:bg-gray-800"
-                      }`}
-                    >
-                      {h}
-                    </button>
-                  );
-                })}
-              </div>
-              {horarioSeleccionado && (
-                <>
-                  <p className="mt-4 font-medium">
-                    Has seleccionado: {servicioSeleccionado} el {fechaSeleccionada} a las {horarioSeleccionado}
-                  </p>
-                  <button
-                    onClick={guardarTurno}
-                    className="mt-6 px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700"
-                  >
-                    Confirmar turno
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+
+    {fechaSeleccionada && horarioSeleccionado && (
+      <div className="mt-6 text-center">
+        <p className="mb-4 font-medium">
+          Has seleccionado: {servicioSeleccionado} el{" "}
+          {fechaSeleccionada} a las {horarioSeleccionado}
+        </p>
+        <button
+          onClick={guardarTurno}
+          className="px-6 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700"
+        >
+          Confirmar turno
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
         </div>
       )}
     </section>
