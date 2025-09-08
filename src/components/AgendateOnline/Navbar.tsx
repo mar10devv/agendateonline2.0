@@ -233,14 +233,14 @@ export default function Navbar() {
                     </a>
                   )}
                   <a
-                    href="/agenda-usuario"
+                    href="/Usuarios/AgendaDelUsuario"
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-350"
                   >
                     📅 Mi Agenda
                   </a>
                   {isPremium && (
                     <a
-                      href="/panel"
+                      href="/ControlPanel/PanelDeControlPrincipal"
                       className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-375"
                     >
                       🖥 Mi Panel
