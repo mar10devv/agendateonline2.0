@@ -234,7 +234,6 @@ export default function DashboardAgenda() {
     </button>
   );
 })}
-
           </div>
         </div>
 
