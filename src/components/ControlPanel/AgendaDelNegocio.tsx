@@ -195,17 +195,6 @@ export default function DashboardAgenda() {
 
         {/* 📅 Calendario estilo cuadrícula responsive */}
         <div className="p-6">
-          {/* Días de la semana */}
-          <div className="hidden sm:grid grid-cols-7 text-center font-medium text-gray-600 mb-2">
-            <span>Dom</span>
-            <span>Lun</span>
-            <span>Mar</span>
-            <span>Mié</span>
-            <span>Jue</span>
-            <span>Vie</span>
-            <span>Sáb</span>
-          </div>
-
           {/* Fechas con scroll en móvil */}
           <div
             ref={scrollRef}
@@ -216,34 +205,36 @@ export default function DashboardAgenda() {
             onMouseMove={handleMouseMove}
           >
             {diasDisponibles.map((d) => {
-              const turnosDeEseDia = turnos.filter((t) => t.fecha === d.value);
-              const tieneConfirmados = turnosDeEseDia.some((t) => t.estado === "confirmado");
-              const tienePendientes = turnosDeEseDia.some((t) => t.estado === "pendiente");
-              const estaSeleccionado = fechaSeleccionada === d.value;
+  const turnosDeEseDia = turnos.filter((t) => t.fecha === d.value);
+  const tieneConfirmados = turnosDeEseDia.some((t) => t.estado === "confirmado");
+  const tienePendientes = turnosDeEseDia.some((t) => t.estado === "pendiente");
+  const estaSeleccionado = fechaSeleccionada === d.value;
 
-              return (
-                <button
-                  key={d.value}
-                  onClick={() => setFechaSeleccionada(d.value)}
-                  disabled={d.disabled}
-                  className={`flex-shrink-0 h-16 w-16 sm:h-20 sm:w-full flex items-center justify-center 
-                              rounded-lg font-bold transition-all duration-200 relative snap-start
-                    ${
-                      estaSeleccionado
-                        ? "bg-indigo-500 text-white scale-105"
-                        : tieneConfirmados
-                        ? "bg-green-500 text-white"
-                        : tienePendientes
-                        ? "bg-yellow-400 text-white"
-                        : d.disabled
-                        ? "bg-gray-200 text-gray-400"
-                        : "bg-white text-gray-800 border hover:bg-indigo-100"
-                    }`}
-                >
-                  {d.date.getDate()}
-                </button>
-              );
-            })}
+  return (
+    <button
+      key={d.value}
+      onClick={() => setFechaSeleccionada(d.value)}
+      disabled={d.disabled}
+      className={`flex-shrink-0 h-20 w-20 sm:h-24 sm:w-full flex flex-col items-center justify-center 
+                  rounded-lg font-bold transition-all duration-200 relative snap-start
+        ${
+          estaSeleccionado
+            ? "bg-indigo-500 text-white scale-105"
+            : tieneConfirmados
+            ? "bg-green-500 text-white"
+            : tienePendientes
+            ? "bg-yellow-400 text-white"
+            : d.disabled
+            ? "bg-gray-200 text-gray-400"
+            : "bg-white text-gray-800 border hover:bg-indigo-100"
+        }`}
+    >
+      <span className="text-sm">{d.label.split(" ")[0]}</span> {/* nombre del día */}
+      <span className="text-lg">{d.date.getDate()}</span>       {/* número del día */}
+    </button>
+  );
+})}
+
           </div>
         </div>
 
