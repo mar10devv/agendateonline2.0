@@ -3,11 +3,10 @@
 import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import tailwind from "@astrojs/tailwind";
-import netlify from "@astrojs/netlify/static";   // 👈 usá el adaptador estático
-import vercel from "@astrojs/vercel/serverless"; // 👈 si querés SSR en Vercel
+import netlify from "@astrojs/netlify";
 
+// Detecta si estás en Netlify
 const isNetlify = process.env.NETLIFY === "true";
-const isVercel = process.env.VERCEL === "1";
 
 export default defineConfig({
   integrations: [
@@ -16,10 +15,7 @@ export default defineConfig({
       applyBaseStyles: true,
     }),
   ],
-  output: isVercel ? "server" : "static", // 👈 Netlify vuelve a static
-  adapter: isNetlify
-    ? netlify()
-    : isVercel
-    ? vercel({})
-    : undefined,
+  // 👇 Si estás en local = static. En Netlify = server con adapter
+  output: isNetlify ? "server" : "static",
+  adapter: isNetlify ? netlify() : undefined,
 });
