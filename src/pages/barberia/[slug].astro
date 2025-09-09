@@ -2,14 +2,14 @@
 export const prerender = false;
 
 import BarberiaLayout from "../../layouts/BarberiaLayout.astro";
-import NavbarBarberia from "../../components/PlantillaBarberia/NavbarBarberia";
-import HeroBarberia from "../../components/PlantillaBarberia/HeroBarberia";
-import ServiciosBarberia from "../../components/PlantillaBarberia/ServiciosBarberia";
-import SobreNosotros from "../../components/PlantillaBarberia/SobreNosotros";
-import Resenas from "../../components/PlantillaBarberia/Resenas";
-import FooterBarberia from "../../components/PlantillaBarberia/FooterBarberia";
-import AgendarTurno from "../../components/PlantillaBarberia/AgendarTurno";
-import UbicacionBarberia from "../../components/PlantillaBarberia/UbicacionBarberia";
+import NavbarBarberia from "../../components/plantilla-barberia/navbar"
+import HeroBarberia from "../../components/plantilla-barberia/hero"
+import ServiciosBarberia from "../../components/plantilla-barberia/servicios"
+import SobreNosotros from "../../components/plantilla-barberia/sobre-nosotros";
+import Resenas from "../../components/plantilla-barberia/comentarios";
+import FooterBarberia from "../../components/plantilla-barberia/footer"
+import AgendarTurno from "../../components/plantilla-barberia/agendar-turno";
+import UbicacionBarberia from "../../components/plantilla-barberia/ubicacion"
 
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
