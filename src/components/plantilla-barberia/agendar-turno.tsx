@@ -29,6 +29,7 @@ type CalendarioEmpleado = {
   inicio: string;
   fin: string;
   diasLibres: string[];
+  horariosOcupados?: string[];
 };
 
 type Empleado = {
@@ -75,9 +76,8 @@ export default function AgendarTurno({
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(
     null
   );
-  const [horarioSeleccionado, setHorarioSeleccionado] = useState<
-    string | null
-  >(null);
+  const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(null);
+
   const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
   const [turnoActivo, setTurnoActivo] = useState<any>(null);
   const [estadoTurno, setEstadoTurno] = useState<
@@ -148,20 +148,23 @@ export default function AgendarTurno({
     return () => unsubAuth();
   }, [negocioId]);
 
-  // 🔎 Escuchar horarios ocupados
   useEffect(() => {
-    if (!barberoSeleccionado || !fechaSeleccionada) return;
-    const q = query(
-      collection(db, "Negocios", negocioId, "Turnos"),
-      where("barbero", "==", barberoSeleccionado.nombre),
-      where("fecha", "==", fechaSeleccionada)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const ocupados = snap.docs.map((d) => d.data().hora as string);
-      setHorariosOcupados(ocupados);
+  if (!barberoSeleccionado || !fechaSeleccionada) return;
+  const q = query(
+    collection(db, "Negocios", negocioId, "Turnos"),
+    where("barbero", "==", barberoSeleccionado.nombre),
+    where("fecha", "==", fechaSeleccionada)
+  );
+  const unsub = onSnapshot(q, (snap) => {
+    const ocupados = snap.docs.map((d) => {
+      const hora = d.data().hora as string;
+      return hora.slice(0, 5); // normalizamos formato "HH:mm"
     });
-    return () => unsub();
-  }, [barberoSeleccionado, fechaSeleccionada, negocioId]);
+    setHorariosOcupados(ocupados);
+  });
+  return () => unsub();
+}, [barberoSeleccionado, fechaSeleccionada, negocioId]);
+
 
   // 🔹 Guardar turno → ahora guarda múltiples turnos si hay amigos
   const guardarTurno = async () => {
@@ -600,12 +603,16 @@ export default function AgendarTurno({
 {paso === "fecha" && barberoSeleccionado && (
   <div className="w-full max-w-3xl p-6 flex flex-col items-center justify-center min-h-[500px]">
     <Calendario
-      calendario={barberoSeleccionado.calendario}
-      onSeleccionarTurno={(fecha: Date, hora: string) => {
-        setFechaSeleccionada(fecha.toISOString().split("T")[0]);
-        setHorarioSeleccionado(hora);
-      }}
-    />
+  calendario={barberoSeleccionado.calendario}
+  horariosOcupados={horariosOcupados}
+  onSeleccionarTurno={(fecha: Date, hora: string | null) => {
+    setFechaSeleccionada(fecha.toISOString().split("T")[0]);
+    setHorarioSeleccionado(hora); // ahora puede ser string o null
+  }}
+/>
+
+
+
 
     <div className="mt-6 text-center w-full">
       {/* Info turno seleccionado */}

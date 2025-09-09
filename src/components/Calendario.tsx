@@ -1,5 +1,4 @@
-// src/components/Calendario.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useCalendario } from "../lib/useCalendario";
 
 type CalendarioEmpleado = {
@@ -10,14 +9,29 @@ type CalendarioEmpleado = {
 
 type Props = {
   calendario?: CalendarioEmpleado | null;
-  onSeleccionarTurno?: (fecha: Date, hora: string) => void;
+  onSeleccionarTurno?: (fecha: Date, hora: string | null) => void; // 👈 hora opcional
+  horariosOcupados?: string[];
 };
 
-export default function CalendarioNuevo({ calendario, onSeleccionarTurno }: Props) {
+export default function Calendario({
+  calendario,
+  onSeleccionarTurno,
+  horariosOcupados = [],
+}: Props) {
+  const { diasDisponibles, horariosDisponibles } = useCalendario(calendario, 15);
+
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
   const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
 
-  const { diasDisponibles, horariosDisponibles } = useCalendario(calendario, 15);
+  // ⏰ Seleccionar automáticamente la primera fecha disponible
+  useEffect(() => {
+    const primerDia = diasDisponibles.find((d) => !d.disabled);
+    if (primerDia) {
+      setFechaSeleccionada(primerDia.date);
+      setHoraSeleccionada(null);
+      onSeleccionarTurno?.(primerDia.date, null); // 👈 así forzamos el render de horarios
+    }
+  }, [diasDisponibles]);
 
   // 🚨 Caso: no hay calendario configurado
   if (!calendario || !calendario.inicio || !calendario.fin) {
@@ -50,6 +64,7 @@ export default function CalendarioNuevo({ calendario, onSeleccionarTurno }: Prop
               if (!disabled) {
                 setFechaSeleccionada(date);
                 setHoraSeleccionada(null);
+                onSeleccionarTurno?.(date, null); // 👈 actualizamos también aquí
               }
             }}
             className={`py-3 rounded-lg font-semibold transition ${
@@ -77,22 +92,30 @@ export default function CalendarioNuevo({ calendario, onSeleccionarTurno }: Prop
             })}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {horariosDisponibles.map((slot) => (
-              <button
-                key={slot}
-                onClick={() => {
-                  setHoraSeleccionada(slot);
-                  onSeleccionarTurno?.(fechaSeleccionada, slot);
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  horaSeleccionada === slot
-                    ? "bg-green-600 text-white shadow-md"
-                    : "bg-gray-100 text-gray-800 hover:bg-green-100"
-                }`}
-              >
-                {slot}
-              </button>
-            ))}
+            {horariosDisponibles.map((slot) => {
+              const ocupado = horariosOcupados.includes(slot);
+              return (
+                <button
+                  key={slot}
+                  disabled={ocupado}
+                  onClick={() => {
+                    if (!ocupado) {
+                      setHoraSeleccionada(slot);
+                      onSeleccionarTurno?.(fechaSeleccionada, slot);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    ocupado
+                      ? "bg-red-500 text-white cursor-not-allowed"
+                      : horaSeleccionada === slot
+                      ? "bg-green-600 text-white shadow-md"
+                      : "bg-gray-100 text-gray-800 hover:bg-green-100"
+                  }`}
+                >
+                  {slot}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
