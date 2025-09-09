@@ -14,7 +14,7 @@ import Menu from "./Menu";
 type ClienteLink = { label: string; href: string; highlight?: boolean };
 
 const baseLinks: ClienteLink[] = [
-  { label: "Mi Agenda", href: "/Usuarios/AgendaDelUsuario", highlight: true },
+  { label: "Mi Agenda", href: "/usuarios/usuario-agenda", highlight: true },
   { label: "Descargar la app", href: "/app" },
   { label: "Ayuda y servicio al cliente", href: "/ayuda" },
 ];
@@ -67,7 +67,7 @@ export default function Navbar() {
   // 🔹 Links dinámicos
   const linksMenu: ClienteLink[] = [...baseLinks];
   if (isPremium) {
-    linksMenu.splice(1, 0, { label: "Mi Panel", href: "/ControlPanel/PanelDeControlPrincipal", highlight: true });
+    linksMenu.splice(1, 0, { label: "Mi Panel", href: "/panel/paneldecontrol", highlight: true });
   }
 
   return (
@@ -233,14 +233,14 @@ export default function Navbar() {
                     </a>
                   )}
                   <a
-                    href="/Usuarios/AgendaDelUsuario"
+                    href="/usuarios/usuario-agenda"
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-350"
                   >
                     📅 Mi Agenda
                   </a>
                   {isPremium && (
                     <a
-                      href="/ControlPanel/PanelDeControlPrincipal"
+                      href="/panel/paneldecontrol"
                       className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-375"
                     >
                       🖥 Mi Panel

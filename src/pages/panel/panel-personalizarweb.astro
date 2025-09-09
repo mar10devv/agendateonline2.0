@@ -1,0 +1,12 @@
+---
+import "../../styles/global.css";
+import PlantillaForm from "../../components/panel/panel-personalizar";
+import Layout from "../../layouts/Layout.astro"; // 👈 importar Layout
+---
+
+<Layout title="Panel - Plantilla">
+  <main class="container mx-auto px-4 py-8">
+    <PlantillaForm client:only="react" />
+
+  </main>
+</Layout>

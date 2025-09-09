@@ -5,7 +5,7 @@ import { db } from "../../lib/firebase";
 import { doc, collection, setDoc, deleteDoc, getDocs, onSnapshot } from "firebase/firestore";
 
 // 📂 Icono papelera
-import PapeleraIcon from "../../assets/papelera-svg.svg?url";
+import PapeleraIcon from "../../assets/papelera-svg.svg";
 
 export default function PreciosControlPanel() {
   const [user, setUser] = useState<any>(null);
