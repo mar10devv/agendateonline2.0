@@ -216,7 +216,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           <button
             onClick={() =>
-              (window.location.href = "/ControlPanel/PanelDeControlPrincipal")
+              (window.location.href = "/panel/paneldecontrol/")
             }
             className="flex items-center gap-2 bg-white text-green-700 px-4 py-2 rounded-lg shadow hover:bg-green-50 transition"
           >

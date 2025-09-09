@@ -167,7 +167,7 @@ export default function DashboardAgenda() {
         <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
           <h1 className="text-xl md:text-2xl font-bold">Agenda de turnos</h1>
           <button
-            onClick={() => (window.location.href = "/ControlPanel/PanelDeControlPrincipal")}
+            onClick={() => (window.location.href = "/panel/paneldecontrol/")}
             className="flex items-center gap-2 bg-white text-indigo-700 px-4 py-2 rounded-lg shadow hover:bg-indigo-50 transition"
           >
             <span className="text-lg">←</span>

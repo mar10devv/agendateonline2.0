@@ -6,18 +6,17 @@ import {
   doc,
   collection,
   setDoc,
+  addDoc,
   deleteDoc,
-  getDocs,
   onSnapshot,
 } from "firebase/firestore";
 
-// 📂 Icono papelera
+// 📂 Icono papelera (usar ?url para evitar error TS)
 import PapeleraIcon from "../../assets/papelera-svg.svg?url";
-
 
 export default function PreciosControlPanel() {
   const [user, setUser] = useState<any>(null);
-  const [precios, setPrecios] = useState<any[] | null>(null); // null = aún no cargado
+  const [precios, setPrecios] = useState<any[] | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
@@ -27,7 +26,6 @@ export default function PreciosControlPanel() {
       if (usuario) {
         setUser(usuario);
 
-        // 🔹 Cargar precios existentes en tiempo real
         const negocioRef = doc(db, "Negocios", usuario.uid);
         const preciosRef = collection(negocioRef, "Precios");
 
@@ -39,7 +37,7 @@ export default function PreciosControlPanel() {
           setPrecios(preciosData);
         });
       } else {
-        setPrecios([]); // usuario no logueado
+        setPrecios([]);
       }
     });
     return () => unsub();
@@ -56,12 +54,22 @@ export default function PreciosControlPanel() {
     if (!precios) {
       setPrecios([{ servicio: "", precio: 0 }]);
     } else {
-      setPrecios([...precios, { servicio: "", precio: 0 }]);
+      setPrecios([...precios, { servicio: "", precio: 0 }]); // 👈 sin id = nuevo
     }
   };
 
-  const eliminarServicio = (index: number) => {
+  const eliminarServicio = async (index: number) => {
     if (!precios) return;
+    const servicio = precios[index];
+
+    // Borrar de Firebase si ya existe
+    if (user && servicio.id) {
+      const negocioRef = doc(db, "Negocios", user.uid);
+      const preciosRef = collection(negocioRef, "Precios");
+      await deleteDoc(doc(preciosRef, servicio.id));
+    }
+
+    // Borrar del estado local
     const nuevos = precios.filter((_, i) => i !== index);
     setPrecios(nuevos);
   };
@@ -75,24 +83,26 @@ export default function PreciosControlPanel() {
       const negocioRef = doc(db, "Negocios", user.uid);
       const preciosRef = collection(negocioRef, "Precios");
 
-      // Borrar todos los docs actuales
-      const snapshot = await getDocs(preciosRef);
-      snapshot.forEach(async (docSnap) => {
-        await deleteDoc(docSnap.ref);
-      });
-
-      // Guardar cada servicio nuevo
       for (const item of precios) {
         if (item.servicio.trim() !== "") {
-          const nuevoDoc = doc(preciosRef); // auto-ID
-          await setDoc(nuevoDoc, {
-            servicio: item.servicio,
-            precio: item.precio,
-          });
+          if (item.id) {
+            // 🔹 Actualizar si ya existe
+            await setDoc(
+              doc(preciosRef, item.id),
+              { servicio: item.servicio, precio: item.precio },
+              { merge: true }
+            );
+          } else {
+            // 🔹 Crear si es nuevo
+            await addDoc(preciosRef, {
+              servicio: item.servicio,
+              precio: item.precio,
+            });
+          }
         }
       }
 
-      setMensaje("✅ Precios guardados correctamente.");
+      setMensaje("✅ Precios actualizados correctamente.");
     } catch (error) {
       console.error(error);
       setMensaje("❌ Error al guardar precios.");
@@ -108,7 +118,7 @@ export default function PreciosControlPanel() {
         <h1 className="text-xl md:text-2xl font-bold">Gestión de precios</h1>
         <button
           onClick={() =>
-            (window.location.href = "/ControlPanel/PanelDeControlPrincipal")
+            (window.location.href = "/panel/paneldecontrol/")
           }
           className="flex items-center gap-2 bg-white text-blue-600 px-4 py-2 rounded-lg shadow hover:bg-blue-50 transition"
         >
@@ -128,17 +138,10 @@ export default function PreciosControlPanel() {
           {precios === null ? (
             // 🔹 Loader mientras Firebase responde
             <div className="flex flex-col items-center justify-center h-[200px] gap-4 border rounded-lg bg-gray-50">
-              <section className="dots-container">
-                <div className="dot"></div>
-                <div className="dot"></div>
-                <div className="dot"></div>
-                <div className="dot"></div>
-                <div className="dot"></div>
-              </section>
+              <div className="w-10 h-10 border-4 border-t-blue-500 border-gray-300 rounded-full animate-spin"></div>
               <p className="text-gray-600 font-medium">Cargando servicios...</p>
             </div>
           ) : precios.length === 0 ? (
-            // 🔹 Formulario vacío cuando Firebase respondió sin datos
             <div className="bg-gray-50 p-4 rounded-lg border flex flex-col gap-3">
               <div className="flex flex-col">
                 <label className="mb-1 text-sm font-bold text-gray-600">
@@ -167,10 +170,9 @@ export default function PreciosControlPanel() {
               </div>
             </div>
           ) : (
-            // 🔹 Lista de servicios cargada
             precios.map((item, i) => (
               <div
-                key={i}
+                key={item.id || i}
                 className="bg-gray-50 p-4 rounded-lg border flex flex-col md:flex-row md:items-end md:gap-4"
               >
                 {/* Servicio */}
@@ -236,7 +238,7 @@ export default function PreciosControlPanel() {
             className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2 text-sm"
           >
             {guardando && (
-              <div className="w-4 h-4 border-2 border-t-white border-white/30 rounded-full animate-spin"></div>
+              <div className="w-5 h-5 border-2 border-t-white border-white/30 rounded-full animate-spin"></div>
             )}
             {guardando ? "Guardando..." : "Guardar precios"}
           </button>
