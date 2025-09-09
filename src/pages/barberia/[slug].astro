@@ -99,7 +99,7 @@ const css = `
       fuenteLogo={fuenteLogo}
       fuenteTexto={fuenteTexto}
       fuenteBotones={fuenteBotones}
-      client:load
+      client:only="react"
     />
 
     <!-- ✅ Hero -->
@@ -112,6 +112,7 @@ const css = `
       fuenteLogo={fuenteLogo}
       fuenteTexto={fuenteTexto}
       fuenteBotones={fuenteBotones}
+      client:only="react"
     />
 
     <!-- 🚀 Nueva sección Servicios -->
@@ -119,7 +120,7 @@ const css = `
       <ServiciosBarberia 
         fuenteTexto={fuenteTexto} 
         fuenteBotones={fuenteBotones} 
-        client:load 
+        client:only="react"
       />
     </div>
 
@@ -130,7 +131,7 @@ const css = `
     fuenteBotones={fuenteBotones}
     sobreNosotrosImages={negocio?.sobreNosotrosImages || []}
     modoSobreNosotros={negocio?.modoSobreNosotros || "defecto"}
-    client:load 
+    client:only="react" 
   />
 </div>
 
@@ -143,7 +144,7 @@ const css = `
         fuenteTexto={fuenteTexto} 
         fuenteBotones={fuenteBotones}
         negocioId={negocio.id}
-        client:load 
+        client:only="react" 
       />
     </div>
 
@@ -152,7 +153,7 @@ const css = `
   <UbicacionBarberia 
     nombre={negocio.nombre}
     ubicacion={negocio.ubicacion}
-    client:load
+    client:only="react"
   />
 </div>
 
@@ -161,7 +162,7 @@ const css = `
       <Resenas 
         fuenteTexto={fuenteTexto} 
         fuenteBotones={fuenteBotones}
-        client:load 
+        client:only="react" 
       />
     </div>
 
@@ -175,7 +176,7 @@ const css = `
   emailContacto={negocio?.emailContacto}
   lat={negocio?.ubicacion?.lat}
   lng={negocio?.ubicacion?.lng}
-  client:load
+  client:only="react"
 />
 
   </BarberiaLayout>
