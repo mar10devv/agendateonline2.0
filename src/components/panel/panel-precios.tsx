@@ -2,14 +2,22 @@
 import React, { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../../lib/firebase";
-import { doc, collection, setDoc, deleteDoc, getDocs, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  collection,
+  setDoc,
+  deleteDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
 
 // 📂 Icono papelera
-import PapeleraIcon from "../../assets/papelera-svg.svg";
+import PapeleraIcon from "../../assets/papelera-svg.svg?url";
+
 
 export default function PreciosControlPanel() {
   const [user, setUser] = useState<any>(null);
-  const [precios, setPrecios] = useState<any[]>([]);
+  const [precios, setPrecios] = useState<any[] | null>(null); // null = aún no cargado
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
@@ -23,35 +31,43 @@ export default function PreciosControlPanel() {
         const negocioRef = doc(db, "Negocios", usuario.uid);
         const preciosRef = collection(negocioRef, "Precios");
 
-        return onSnapshot(preciosRef, (snapshot) => {
+        onSnapshot(preciosRef, (snapshot) => {
           const preciosData = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
           }));
           setPrecios(preciosData);
         });
+      } else {
+        setPrecios([]); // usuario no logueado
       }
     });
     return () => unsub();
   }, []);
 
   const handleChange = (index: number, campo: string, valor: string) => {
+    if (!precios) return;
     const nuevos = [...precios];
     (nuevos[index] as any)[campo] = campo === "precio" ? Number(valor) : valor;
     setPrecios(nuevos);
   };
 
   const agregarServicio = () => {
-    setPrecios([...precios, { servicio: "", precio: 0 }]);
+    if (!precios) {
+      setPrecios([{ servicio: "", precio: 0 }]);
+    } else {
+      setPrecios([...precios, { servicio: "", precio: 0 }]);
+    }
   };
 
   const eliminarServicio = (index: number) => {
+    if (!precios) return;
     const nuevos = precios.filter((_, i) => i !== index);
     setPrecios(nuevos);
   };
 
   const guardarPrecios = async () => {
-    if (!user) return;
+    if (!user || !precios) return;
     setGuardando(true);
     setMensaje("");
 
@@ -109,7 +125,20 @@ export default function PreciosControlPanel() {
 
         {/* Lista de servicios */}
         <div className="space-y-4">
-          {precios.length === 0 ? (
+          {precios === null ? (
+            // 🔹 Loader mientras Firebase responde
+            <div className="flex flex-col items-center justify-center h-[200px] gap-4 border rounded-lg bg-gray-50">
+              <section className="dots-container">
+                <div className="dot"></div>
+                <div className="dot"></div>
+                <div className="dot"></div>
+                <div className="dot"></div>
+                <div className="dot"></div>
+              </section>
+              <p className="text-gray-600 font-medium">Cargando servicios...</p>
+            </div>
+          ) : precios.length === 0 ? (
+            // 🔹 Formulario vacío cuando Firebase respondió sin datos
             <div className="bg-gray-50 p-4 rounded-lg border flex flex-col gap-3">
               <div className="flex flex-col">
                 <label className="mb-1 text-sm font-bold text-gray-600">
@@ -138,6 +167,7 @@ export default function PreciosControlPanel() {
               </div>
             </div>
           ) : (
+            // 🔹 Lista de servicios cargada
             precios.map((item, i) => (
               <div
                 key={i}
@@ -182,11 +212,7 @@ export default function PreciosControlPanel() {
                   className="ml-auto p-2 rounded-lg hover:bg-red-100 transition"
                   title="Eliminar servicio"
                 >
-                  <img
-                    src={PapeleraIcon}
-                    alt="Eliminar"
-                    className="w-6 h-6"
-                  />
+                  <img src={PapeleraIcon} alt="Eliminar" className="w-6 h-6" />
                 </button>
               </div>
             ))

@@ -597,8 +597,6 @@ export default function AgendarTurno({
     </div>
   </div>
 )}
-
-
           {/* Paso fecha */}
 {paso === "fecha" && barberoSeleccionado && (
   <div className="w-full max-w-3xl p-6 flex flex-col items-center justify-center min-h-[500px]">
@@ -610,9 +608,6 @@ export default function AgendarTurno({
     setHorarioSeleccionado(hora); // ahora puede ser string o null
   }}
 />
-
-
-
 
     <div className="mt-6 text-center w-full">
       {/* Info turno seleccionado */}
