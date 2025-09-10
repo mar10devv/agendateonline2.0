@@ -25,6 +25,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 
+// Definición del calendario
 type CalendarioEmpleado = {
   inicio: string;
   fin: string;
@@ -32,12 +33,29 @@ type CalendarioEmpleado = {
   horariosOcupados?: string[];
 };
 
+// Definición de turno
+type Turno = {
+  id: string;
+  fecha: string;
+  hora: string;
+  barbero: string;
+  servicio: string;
+  precio: number;
+  cliente: string;
+  email: string;
+  uidCliente: string;
+  estado: string;
+  creadoEn: any; // Date o Firebase Timestamp
+};
+
+// Definición de empleado
 type Empleado = {
   nombre: string;
   fotoPerfil: string;
   trabajos?: string[];
   calendario?: CalendarioEmpleado | null;
 };
+
 
 type Props = {
   fuenteTexto?: string;
@@ -125,28 +143,45 @@ export default function AgendarTurno({
   }, [negocioId]);
 
   // 🔎 Escuchar si el usuario ya tiene un turno en este negocio
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubAuth = onAuthStateChanged(auth, (usuario) => {
-      if (usuario && negocioId) {
-        const q = query(
-          collection(db, "Negocios", negocioId, "Turnos"),
-          where("uidCliente", "==", usuario.email)
-        );
-        const unsubTurnos = onSnapshot(q, (snap) => {
-          if (!snap.empty) {
-            setTurnoActivo({ id: snap.docs[0].id, ...snap.docs[0].data() });
-          } else {
-            setTurnoActivo(null);
+useEffect(() => {
+  const auth = getAuth();
+  const unsubAuth = onAuthStateChanged(auth, (usuario) => {
+    if (usuario && negocioId) {
+      const q = query(
+        collection(db, "Negocios", negocioId, "Turnos"),
+        where("uidCliente", "==", usuario.uid) // 👈 antes era usuario.email
+      );
+      const unsubTurnos = onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          const data = snap.docs[0].data() as Omit<Turno, "id">;
+          const turno: Turno = { id: snap.docs[0].id, ...data };
+
+          // Verificamos que el turno esté vigente
+          if (turno.fecha && turno.hora) {
+            const [year, month, day] = turno.fecha.split("-").map(Number);
+            const [hours, minutes] = turno.hora.split(":").map(Number);
+            const fechaHoraTurno = new Date(year, month - 1, day, hours, minutes);
+
+            if (fechaHoraTurno.getTime() >= Date.now()) {
+              setTurnoActivo(turno);
+              setEstadoTurno("ver");
+              return;
+            }
           }
-        });
-        return () => unsubTurnos();
-      } else {
+        }
+        // Si no hay turno o está vencido
         setTurnoActivo(null);
-      }
-    });
-    return () => unsubAuth();
-  }, [negocioId]);
+        setEstadoTurno("inicial");
+      });
+      return () => unsubTurnos();
+    } else {
+      setTurnoActivo(null);
+      setEstadoTurno("inicial");
+    }
+  });
+  return () => unsubAuth();
+}, [negocioId]);
+
 
   useEffect(() => {
   if (!barberoSeleccionado || !fechaSeleccionada) return;
@@ -210,21 +245,22 @@ export default function AgendarTurno({
         }
 
         // Guardar turno en negocio
-        const turnoRef = await addDoc(
-          collection(db, "Negocios", negocioId, "Turnos"),
-          {
-            barbero: barberoSeleccionado.nombre,
-            servicio: servicio.servicio,
-            precio: servicio.precio,
-            fecha: fechaStr,
-            hora: horaTurno,
-            cliente: usuario.displayName || "Cliente",
-            email: usuario.email || "",
-            uidCliente: usuario.email || "",
-            estado: "pendiente",
-            creadoEn: new Date(),
-          }
-        );
+const turnoRef = await addDoc(
+  collection(db, "Negocios", negocioId, "Turnos"),
+  {
+    barbero: barberoSeleccionado.nombre,
+    servicio: servicio.servicio,
+    precio: servicio.precio,
+    fecha: fechaStr,
+    hora: horaTurno,
+    cliente: usuario.displayName || "Cliente",
+    email: usuario.email || "",
+    uidCliente: usuario.uid, // 👈 antes era usuario.email
+    estado: "pendiente",
+    creadoEn: new Date(),
+  }
+);
+
 
         // Guardar copia en usuario
         await setDoc(

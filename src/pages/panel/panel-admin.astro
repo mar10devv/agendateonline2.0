@@ -1,0 +1,18 @@
+---
+// src/pages/panel-admin.astro
+import "../styles/global.css"; // 👈 importa tus estilos globales
+import PanelAdministrador from "../../components/panel/panel-admin"; // 👈 ajusta la ruta si lo guardaste en otra carpeta
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel de Administración</title>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <main class="w-full flex justify-center">
+      <PanelAdministrador client:only="react" />
+    </main>
+  </body>
+</html>

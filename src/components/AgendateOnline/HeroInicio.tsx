@@ -152,46 +152,50 @@ export default function HeroInicio() {
       </h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {negocios.map((negocio) => (
-          <a
-            key={negocio.id}
-            href={`/${negocio.plantilla}/${negocio.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition"
-          >
-            {/* Imagen */}
-            {negocio.logoUrl ? (
-              <img
-                src={negocio.logoUrl}
-                alt={negocio.nombre}
-                className="h-40 w-full object-cover"
-              />
-            ) : negocio.bannerImages && negocio.bannerImages[0] ? (
-              <img
-                src={negocio.bannerImages[0].url}
-                alt={negocio.nombre}
-                className="h-40 w-full object-cover"
-              />
-            ) : (
-              <div className="h-40 w-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                Sin imagen
-              </div>
-            )}
+  {negocios.map((negocio) => (
+    <a
+      key={negocio.id}
+      href={`/${negocio.plantilla}/${negocio.slug}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-2"
+    >
+      {/* Imagen */}
+      {negocio.logoUrl ? (
+        <img
+          src={negocio.logoUrl}
+          alt={negocio.nombre}
+          className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : negocio.bannerImages && negocio.bannerImages[0] ? (
+        <img
+          src={negocio.bannerImages[0].url}
+          alt={negocio.nombre}
+          className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <div className="h-40 w-full bg-black flex items-center justify-center text-white text-lg font-bold font-euphoria text-center px-2">
+  {negocio.nombre}
+</div>
 
-            {/* Info */}
-            <div className="p-4">
-              <h3 className="text-lg font-bold">{negocio.nombre}</h3>
-              <p className="text-gray-600 text-sm">
-                {negocio.ubicacion?.direccion || "Ubicación no disponible"}
-              </p>
-              <span className="mt-2 inline-block bg-gray-100 text-gray-800 px-3 py-1 text-xs rounded-full capitalize">
-                {negocio.plantilla}
-              </span>
-            </div>
-          </a>
-        ))}
+      )}
+
+      {/* Info */}
+      <div className="p-4 transition-colors duration-300 group-hover:bg-gray-50">
+        <h3 className="text-lg font-bold group-hover:text-blue-600 transition-colors duration-300">
+          {negocio.nombre}
+        </h3>
+        <p className="text-gray-600 text-sm">
+          {negocio.ubicacion?.direccion || "Ubicación no disponible"}
+        </p>
+        <span className="mt-2 inline-block bg-gray-100 text-gray-800 px-3 py-1 text-xs rounded-full capitalize group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors duration-300">
+          {negocio.plantilla}
+        </span>
       </div>
+    </a>
+  ))}
+</div>
+
     </>
   )}
 </div>
