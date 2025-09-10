@@ -233,10 +233,16 @@ export default function PlantillaForm() {
     );
 
     const ok = await guardarConfigNegocio(user.uid, {
-      ...config,
-      bannerImages: nuevasImagenes,
-      sobreNosotrosImages: nuevasImagenesSobreNosotros,
-    });
+  ...config,
+  bannerImages: nuevasImagenes,
+  sobreNosotrosImages: nuevasImagenesSobreNosotros,
+  ubicacion: {
+    lat: config.ubicacion?.lat,
+    lng: config.ubicacion?.lng,
+    direccion: config.ubicacion?.direccion, // 👈 aseguramos que se guarde
+  },
+});
+
     setMensaje(ok ? "✅ Cambios guardados correctamente." : "❌ Error al guardar.");
     setEstado("listo");
   };
@@ -595,86 +601,94 @@ export default function PlantillaForm() {
         <button
           type="button"
           onClick={() => {
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  const { latitude, longitude } = pos.coords;
-                  setConfig((prev: any) => ({
-                    ...prev,
-                    ubicacion: {
-                      lat: latitude,
-                      lng: longitude,
-                      direccion: `Lat: ${latitude}, Lng: ${longitude}`,
-                    },
-                  }));
-                  setMensaje("📍 Ubicación actual detectada.");
-                },
-                (error) => {
-                  console.error(error);
-                  if (error.code === 1) {
-                    setMensaje(
-                      "⚠️ Permiso de ubicación denegado. Activa el GPS y otorga permisos."
-                    );
-                  } else if (error.code === 2) {
-                    setMensaje(
-                      "⚠️ No se pudo obtener tu ubicación. Verifica tu señal o activa el GPS."
-                    );
-                  } else if (error.code === 3) {
-                    setMensaje(
-                      "⚠️ Tiempo de espera agotado al intentar obtener tu ubicación."
-                    );
-                  } else {
-                    setMensaje("❌ Error desconocido al obtener ubicación.");
-                  }
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-              );
-            } else {
-              setMensaje("⚠️ Tu navegador no soporta geolocalización.");
-            }
-          }}
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+
+        // ✅ obtener dirección legible
+        const direccion = await obtenerDireccion(latitude, longitude);
+
+        setConfig((prev: any) => ({
+          ...prev,
+          ubicacion: {
+            lat: latitude,
+            lng: longitude,
+            direccion,
+          },
+        }));
+        setMensaje("📍 Ubicación actual detectada.");
+      },
+      (error) => {
+        console.error(error);
+        if (error.code === 1) {
+          setMensaje("⚠️ Permiso de ubicación denegado. Activa el GPS y otorga permisos.");
+        } else if (error.code === 2) {
+          setMensaje("⚠️ No se pudo obtener tu ubicación. Verifica tu señal o activa el GPS.");
+        } else if (error.code === 3) {
+          setMensaje("⚠️ Tiempo de espera agotado al intentar obtener tu ubicación.");
+        } else {
+          setMensaje("❌ Error desconocido al obtener ubicación.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  } else {
+    setMensaje("⚠️ Tu navegador no soporta geolocalización.");
+  }
+}}
+
           className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition"
         >
           Usar mi ubicación actual
         </button>
 
         {/* Mini mapa */}
-        {config.ubicacion?.lat && config.ubicacion?.lng && (
-          <div className="mt-3">
-            <div className="w-full h-64 rounded-md overflow-hidden border">
-              <MapContainer
-                key={`${config.ubicacion.lat}-${config.ubicacion.lng}`}
-                center={[config.ubicacion.lat, config.ubicacion.lng]}
-                zoom={16}
-                style={{ width: "100%", height: "100%" }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                <Marker
-                  position={[config.ubicacion.lat, config.ubicacion.lng]}
-                  icon={customIcon}
-                  draggable={true}
-                  eventHandlers={{
-                    dragend: (e) => {
-                      const newPos = e.target.getLatLng();
-                      setConfig((prev: any) => ({
-                        ...prev,
-                        ubicacion: {
-                          lat: newPos.lat,
-                          lng: newPos.lng,
-                        },
-                      }));
-                    },
-                  }}
-                >
-                  <Popup>Mueve el pin si la ubicación no es correcta</Popup>
-                </Marker>
-              </MapContainer>
-            </div>
-          </div>
-        )}
+{config.ubicacion?.lat && config.ubicacion?.lng && (
+  <div className="mt-3">
+    <div className="w-full h-64 rounded-md overflow-hidden border">
+      <MapContainer
+        key={`${config.ubicacion.lat}-${config.ubicacion.lng}`}
+        center={[config.ubicacion.lat, config.ubicacion.lng]}
+        zoom={16}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+        />
+        <Marker
+          position={[config.ubicacion.lat, config.ubicacion.lng]}
+          icon={customIcon}
+          draggable={true}
+          eventHandlers={{
+            dragend: async (e) => {
+              const newPos = e.target.getLatLng();
+
+              // 👇 aquí llamamos al helper para traducir coords a país/departamento
+              const direccion = await obtenerDireccion(
+                newPos.lat,
+                newPos.lng
+              );
+
+              setConfig((prev: any) => ({
+                ...prev,
+                ubicacion: {
+                  lat: newPos.lat,
+                  lng: newPos.lng,
+                  direccion, // 👈 guardamos la dirección legible
+                },
+              }));
+              setMensaje("📍 Ubicación actualizada.");
+            },
+          }}
+        >
+          <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+        </Marker>
+      </MapContainer>
+    </div>
+  </div>
+)}
 
         {/* Botones */}
         <div className="flex flex-col gap-2 mt-4">
