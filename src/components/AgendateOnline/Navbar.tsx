@@ -10,6 +10,7 @@ import {
 import { auth, googleProvider, db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import Menu from "./Menu";
+import { loginConGoogle, logout } from "../../lib/auth";
 
 type ClienteLink = { label: string; href: string; highlight?: boolean };
 
@@ -52,13 +53,13 @@ export default function Navbar() {
   }, []);
 
   const handleLogin = async () => {
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(auth, googleProvider);
-    } catch (e) {
-      alert(`No se pudo iniciar sesión: ${String((e as any)?.code || e)}`);
-    }
-  };
+  try {
+    await loginConGoogle(); // 👈 ahora usa la función que guarda en Firestore
+  } catch (e) {
+    alert(`No se pudo iniciar sesión: ${String((e as any)?.code || e)}`);
+  }
+};
+
 
   const handleLogout = () => {
     signOut(auth).catch((e) => console.error("[Navbar] signOut error:", e));
