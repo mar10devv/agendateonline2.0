@@ -1,0 +1,47 @@
+---
+import "../../styles/global.css";
+import AgendaVirtual from "../../components/agenda/agenda-virtual";
+import { db } from "../../lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+
+export const prerender = false;
+
+type Negocio = {
+  id: string;
+  nombre: string;
+  empleadosData?: any[];
+};
+
+const { slug } = Astro.params;
+
+let negocio: Negocio | null = null;
+const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+const snap = await getDocs(q);
+
+if (!snap.empty) {
+  const docSnap = snap.docs[0];
+  negocio = { id: docSnap.id, ...docSnap.data() } as Negocio;
+}
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{negocio ? negocio.nombre : "Mi Agenda"}</title>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <main class="w-full flex justify-center">
+      {!negocio ? (
+        <h1 class="text-center text-2xl mt-10">❌ Este negocio no existe.</h1>
+      ) : (
+        <AgendaVirtual
+          client:only="react"
+          negocioId={negocio.id}
+          nombre={negocio.nombre}
+          empleados={negocio.empleadosData || []}
+        />
+      )}
+    </main>
+  </body>
+</html>
