@@ -9,13 +9,15 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// Paneles existentes
+// Paneles
 import DashboardAgenda from "../panel/panel-agenda";
 import DashboardEmpleados from "../panel/panel-empleados";
+import DashboardAgendaLite from "../panel-lite/panel-agenda";
+import PanelEmpleadosLite from "../panel-lite/panel-empleados";
 import AgendarTurnoLite from "./agendar-turno-lite";
 
 type Props = {
-  negocioId: string;   // viene del uid del negocio
+  negocioId: string; // viene del uid del negocio
   empleados: any[];
 };
 
@@ -143,22 +145,21 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
   if (esDuenio && plan === "gratis") {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-600 text-center p-6">
-        🚫 Tu negocio está en plan <b>Gratis</b>.  
+        🚫 Tu negocio está en plan <b>Gratis</b>.
+        <br />
         Actualizá a Premium Lite o Premium Gold para activar tu agenda.
       </div>
     );
   }
 
-  // 🟡 Dueño Premium
+  // 🟡 Dueño Premium (Lite o Gold)
   if (esDuenio && (plan === "lite" || plan === "gold")) {
     return (
       <div className="w-full p-6 md:p-10 flex justify-center">
         <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
           {/* Cabecera */}
           <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
-            <h1 className="text-xl md:text-2xl font-bold">
-              Agenda de {slug}
-            </h1>
+            <h1 className="text-xl md:text-2xl font-bold">Agenda de {slug}</h1>
           </div>
 
           {/* Tabs */}
@@ -187,8 +188,10 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
 
           {/* Contenido */}
           <div className="p-6">
-            {tab === "agenda" && <DashboardAgenda />}
-            {tab === "empleados" && <DashboardEmpleados />}
+            {tab === "agenda" &&
+              (plan === "gold" ? <DashboardAgenda /> : <DashboardAgendaLite />)}
+            {tab === "empleados" &&
+              (plan === "gold" ? <DashboardEmpleados /> : <PanelEmpleadosLite />)}
           </div>
         </div>
       </div>
