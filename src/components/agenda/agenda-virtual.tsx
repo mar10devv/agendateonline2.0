@@ -1,54 +1,106 @@
 // src/components/agenda/agenda-virtual.tsx
 import { useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  getAuth,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
 // Paneles existentes
 import DashboardAgenda from "../panel/panel-agenda";
 import DashboardEmpleados from "../panel/panel-empleados";
-// Nueva agenda simplificada para clientes
 import AgendarTurnoLite from "./agendar-turno-lite";
 
 type Props = {
-  negocioId: string;
+  negocioId: string;   // viene del uid del negocio
   empleados: any[];
 };
 
 export default function AgendaVirtual({ negocioId, empleados }: Props) {
-  const [user, setUser] = useState<any>(null);
-  const [esDueno, setEsDueno] = useState(false);
-  const [estado, setEstado] = useState<"cargando" | "listo" | "no-sesion">(
-    "cargando"
-  );
+  const [estado, setEstado] = useState<"cargando" | "listo" | "no-sesion">("cargando");
+  const [rol, setRol] = useState<"usuario" | "negocio" | "admin">("usuario");
+  const [plan, setPlan] = useState<"gratis" | "gold" | "lite">("gratis");
+  const [esDuenio, setEsDuenio] = useState(false);
   const [tab, setTab] = useState<"agenda" | "empleados">("agenda");
+  const [slug, setSlug] = useState<string>("");
 
   useEffect(() => {
     const auth = getAuth();
+
+    // 🔹 Obtener slug del negocio
+    const fetchSlug = async () => {
+      try {
+        const negocioRef = doc(db, "Negocios", negocioId);
+        const negocioSnap = await getDoc(negocioRef);
+        if (negocioSnap.exists()) {
+          const data = negocioSnap.data();
+          setSlug(data?.slug || "mi-negocio");
+        }
+      } catch (err) {
+        console.error("❌ Error obteniendo slug del negocio:", err);
+      }
+    };
+    fetchSlug();
+
+    // 🔹 Verificar usuario logueado
     const unsub = onAuthStateChanged(auth, async (usuario) => {
       if (!usuario) {
         setEstado("no-sesion");
         return;
       }
 
-      setUser(usuario);
+      try {
+        const userRef = doc(db, "Usuarios", usuario.uid);
+        const snap = await getDoc(userRef);
 
-      // Verificamos si es dueño premium
-      const userRef = doc(db, "Usuarios", usuario.uid);
-      const snap = await getDoc(userRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data?.premium) {
-          setEsDueno(true);
+        if (snap.exists()) {
+          const data = snap.data();
+
+          // Normalizar
+          const updates: any = {};
+          if (!("rol" in data)) updates.rol = "usuario";
+          if (!("premium" in data)) updates.premium = false;
+          if (!("tipoPremium" in data)) updates.tipoPremium = "";
+          if (Object.keys(updates).length > 0) await updateDoc(userRef, updates);
+
+          setRol((data.rol as any) || "usuario");
+          if (!data.premium) setPlan("gratis");
+          else if (data.tipoPremium === "gold") setPlan("gold");
+          else if (data.tipoPremium === "lite") setPlan("lite");
+
+          // 👇 dueño si uid === negocioId
+          if (usuario.uid === negocioId) {
+            setEsDuenio(true);
+          }
+        } else {
+          await setDoc(userRef, {
+            nombre: usuario.displayName || "",
+            email: usuario.email || "",
+            fotoPerfil: usuario.photoURL || "",
+            creadoEn: new Date(),
+            rol: "usuario",
+            premium: false,
+            tipoPremium: "",
+          });
+          setRol("usuario");
+          setPlan("gratis");
         }
+      } catch (err) {
+        console.error("❌ Error obteniendo usuario:", err);
+        setRol("usuario");
+        setPlan("gratis");
       }
 
       setEstado("listo");
     });
 
     return () => unsub();
-  }, []);
+  }, [negocioId]);
 
+  // Loader
   if (estado === "cargando") {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-700">
@@ -58,19 +110,13 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
     );
   }
 
+  // Usuario no logueado
   if (estado === "no-sesion") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
-        <p className="text-lg mb-4">
-          🔒 Debes iniciar sesión para acceder a la agenda.
-        </p>
+        <p className="text-lg mb-4">🔒 Debes iniciar sesión para acceder a la agenda.</p>
         <button
           onClick={async () => {
-            const {
-              getAuth,
-              signInWithPopup,
-              GoogleAuthProvider,
-            } = await import("firebase/auth");
             const auth = getAuth();
             const provider = new GoogleAuthProvider();
             try {
@@ -82,22 +128,40 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
           }}
           className="px-6 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition"
         >
-          Iniciar sesión
+          Iniciar sesión con Google
         </button>
       </div>
     );
   }
 
-  return (
-    <div className="w-full p-6 md:p-10 flex justify-center">
-      <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-        {/* Encabezado */}
-        <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
-          <h1 className="text-xl md:text-2xl font-bold">Agenda Virtual</h1>
-        </div>
+  // 🟢 Visitante/cliente
+  if (!esDuenio) {
+    return <AgendarTurnoLite negocioId={negocioId} empleados={empleados} slug={slug} />;
+  }
 
-        {/* Tabs si es dueño */}
-        {esDueno && (
+  // 🔴 Dueño Gratis
+  if (esDuenio && plan === "gratis") {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-600 text-center p-6">
+        🚫 Tu negocio está en plan <b>Gratis</b>.  
+        Actualizá a Premium Lite o Premium Gold para activar tu agenda.
+      </div>
+    );
+  }
+
+  // 🟡 Dueño Premium
+  if (esDuenio && (plan === "lite" || plan === "gold")) {
+    return (
+      <div className="w-full p-6 md:p-10 flex justify-center">
+        <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+          {/* Cabecera */}
+          <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+            <h1 className="text-xl md:text-2xl font-bold">
+              Agenda de {slug}
+            </h1>
+          </div>
+
+          {/* Tabs */}
           <div className="flex border-b bg-gray-50">
             <button
               onClick={() => setTab("agenda")}
@@ -120,20 +184,21 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
               Empleados
             </button>
           </div>
-        )}
 
-        {/* Contenido */}
-        <div className="p-6">
-          {esDueno ? (
-            <>
-              {tab === "agenda" && <DashboardAgenda />}
-              {tab === "empleados" && <DashboardEmpleados />}
-            </>
-          ) : (
-            <AgendarTurnoLite negocioId={negocioId} empleados={empleados} />
-          )}
+          {/* Contenido */}
+          <div className="p-6">
+            {tab === "agenda" && <DashboardAgenda />}
+            {tab === "empleados" && <DashboardEmpleados />}
+          </div>
         </div>
       </div>
+    );
+  }
+
+  // Fallback
+  return (
+    <div className="flex items-center justify-center min-h-screen text-gray-600">
+      ⚠️ No se pudo determinar el plan o rol de este usuario.
     </div>
   );
 }

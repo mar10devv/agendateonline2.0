@@ -18,6 +18,7 @@ type Usuario = {
   foto?: string;
   rol: "usuario" | "negocio" | "admin";
   premium: boolean;
+  tipoPremium?: "gold" | "lite" | "";
   plantilla?: string;
 };
 
@@ -46,33 +47,69 @@ export default function PanelAdmin() {
     if (!isAdmin) return;
     const cargarUsuarios = async () => {
       const snap = await getDocs(collection(db, "Usuarios"));
-      const data: Usuario[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Usuario, "id">),
-      }));
+      const data: Usuario[] = snap.docs.map((d) => {
+        const datos = d.data() as any;
+        return {
+          id: d.id,
+          nombre: datos.nombre,
+          email: datos.email,
+          fotoPerfil: datos.fotoPerfil,
+          foto: datos.foto,
+          rol: datos.rol || "usuario",
+          premium: datos.premium || false,
+          tipoPremium: datos.tipoPremium || "",
+          plantilla: datos.plantilla,
+        };
+      });
       setUsuarios(data);
     };
     cargarUsuarios();
   }, [isAdmin]);
 
-  const togglePremium = async (usuario: Usuario) => {
+  const actualizarPremium = async (usuarioId: string, nuevoValor: boolean) => {
+  try {
+    let cambios: any = { premium: nuevoValor };
+
+    if (nuevoValor) {
+      // 👇 Si activamos Premium, lo dejamos por defecto en Lite
+      cambios.tipoPremium = "lite";
+    } else {
+      // 👇 Si lo desactivamos, limpiamos tipoPremium
+      cambios.tipoPremium = "";
+    }
+
+    await updateDoc(doc(db, "Usuarios", usuarioId), cambios);
+
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.id === usuarioId
+          ? { ...u, premium: nuevoValor, tipoPremium: cambios.tipoPremium }
+          : u
+      )
+    );
+
+    setUsuarioSeleccionado((prev) =>
+      prev
+        ? { ...prev, premium: nuevoValor, tipoPremium: cambios.tipoPremium }
+        : prev
+    );
+  } catch (err) {
+    console.error("Error cambiando premium:", err);
+  }
+};
+
+
+  const actualizarTipoPremium = async (usuarioId: string, tipo: string) => {
     try {
-      await updateDoc(doc(db, "Usuarios", usuario.id), {
-        premium: !usuario.premium,
-        rol: !usuario.premium ? "negocio" : "usuario",
-      });
+      await updateDoc(doc(db, "Usuarios", usuarioId), { tipoPremium: tipo });
       setUsuarios((prev) =>
-        prev.map((u) =>
-          u.id === usuario.id
-            ? { ...u, premium: !usuario.premium, rol: !usuario.premium ? "negocio" : "usuario" }
-            : u
-        )
+        prev.map((u) => (u.id === usuarioId ? { ...u, tipoPremium: tipo as "gold" | "lite" } : u))
       );
       setUsuarioSeleccionado((prev) =>
-        prev ? { ...prev, premium: !prev.premium, rol: !prev.premium ? "negocio" : "usuario" } : prev
+        prev ? { ...prev, tipoPremium: tipo as "gold" | "lite" } : prev
       );
     } catch (err) {
-      console.error("Error cambiando premium:", err);
+      console.error("Error actualizando tipoPremium:", err);
     }
   };
 
@@ -145,10 +182,22 @@ export default function PanelAdmin() {
                   </span>
                   <span
                     className={`mt-2 px-2 py-1 text-xs rounded ${
-                      u.premium ? "bg-green-500 text-white" : "bg-gray-300"
+                      !u.premium
+                        ? "bg-gray-300"
+                        : u.tipoPremium === "gold"
+                        ? "bg-green-500 text-white"
+                        : u.tipoPremium === "lite"
+                        ? "bg-yellow-500 text-white"
+                        : "bg-blue-400 text-white"
                     }`}
                   >
-                    {u.premium ? "Premium" : "Gratis"}
+                    {!u.premium
+                      ? "Gratis"
+                      : u.tipoPremium === "gold"
+                      ? "Premium Gold"
+                      : u.tipoPremium === "lite"
+                      ? "Premium Lite"
+                      : "Premium"}
                   </span>
                 </div>
               );
@@ -171,14 +220,19 @@ export default function PanelAdmin() {
               Configuración de {usuarioSeleccionado.nombre}
             </h2>
 
-            {/* Premium con toggle */}
+            {/* Toggle Premium */}
             <div className="mb-4">
               <p className="font-medium mb-2">Estado Premium:</p>
               <label className="relative inline-block w-[3.5em] h-[2em]">
                 <input
                   type="checkbox"
                   checked={usuarioSeleccionado.premium}
-                  onChange={() => togglePremium(usuarioSeleccionado)}
+                  onChange={() =>
+                    actualizarPremium(
+                      usuarioSeleccionado.id,
+                      !usuarioSeleccionado.premium
+                    )
+                  }
                   className="opacity-0 w-0 h-0 peer"
                 />
                 <span
@@ -194,6 +248,24 @@ export default function PanelAdmin() {
                 ></span>
               </label>
             </div>
+
+            {/* Tipo Premium */}
+            {usuarioSeleccionado.premium && (
+              <div className="mb-4">
+                <p className="font-medium mb-2">Tipo de Premium:</p>
+                <select
+                  value={usuarioSeleccionado.tipoPremium || ""}
+                  onChange={(e) =>
+                    actualizarTipoPremium(usuarioSeleccionado.id, e.target.value)
+                  }
+                  className="border rounded px-2 py-1 mt-2 w-full"
+                >
+                  <option value="">-- Seleccionar --</option>
+                  <option value="gold">Premium Gold</option>
+                  <option value="lite">Premium Lite</option>
+                </select>
+              </div>
+            )}
 
             {/* Plantilla */}
             <div className="mb-4">
