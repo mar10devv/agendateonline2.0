@@ -15,6 +15,10 @@ import DashboardEmpleados from "../panel/panel-empleados";
 import DashboardAgendaLite from "../panel-lite/panel-agenda";
 import PanelEmpleadosLite from "../panel-lite/panel-empleados";
 import AgendarTurnoLite from "./agendar-turno-lite";
+import ConfigModalLite from "../panel-lite/panel-modal";
+
+// SVG de configuración
+import ConfigIcon from "../../assets/config-svg.svg?url";
 
 type Props = {
   negocioId: string; // viene del uid del negocio
@@ -28,6 +32,9 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
   const [esDuenio, setEsDuenio] = useState(false);
   const [tab, setTab] = useState<"agenda" | "empleados">("agenda");
   const [slug, setSlug] = useState<string>("");
+
+  // 👇 Estado del modal de configuración
+  const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
     const auth = getAuth();
@@ -107,7 +114,7 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-700">
         <div className="w-10 h-10 border-4 border-t-indigo-500 border-gray-300 rounded-full animate-spin"></div>
-        <p className="ml-3">Cargando agenda virtual...</p>
+        <p className="ml-3">Cargando agenda...</p>
       </div>
     );
   }
@@ -155,46 +162,71 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
   // 🟡 Dueño Premium (Lite o Gold)
   if (esDuenio && (plan === "lite" || plan === "gold")) {
     return (
-      <div className="w-full p-6 md:p-10 flex justify-center">
-        <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-          {/* Cabecera */}
-          <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
-            <h1 className="text-xl md:text-2xl font-bold">Agenda de {slug}</h1>
-          </div>
+      <>
+        <div className="w-full p-6 md:p-10 flex justify-center">
+          <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            {/* Cabecera */}
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+              <h1 className="text-xl md:text-2xl font-bold">Agenda de {slug}</h1>
 
-          {/* Tabs */}
-          <div className="flex border-b bg-gray-50">
-            <button
-              onClick={() => setTab("agenda")}
-              className={`flex-1 px-4 py-3 text-center font-medium transition ${
-                tab === "agenda"
-                  ? "border-b-2 border-indigo-600 text-indigo-600 bg-white"
-                  : "text-gray-600 hover:text-indigo-600"
-              }`}
-            >
-              Agenda
-            </button>
-            <button
-              onClick={() => setTab("empleados")}
-              className={`flex-1 px-4 py-3 text-center font-medium transition ${
-                tab === "empleados"
-                  ? "border-b-2 border-indigo-600 text-indigo-600 bg-white"
-                  : "text-gray-600 hover:text-indigo-600"
-              }`}
-            >
-              Empleados
-            </button>
-          </div>
+              {/* Botón config visible solo para el dueño */}
+              {esDuenio && (
+                <button
+                  onClick={() => setShowConfig(true)}
+                  className="ml-4 p-2 rounded-full hover:bg-indigo-700 transition"
+                >
+                  <img
+                    src={ConfigIcon}
+                    alt="configuración"
+                    className="w-6 h-6 filter invert"
+                  />
+                </button>
+              )}
+            </div>
 
-          {/* Contenido */}
-          <div className="p-6">
-            {tab === "agenda" &&
-              (plan === "gold" ? <DashboardAgenda /> : <DashboardAgendaLite />)}
-            {tab === "empleados" &&
-              (plan === "gold" ? <DashboardEmpleados /> : <PanelEmpleadosLite />)}
+            {/* Tabs */}
+            <div className="flex border-b bg-gray-50">
+              <button
+                onClick={() => setTab("agenda")}
+                className={`flex-1 px-4 py-3 text-center font-medium transition ${
+                  tab === "agenda"
+                    ? "border-b-2 border-indigo-600 text-indigo-600 bg-white"
+                    : "text-gray-600 hover:text-indigo-600"
+                }`}
+              >
+                Agenda
+              </button>
+              <button
+                onClick={() => setTab("empleados")}
+                className={`flex-1 px-4 py-3 text-center font-medium transition ${
+                  tab === "empleados"
+                    ? "border-b-2 border-indigo-600 text-indigo-600 bg-white"
+                    : "text-gray-600 hover:text-indigo-600"
+                }`}
+              >
+                Empleados
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6">
+              {tab === "agenda" &&
+                (plan === "gold" ? <DashboardAgenda /> : <DashboardAgendaLite />)}
+              {tab === "empleados" &&
+                (plan === "gold" ? <DashboardEmpleados /> : <PanelEmpleadosLite />)}
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Modal de configuración */}
+        {showConfig && (
+          <ConfigModalLite
+            negocioId={negocioId}
+            slug={slug}
+            onClose={() => setShowConfig(false)}
+          />
+        )}
+      </>
     );
   }
 
