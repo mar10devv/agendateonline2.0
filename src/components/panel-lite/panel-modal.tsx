@@ -1,6 +1,13 @@
 // src/components/panel-lite/panel-modal.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import PanelServiciosLite from "./panel-servicios";
 import DownIcon from "../../assets/down-svg.svg?url";
@@ -26,7 +33,45 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
   const [mensaje, setMensaje] = useState("");
   const [mostrarFlecha, setMostrarFlecha] = useState(false);
 
+  const [slugDisponible, setSlugDisponible] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 🔎 Verificar slug en Firestore
+  const verificarSlugDisponible = async (slugCheck: string) => {
+    const q = query(collection(db, "Negocios"), where("slug", "==", slugCheck));
+    const snap = await getDocs(q);
+
+    // Si está vacío → disponible
+    if (snap.empty) return true;
+
+    // Si existe, verificar que el único doc encontrado sea el mismo negocio actual
+    if (snap.size === 1 && snap.docs[0].id === negocioId) {
+      return true; // es su propio slug, válido
+    }
+
+    return false; // ocupado por otro negocio
+  };
+
+  // Validar slug mientras el usuario escribe
+  useEffect(() => {
+    if (!nuevoNombre.trim()) {
+      setSlugDisponible(null);
+      return;
+    }
+
+    const slugGenerado = generarSlug(nuevoNombre);
+
+    setChecking(true);
+    const timeout = setTimeout(async () => {
+      const disponible = await verificarSlugDisponible(slugGenerado);
+      setSlugDisponible(disponible);
+      setChecking(false);
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [nuevoNombre, negocioId]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -36,7 +81,7 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
       setMostrarFlecha(el.scrollHeight > el.clientHeight && el.scrollTop === 0);
     };
 
-    calcularFlecha(); // primera vez
+    calcularFlecha();
 
     const handleScroll = () => {
       if (el.scrollTop > 0) setMostrarFlecha(false);
@@ -44,7 +89,6 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
 
     el.addEventListener("scroll", handleScroll);
 
-    // 👇 Observer para detectar cambios en el tamaño del contenido
     const resizeObserver = new ResizeObserver(() => calcularFlecha());
     resizeObserver.observe(el);
 
@@ -55,21 +99,26 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
   }, [slug, negocioId]);
 
   const guardarNombre = async () => {
+    if (!slugDisponible) return;
+
     setGuardando(true);
     setMensaje("");
 
     try {
       const negocioRef = doc(db, "Negocios", negocioId);
+      const nuevoSlug = generarSlug(nuevoNombre);
+
       await updateDoc(negocioRef, {
         nombre: nuevoNombre,
-        slug: generarSlug(nuevoNombre),
+        slug: nuevoSlug,
       });
 
-      const nuevoSlug = generarSlug(nuevoNombre);
-      window.history.pushState({}, "", `/agenda/${nuevoSlug}`);
-      document.title = nuevoSlug;
-
       setMensaje("✅ Nombre de la agenda actualizado.");
+
+      // 👇 Recargar la página en la nueva URL
+      setTimeout(() => {
+        window.location.href = `/agenda/${nuevoSlug}`;
+      }, 800);
     } catch (err) {
       console.error("❌ Error guardando nombre:", err);
       setMensaje("❌ No se pudo guardar el nombre de la agenda.");
@@ -111,9 +160,23 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
               placeholder="Nuevo nombre de la agenda"
               className="w-full md:w-3/4 mx-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600"
             />
+
+            {/* Validación slug */}
+            {nuevoNombre.trim() && (
+              <p className="mt-2 text-sm">
+                {checking ? (
+                  <span className="text-gray-500">Verificando...</span>
+                ) : slugDisponible ? (
+                  <span className="text-green-600">✅ Disponible</span>
+                ) : (
+                  <span className="text-red-600">❌ Ocupado</span>
+                )}
+              </p>
+            )}
+
             <button
               onClick={guardarNombre}
-              disabled={guardando || !nuevoNombre.trim()}
+              disabled={guardando || !nuevoNombre.trim() || !slugDisponible}
               className="mt-4 px-6 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {guardando ? "Guardando..." : "Guardar nombre"}
@@ -124,13 +187,13 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
           {/* Servicios */}
           <PanelServiciosLite negocioId={negocioId} />
 
-          {/* Flecha al final del modal */}
+          {/* Flecha */}
           {mostrarFlecha && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
               <img
                 src={DownIcon}
                 alt="scroll down"
-                className="w-20 opacity-70 animate-bounce"
+                className="w-10 h-10 opacity-70 animate-bounce"
               />
             </div>
           )}
