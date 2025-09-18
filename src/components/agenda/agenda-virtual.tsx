@@ -109,6 +109,13 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
     return () => unsub();
   }, [negocioId]);
 
+  // 🔹 Actualizar título de la pestaña cuando cambia el slug
+  useEffect(() => {
+    if (slug) {
+      document.title = slug; // 👈 ahora solo muestra el slug
+    }
+  }, [slug]);
+
   // Loader
   if (estado === "cargando") {
     return (

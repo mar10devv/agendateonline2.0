@@ -152,3 +152,16 @@
 .custom-scroll::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, #2563eb, #1e3a8a);
 }
+
+@keyframes bounceSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 1.5s infinite;
+}
