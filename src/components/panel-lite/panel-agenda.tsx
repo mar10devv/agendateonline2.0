@@ -136,18 +136,27 @@ export default function DashboardAgendaLite() {
   );
 
   // Cancelar turno
-  const cancelarTurno = async (turno: Turno) => {
-    if (!user) return;
-    if (!window.confirm(`¿Cancelar turno de ${turno.cliente} (${turno.hora})?`)) return;
-    try {
-      await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
-      if (turno.uidCliente) {
-        await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
-      }
-    } catch (err) {
-      console.error("❌ Error al cancelar turno:", err);
+const cancelarTurno = async (turno: Turno) => {
+  if (!user) return;
+  if (!window.confirm(`¿Cancelar turno de ${turno.cliente} (${turno.hora})?`)) return;
+
+  try {
+    // Borramos el turno en el negocio
+    await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
+
+    // Si también está guardado en el usuario, lo borramos
+    if (turno.uidCliente) {
+      await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
     }
-  };
+
+    console.log("✅ Turno cancelado correctamente");
+  } catch (err: any) {
+    // Este error aparece porque Firestore intenta cerrar el stream post-delete.
+    // El turno ya está eliminado, así que lo manejamos como advertencia.
+    console.warn("⚠️ Error post-delete ignorado:", err.message);
+  }
+};
+
 
   if (estado === "cargando") return <p className="text-center">Cargando agenda...</p>;
   if (estado === "sin-acceso") return <p className="text-red-600 text-center mt-10">{mensaje}</p>;

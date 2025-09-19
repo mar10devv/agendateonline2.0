@@ -81,9 +81,60 @@ export default function PanelRegistro() {
     );
   };
 
-  const handleFinalizar = () => {
+  const handleFinalizar = async () => {
+  // Validaciones
+  if (!modoTurnos) {
+    alert("⚠️ Debes seleccionar un modo de turnos (jornada o personalizado).");
+    return;
+  }
+
+  if (modoTurnos === "jornada" && !subModoJornada) {
+    alert("⚠️ Debes indicar si trabajas por minutos o por horas.");
+    return;
+  }
+
+  if (modoTurnos === "jornada" && horasSeparacion <= 0) {
+    alert("⚠️ Debes configurar el tiempo de separación entre clientes.");
+    return;
+  }
+
+  if (modoTurnos === "personalizado" && clientesPorDia <= 0) {
+    alert("⚠️ Debes indicar cuántos clientes atiendes por día.");
+    return;
+  }
+
+  if (diasLibres.length === 0) {
+    alert("⚠️ Debes seleccionar al menos un día libre.");
+    return;
+  }
+
+  try {
+    let user = auth.currentUser;
+    if (!user) {
+      const result = await signInWithPopup(auth, googleProvider);
+      user = result.user;
+    }
+
+    const negocioRef = doc(db, "Negocios", user.uid);
+
+    await updateDoc(negocioRef, {
+      configuracionAgenda: {
+        diasLibres,
+        modoTurnos,
+        subModoJornada,
+        clientesPorDia,
+        horasSeparacion,
+      },
+    });
+
+    console.log("✅ Configuración de agenda guardada en el negocio");
     setPaso(3);
-  };
+  } catch (error) {
+    console.error("❌ Error guardando configuración de agenda:", error);
+    alert("⚠️ No se pudo guardar la configuración de agenda.");
+  }
+};
+
 
   // Paso 3 → selección de plan
   const [planSeleccionado, setPlanSeleccionado] = useState<"agenda" | "web" | null>(null);

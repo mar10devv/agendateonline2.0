@@ -227,7 +227,7 @@ export default function Navbar() {
                   </button>
                   {!isPremium && (
                     <a
-                      href="/registrar-negocio"
+                      href="/panel/panel-registro/"
                       className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
                     >
                       🏢 Registrar empresa
