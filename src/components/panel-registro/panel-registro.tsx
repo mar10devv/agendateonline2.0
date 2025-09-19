@@ -1,10 +1,46 @@
 import { useState } from "react";
 import { db, auth, googleProvider } from "../../lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { signInWithPopup } from "firebase/auth";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+// 🔑 Normaliza string
+function normalizarTexto(texto: string) {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+// 🔑 Base desde email (antes del @)
+function baseDesdeEmail(email: string, nombre?: string) {
+  if (!email) return normalizarTexto(nombre || "usuario");
+  return normalizarTexto(email.split("@")[0]);
+}
+
+// 🔑 Generar slug único en Firestore
+async function generarSlugUnico(nombre: string, email: string) {
+  const base = baseDesdeEmail(email, nombre);
+  let slug = base;
+
+  let existe = true;
+  while (existe) {
+    const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      existe = false;
+    } else {
+      const randomSuffix = Math.random().toString(36).substring(2, 7);
+      slug = `${base}-${randomSuffix}`;
+    }
+  }
+
+  return slug;
+}
 
 export default function PanelRegistro() {
   const [paso, setPaso] = useState(1);
@@ -58,6 +94,7 @@ export default function PanelRegistro() {
 
   // Paso 5 → confirmación final
   const [finalizado, setFinalizado] = useState(false);
+  const [slugGenerado, setSlugGenerado] = useState<string | null>(null);
 
   // ✅ Validación en Firestore con login
   const verificarCodigo = async () => {
@@ -69,7 +106,6 @@ export default function PanelRegistro() {
     try {
       let user = auth.currentUser;
       if (!user) {
-        // 👉 Forzamos login
         const result = await signInWithPopup(auth, googleProvider);
         user = result.user;
       }
@@ -84,28 +120,57 @@ export default function PanelRegistro() {
       }
 
       const data = codigoSnap.data();
-
       if (!data.valido) {
         setCodigoValido(false);
         alert("❌ Código ya fue utilizado.");
         return;
       }
 
-      // ✅ Código válido → actualizar Firestore
+      // ✅ Crear negocio y usuario
+      const slug = await generarSlugUnico(nombre, email);
+
+      await setDoc(
+        doc(db, "Negocios", user.uid),
+        {
+          nombre,
+          emailContacto: email,
+          telefono,
+          tipoNegocio,
+          slug,
+          urlPersonal: `http://localhost:4321/agenda/${slug}`,
+          plantilla: "",
+          ownerUid: user.uid,
+          plan: planSeleccionado,
+          premium: true,
+          tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
+          fechaRegistro: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, "Usuarios", user.uid),
+        {
+          nombre: user.displayName || nombre,
+          email: user.email,
+          rol: "negocio",
+          premium: true,
+          tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
+        },
+        { merge: true }
+      );
+
       await updateDoc(codigoRef, {
         valido: false,
         usado: true,
-        usadoPor: {
-          uid: user?.uid || "desconocido",
-          email: user?.email || "sin-email",
-          nombre: user?.displayName || nombre || "desconocido",
-        },
+        usadoPor: user.uid,
         fechaUso: new Date().toISOString(),
       });
 
+      setSlugGenerado(slug);
       setCodigoValido(true);
       setFinalizado(true);
-      setPaso(5); // 👉 Avanzamos al paso 5
+      setPaso(5);
     } catch (error) {
       console.error("Error verificando el código:", error);
       alert("⚠️ Ocurrió un error verificando el código.");
@@ -465,9 +530,9 @@ export default function PanelRegistro() {
           <h2 className="text-2xl font-bold text-green-600 mb-4">
             🎉 Tu empresa fue validada con éxito
           </h2>
-          {planSeleccionado === "agenda" ? (
+          {planSeleccionado === "agenda" && slugGenerado ? (
             <a
-              href={`http://localhost:4321/agenda/${nombre.toLowerCase()}`}
+              href={`http://localhost:4321/agenda/${slugGenerado}`}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
             >
               Ver mi agenda
