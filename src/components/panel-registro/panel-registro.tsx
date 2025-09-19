@@ -574,7 +574,7 @@ await setDoc(
           </h2>
           {planSeleccionado === "agenda" && slugGenerado ? (
             <a
-              href={`http://localhost:4321/agenda/${slugGenerado}`}
+              href={`https://agendateonline2.netlify.app//agenda/${slugGenerado}`}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
             >
               Ver mi agenda
