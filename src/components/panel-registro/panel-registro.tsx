@@ -129,24 +129,31 @@ export default function PanelRegistro() {
       // ✅ Crear negocio y usuario
       const slug = await generarSlugUnico(nombre, email);
 
+// Normalizar tipoNegocio para plantilla
+const plantillaNormalizada = tipoNegocio
+  .toLowerCase()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, ""); // quita acentos
+
       await setDoc(
-        doc(db, "Negocios", user.uid),
-        {
-          nombre,
-          emailContacto: email,
-          telefono,
-          tipoNegocio,
-          slug,
-          urlPersonal: `http://localhost:4321/agenda/${slug}`,
-          plantilla: "",
-          ownerUid: user.uid,
-          plan: planSeleccionado,
-          premium: true,
-          tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
-          fechaRegistro: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+  doc(db, "Negocios", user.uid),
+  {
+    nombre,
+    emailContacto: email,
+    telefono,
+    tipoNegocio,
+    slug,
+    urlPersonal: `http://localhost:4321/agenda/${slug}`,
+    plantilla: plantillaNormalizada, // ✅ ahora sí guarda el tipo de negocio normalizado
+    ownerUid: user.uid,
+    plan: planSeleccionado,
+    premium: true,
+    tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
+    fechaRegistro: new Date().toISOString(),
+  },
+  { merge: true }
+);
+
 
       await setDoc(
         doc(db, "Usuarios", user.uid),
