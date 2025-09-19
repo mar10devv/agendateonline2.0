@@ -174,7 +174,10 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
           <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
             {/* Cabecera */}
             <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
-              <h1 className="text-xl md:text-2xl font-bold">Agenda de {slug}</h1>
+              <h1 className="text-xl md:text-2xl font-bold">
+  Agenda de {slug.charAt(0).toUpperCase() + slug.slice(1)}
+</h1>
+
 
               {/* Botón config visible solo para el dueño */}
               {esDuenio && (

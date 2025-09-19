@@ -20,16 +20,16 @@ type Turno = {
 
 // 🔑 etiquetas dinámicas por plantilla
 const etiquetasPorPlantilla: Record<string, string> = {
-  barberia: "barbero",
-  dentista: "dentista",
-  tatuajes: "tatuador",
-  peluqueria: "estilista",
-  spa: "masajista",
+  barberia: "Barbero",
+  dentista: "Dentista",
+  tatuajes: "Tatuador",
+  peluqueria: "Estilista",
+  spa: "Masajista",
 };
 
 function getEtiquetaEmpleado(plantilla?: string) {
-  if (!plantilla) return "empleado";
-  return etiquetasPorPlantilla[plantilla.toLowerCase()] || "empleado";
+  if (!plantilla) return "Empleado";
+  return etiquetasPorPlantilla[plantilla] || "Empleado";
 }
 
 export default function DashboardAgendaLite() {
@@ -232,7 +232,7 @@ export default function DashboardAgendaLite() {
           <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
             <p className="text-yellow-700 font-medium">
               ⚠️ Primero configura el horario y días libres de este{" "}
-              {getEtiquetaEmpleado(plantilla)}.
+              {getEtiquetaEmpleado(plantilla).toLowerCase()}.
             </p>
           </div>
         ) : (
