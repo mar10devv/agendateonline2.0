@@ -81,8 +81,7 @@ export default function PanelRegistro() {
     );
   };
 
-  const handleFinalizar = async () => {
-  // Validaciones
+ const handleFinalizar = () => {
   if (!modoTurnos) {
     alert("⚠️ Debes seleccionar un modo de turnos (jornada o personalizado).");
     return;
@@ -108,31 +107,8 @@ export default function PanelRegistro() {
     return;
   }
 
-  try {
-    let user = auth.currentUser;
-    if (!user) {
-      const result = await signInWithPopup(auth, googleProvider);
-      user = result.user;
-    }
-
-    const negocioRef = doc(db, "Negocios", user.uid);
-
-    await updateDoc(negocioRef, {
-      configuracionAgenda: {
-        diasLibres,
-        modoTurnos,
-        subModoJornada,
-        clientesPorDia,
-        horasSeparacion,
-      },
-    });
-
-    console.log("✅ Configuración de agenda guardada en el negocio");
-    setPaso(3);
-  } catch (error) {
-    console.error("❌ Error guardando configuración de agenda:", error);
-    alert("⚠️ No se pudo guardar la configuración de agenda.");
-  }
+  // ✅ Si todo está bien, solo avanza
+  setPaso(3);
 };
 
 
@@ -195,28 +171,36 @@ const plantillaNormalizada = tipoNegocio
     tipoNegocio,
     slug,
     urlPersonal: `http://localhost:4321/agenda/${slug}`,
-    plantilla: plantillaNormalizada, // ✅ ahora sí guarda el tipo de negocio normalizado
+    plantilla: plantillaNormalizada, // ✅ tipo de negocio normalizado
     ownerUid: user.uid,
     plan: planSeleccionado,
     premium: true,
     tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
     fechaRegistro: new Date().toISOString(),
+
+    // 👇 Configuración de agenda (del paso 2)
+    configuracionAgenda: {
+      diasLibres,
+      modoTurnos,
+      subModoJornada,
+      clientesPorDia,
+      horasSeparacion,
+    },
   },
   { merge: true }
 );
 
-
-      await setDoc(
-        doc(db, "Usuarios", user.uid),
-        {
-          nombre: user.displayName || nombre,
-          email: user.email,
-          rol: "negocio",
-          premium: true,
-          tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
-        },
-        { merge: true }
-      );
+await setDoc(
+  doc(db, "Usuarios", user.uid),
+  {
+    nombre: user.displayName || nombre,
+    email: user.email,
+    rol: "negocio",
+    premium: true,
+    tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
+  },
+  { merge: true }
+);
 
       await updateDoc(codigoRef, {
         valido: false,
