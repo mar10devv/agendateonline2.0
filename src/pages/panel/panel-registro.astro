@@ -1,0 +1,20 @@
+---
+// Importamos estilos globales
+import "../../styles/global.css";
+
+// Alias del componente React
+import PanelRegistroComponent from "../../components/panel-registro/panel-registro";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Negocios</title>
+  </head>
+  <body class="min-h-screen">
+    <section class="min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
+      <PanelRegistroComponent client:load />
+    </section>
+  </body>
+</html>

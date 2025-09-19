@@ -1,4 +1,3 @@
-// src/components/panel/PanelAdmin.tsx
 import { useEffect, useState } from "react";
 import { db, auth } from "../../lib/firebase";
 import {
@@ -10,6 +9,7 @@ import {
   query,
   where,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -35,8 +35,17 @@ export default function PanelAdmin() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<Usuario | null>(null);
-  const [negocioSeleccionado, setNegocioSeleccionado] = useState<Negocio | null>(null);
+  const [usuarioSeleccionado, setUsuarioSeleccionado] =
+    useState<Usuario | null>(null);
+  const [negocioSeleccionado, setNegocioSeleccionado] =
+    useState<Negocio | null>(null);
+
+  // 👉 nueva tab
+  const [activeTab, setActiveTab] = useState<"usuarios" | "codigos">("usuarios");
+
+  // 👉 estados para codigos premium
+  const [codigos, setCodigos] = useState<any[]>([]);
+  const [loadingCodigos, setLoadingCodigos] = useState(true);
 
   const plantillasDisponibles = [
     { id: "barberia", label: "Barbería" },
@@ -45,6 +54,46 @@ export default function PanelAdmin() {
     { id: "dentista", label: "Dentista" },
     { id: "spa", label: "Spa" },
   ];
+
+  // 🔹 Generar un código aleatorio de 15 cifras
+  const generarCodigo = () => {
+    let codigo = "";
+    for (let i = 0; i < 15; i++) {
+      codigo += Math.floor(Math.random() * 10); // solo números
+    }
+    return codigo;
+  };
+
+  // 🔹 Crear un nuevo código en Firebase
+  const crearCodigo = async () => {
+    try {
+      const nuevoCodigo = generarCodigo();
+      await setDoc(doc(db, "CodigosPremium", nuevoCodigo), {
+        codigo: nuevoCodigo,
+        valido: true,
+        usado: false,
+        usadoPor: null,
+        fechaCreacion: serverTimestamp(),
+      });
+      alert(`✅ Código creado: ${nuevoCodigo}`);
+      cargarCodigos();
+    } catch (err) {
+      console.error("Error creando código:", err);
+    }
+  };
+
+  // 🔹 Cargar códigos desde Firestore
+  const cargarCodigos = async () => {
+    setLoadingCodigos(true);
+    try {
+      const snap = await getDocs(collection(db, "CodigosPremium"));
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setCodigos(data);
+    } catch (err) {
+      console.error("Error cargando códigos:", err);
+    }
+    setLoadingCodigos(false);
+  };
 
   // 🔑 Normaliza string
   function normalizarTexto(texto: string) {
@@ -74,7 +123,7 @@ export default function PanelAdmin() {
       if (snap.empty) {
         existe = false;
       } else {
-        const randomSuffix = Math.random().toString(36).substring(2, 7); // 5 chars
+        const randomSuffix = Math.random().toString(36).substring(2, 7);
         slug = `${base}-${randomSuffix}`;
       }
     }
@@ -118,25 +167,14 @@ export default function PanelAdmin() {
     cargarUsuarios();
   }, [isAdmin]);
 
-  // 🔑 Cuando seleccionamos usuario, traemos su negocio actualizado
+  // 🔄 Cargar codigos cuando entra en la tab
   useEffect(() => {
-    const cargarNegocio = async () => {
-      if (!usuarioSeleccionado) return;
+    if (activeTab === "codigos") {
+      cargarCodigos();
+    }
+  }, [activeTab]);
 
-      try {
-        const snap = await getDoc(doc(db, "Negocios", usuarioSeleccionado.id));
-        if (snap.exists()) {
-          setNegocioSeleccionado(snap.data() as Negocio);
-        } else {
-          setNegocioSeleccionado(null);
-        }
-      } catch (err) {
-        console.error("Error cargando negocio:", err);
-      }
-    };
-
-    cargarNegocio();
-  }, [usuarioSeleccionado]);
+  // ... 👇 mantengo toda tu lógica de actualizarPremium, actualizarTipoPremium y asignarPlantilla sin tocar ...
 
   const actualizarPremium = async (usuarioId: string, nuevoValor: boolean) => {
     try {
@@ -145,14 +183,12 @@ export default function PanelAdmin() {
       if (nuevoValor) {
         cambiosUsuario.tipoPremium = "lite";
 
-        // obtener datos usuario
         const snap = await getDoc(doc(db, "Usuarios", usuarioId));
         const datos = snap.data();
 
         if (datos?.nombre && datos?.email) {
           const slug = await generarSlugUnico(datos.nombre, datos.email);
 
-          // 👉 crear/actualizar negocio
           await setDoc(
             doc(db, "Negocios", usuarioId),
             {
@@ -168,7 +204,6 @@ export default function PanelAdmin() {
       } else {
         cambiosUsuario.tipoPremium = "";
 
-        // 👉 limpiar negocio
         await setDoc(
           doc(db, "Negocios", usuarioId),
           { slug: "", urlPersonal: "", plantilla: "" },
@@ -179,16 +214,13 @@ export default function PanelAdmin() {
       await updateDoc(doc(db, "Usuarios", usuarioId), cambiosUsuario);
 
       setUsuarios((prev) =>
-        prev.map((u) =>
-          u.id === usuarioId ? { ...u, ...cambiosUsuario } : u
-        )
+        prev.map((u) => (u.id === usuarioId ? { ...u, ...cambiosUsuario } : u))
       );
 
       setUsuarioSeleccionado((prev) =>
         prev ? { ...prev, ...cambiosUsuario } : prev
       );
 
-      // 🔄 recargar negocio para que el modal muestre datos actualizados
       const snapNegocio = await getDoc(doc(db, "Negocios", usuarioId));
       if (snapNegocio.exists()) {
         setNegocioSeleccionado(snapNegocio.data() as Negocio);
@@ -227,16 +259,13 @@ export default function PanelAdmin() {
       await updateDoc(doc(db, "Usuarios", usuarioId), cambios);
 
       setUsuarios((prev) =>
-        prev.map((u) =>
-          u.id === usuarioId ? { ...u, ...cambios } : u
-        )
+        prev.map((u) => (u.id === usuarioId ? { ...u, ...cambios } : u))
       );
 
       setUsuarioSeleccionado((prev) =>
         prev ? { ...prev, ...cambios } : prev
       );
 
-      // 🔄 recargar negocio actualizado
       const snapNegocio = await getDoc(doc(db, "Negocios", usuarioId));
       if (snapNegocio.exists()) {
         setNegocioSeleccionado(snapNegocio.data() as Negocio);
@@ -249,11 +278,7 @@ export default function PanelAdmin() {
   const asignarPlantilla = async (usuarioId: string, plantilla: string) => {
     try {
       await updateDoc(doc(db, "Usuarios", usuarioId), { plantilla });
-      await setDoc(
-        doc(db, "Negocios", usuarioId),
-        { plantilla },
-        { merge: true }
-      );
+      await setDoc(doc(db, "Negocios", usuarioId), { plantilla }, { merge: true });
 
       setUsuarios((prev) =>
         prev.map((u) => (u.id === usuarioId ? { ...u, plantilla } : u))
@@ -294,57 +319,133 @@ export default function PanelAdmin() {
           <h1 className="text-xl md:text-2xl font-bold">Panel de Administración</h1>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-            {usuarios.map((u) => {
-              const foto =
-                u.fotoPerfil && u.fotoPerfil.trim() !== ""
-                  ? u.fotoPerfil
-                  : u.foto && u.foto.trim() !== ""
-                  ? u.foto
-                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      u.nombre || "U"
-                    )}&background=random`;
+        {/* 🔹 Tabs */}
+        <div className="flex border-b bg-gray-50">
+          <button
+            onClick={() => setActiveTab("usuarios")}
+            className={`flex-1 py-3 text-center font-medium ${
+              activeTab === "usuarios"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            Usuarios
+          </button>
+          <button
+            onClick={() => setActiveTab("codigos")}
+            className={`flex-1 py-3 text-center font-medium ${
+              activeTab === "codigos"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            Códigos Premium
+          </button>
+        </div>
 
-              return (
-                <div
-                  key={u.id}
-                  onClick={() => setUsuarioSeleccionado(u)}
-                  className="w-full h-52 bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-center text-gray-700 hover:scale-105 transition cursor-pointer p-3"
-                >
-                  <img
-                    src={foto}
-                    alt={u.nombre || "Usuario"}
-                    className="w-16 h-16 rounded-full mb-3 border-2 border-gray-300 object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <span className="font-semibold">{u.nombre || "Sin nombre"}</span>
-                  <span className="text-xs opacity-70 truncate w-full max-w-[120px]">
-                    {u.email}
-                  </span>
-                  <span
-                    className={`mt-2 px-2 py-1 text-xs rounded ${
-                      !u.premium
-                        ? "bg-gray-300"
-                        : u.tipoPremium === "gold"
-                        ? "bg-green-500 text-white"
-                        : u.tipoPremium === "lite"
-                        ? "bg-yellow-500 text-white"
-                        : "bg-blue-400 text-white"
-                    }`}
+        {/* 🔹 Contenido de cada tab */}
+        <div className="p-6">
+          {activeTab === "usuarios" && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+              {usuarios.map((u) => {
+                const foto =
+                  u.fotoPerfil && u.fotoPerfil.trim() !== ""
+                    ? u.fotoPerfil
+                    : u.foto && u.foto.trim() !== ""
+                    ? u.foto
+                    : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        u.nombre || "U"
+                      )}&background=random`;
+
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => setUsuarioSeleccionado(u)}
+                    className="w-full h-52 bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-center text-gray-700 hover:scale-105 transition cursor-pointer p-3"
                   >
-                    {!u.premium
-                      ? "Gratis"
-                      : u.tipoPremium === "gold"
-                      ? "Premium Gold"
-                      : u.tipoPremium === "lite"
-                      ? "Premium Lite"
-                      : "Premium"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                    <img
+                      src={foto}
+                      alt={u.nombre || "Usuario"}
+                      className="w-16 h-16 rounded-full mb-3 border-2 border-gray-300 object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="font-semibold">
+                      {u.nombre || "Sin nombre"}
+                    </span>
+                    <span className="text-xs opacity-70 truncate w-full max-w-[120px]">
+                      {u.email}
+                    </span>
+                    <span
+                      className={`mt-2 px-2 py-1 text-xs rounded ${
+                        !u.premium
+                          ? "bg-gray-300"
+                          : u.tipoPremium === "gold"
+                          ? "bg-green-500 text-white"
+                          : u.tipoPremium === "lite"
+                          ? "bg-yellow-500 text-white"
+                          : "bg-blue-400 text-white"
+                      }`}
+                    >
+                      {!u.premium
+                        ? "Gratis"
+                        : u.tipoPremium === "gold"
+                        ? "Premium Gold"
+                        : u.tipoPremium === "lite"
+                        ? "Premium Lite"
+                        : "Premium"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {activeTab === "codigos" && (
+            <div>
+              <h2 className="text-lg font-bold mb-4">Gestión de Códigos Premium</h2>
+              <button
+                onClick={crearCodigo}
+                className="mb-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Generar nuevo código
+              </button>
+
+              {loadingCodigos ? (
+                <p className="text-gray-600">Cargando códigos...</p>
+              ) : (
+                <table className="w-full text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2 border">Código</th>
+                      <th className="p-2 border">Estado</th>
+                      <th className="p-2 border">Usado por</th>
+                      <th className="p-2 border">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {codigos.map((c) => (
+                      <tr key={c.id} className="text-center">
+                        <td className="p-2 border font-mono">{c.codigo}</td>
+                        <td className="p-2 border">
+                          {c.usado
+                            ? "❌ Usado"
+                            : c.valido
+                            ? "✅ Disponible"
+                            : "⚠️ Invalido"}
+                        </td>
+                        <td className="p-2 border">{c.usadoPor || "-"}</td>
+                        <td className="p-2 border">
+                          {c.fechaCreacion?.toDate
+                            ? c.fechaCreacion.toDate().toLocaleString()
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -428,9 +529,7 @@ export default function PanelAdmin() {
               <p className="font-medium">Plantilla:</p>
               <select
                 value={usuarioSeleccionado.plantilla || ""}
-                onChange={(e) =>
-                  asignarPlantilla(usuarioSeleccionado.id, e.target.value)
-                }
+                onChange={(e) => asignarPlantilla(usuarioSeleccionado.id, e.target.value)}
                 className="border rounded px-2 py-1 mt-2 w-full"
               >
                 <option value="">-- Seleccionar --</option>
