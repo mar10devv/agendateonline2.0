@@ -7,6 +7,9 @@ import {
   updateDoc,
   doc,
   getDoc,
+  query,
+  where,
+  setDoc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -22,13 +25,62 @@ type Usuario = {
   plantilla?: string;
 };
 
+type Negocio = {
+  slug?: string;
+  urlPersonal?: string;
+  plantilla?: string;
+};
+
 export default function PanelAdmin() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<Usuario | null>(null);
+  const [negocioSeleccionado, setNegocioSeleccionado] = useState<Negocio | null>(null);
 
-  const plantillas = ["barberia"];
+  const plantillasDisponibles = [
+    { id: "barberia", label: "Barbería" },
+    { id: "tatuajes", label: "Casa de Tatuajes" },
+    { id: "peluqueria", label: "Peluquería" },
+    { id: "dentista", label: "Dentista" },
+    { id: "spa", label: "Spa" },
+  ];
+
+  // 🔑 Normaliza string
+  function normalizarTexto(texto: string) {
+    return texto
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "");
+  }
+
+  // 🔑 Base desde email (antes del @)
+  function baseDesdeEmail(email: string, nombre?: string) {
+    if (!email) return normalizarTexto(nombre || "usuario");
+    return normalizarTexto(email.split("@")[0]);
+  }
+
+  // 🔑 Generar slug único en Firestore (colección Negocios)
+  async function generarSlugUnico(nombre: string, email: string) {
+    const base = baseDesdeEmail(email, nombre);
+    let slug = base;
+
+    let existe = true;
+    while (existe) {
+      const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        existe = false;
+      } else {
+        const randomSuffix = Math.random().toString(36).substring(2, 7); // 5 chars
+        slug = `${base}-${randomSuffix}`;
+      }
+    }
+
+    return slug;
+  }
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -66,48 +118,129 @@ export default function PanelAdmin() {
     cargarUsuarios();
   }, [isAdmin]);
 
+  // 🔑 Cuando seleccionamos usuario, traemos su negocio actualizado
+  useEffect(() => {
+    const cargarNegocio = async () => {
+      if (!usuarioSeleccionado) return;
+
+      try {
+        const snap = await getDoc(doc(db, "Negocios", usuarioSeleccionado.id));
+        if (snap.exists()) {
+          setNegocioSeleccionado(snap.data() as Negocio);
+        } else {
+          setNegocioSeleccionado(null);
+        }
+      } catch (err) {
+        console.error("Error cargando negocio:", err);
+      }
+    };
+
+    cargarNegocio();
+  }, [usuarioSeleccionado]);
+
   const actualizarPremium = async (usuarioId: string, nuevoValor: boolean) => {
-  try {
-    let cambios: any = { premium: nuevoValor };
+    try {
+      let cambiosUsuario: any = { premium: nuevoValor };
 
-    if (nuevoValor) {
-      // 👇 Si activamos Premium, lo dejamos por defecto en Lite
-      cambios.tipoPremium = "lite";
-    } else {
-      // 👇 Si lo desactivamos, limpiamos tipoPremium
-      cambios.tipoPremium = "";
+      if (nuevoValor) {
+        cambiosUsuario.tipoPremium = "lite";
+
+        // obtener datos usuario
+        const snap = await getDoc(doc(db, "Usuarios", usuarioId));
+        const datos = snap.data();
+
+        if (datos?.nombre && datos?.email) {
+          const slug = await generarSlugUnico(datos.nombre, datos.email);
+
+          // 👉 crear/actualizar negocio
+          await setDoc(
+            doc(db, "Negocios", usuarioId),
+            {
+              nombre: datos.nombre,
+              emailContacto: datos.email || "",
+              slug,
+              urlPersonal: `https://agendateonline.com/${slug}`,
+              plantilla: datos.plantilla || "",
+            },
+            { merge: true }
+          );
+        }
+      } else {
+        cambiosUsuario.tipoPremium = "";
+
+        // 👉 limpiar negocio
+        await setDoc(
+          doc(db, "Negocios", usuarioId),
+          { slug: "", urlPersonal: "", plantilla: "" },
+          { merge: true }
+        );
+      }
+
+      await updateDoc(doc(db, "Usuarios", usuarioId), cambiosUsuario);
+
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === usuarioId ? { ...u, ...cambiosUsuario } : u
+        )
+      );
+
+      setUsuarioSeleccionado((prev) =>
+        prev ? { ...prev, ...cambiosUsuario } : prev
+      );
+
+      // 🔄 recargar negocio para que el modal muestre datos actualizados
+      const snapNegocio = await getDoc(doc(db, "Negocios", usuarioId));
+      if (snapNegocio.exists()) {
+        setNegocioSeleccionado(snapNegocio.data() as Negocio);
+      }
+    } catch (err) {
+      console.error("Error cambiando premium:", err);
     }
-
-    await updateDoc(doc(db, "Usuarios", usuarioId), cambios);
-
-    setUsuarios((prev) =>
-      prev.map((u) =>
-        u.id === usuarioId
-          ? { ...u, premium: nuevoValor, tipoPremium: cambios.tipoPremium }
-          : u
-      )
-    );
-
-    setUsuarioSeleccionado((prev) =>
-      prev
-        ? { ...prev, premium: nuevoValor, tipoPremium: cambios.tipoPremium }
-        : prev
-    );
-  } catch (err) {
-    console.error("Error cambiando premium:", err);
-  }
-};
-
+  };
 
   const actualizarTipoPremium = async (usuarioId: string, tipo: string) => {
     try {
-      await updateDoc(doc(db, "Usuarios", usuarioId), { tipoPremium: tipo });
+      let cambios: any = { tipoPremium: tipo };
+
+      if (tipo === "gold" || tipo === "lite") {
+        const snap = await getDoc(doc(db, "Negocios", usuarioId));
+        if (!snap.exists() || !snap.data()?.slug) {
+          const snapUser = await getDoc(doc(db, "Usuarios", usuarioId));
+          const datos = snapUser.data();
+          if (datos?.nombre && datos?.email) {
+            const slug = await generarSlugUnico(datos.nombre, datos.email);
+            await setDoc(
+              doc(db, "Negocios", usuarioId),
+              {
+                nombre: datos.nombre,
+                emailContacto: datos.email || "",
+                slug,
+                urlPersonal: `https://agendateonline.com/${slug}`,
+                plantilla: datos.plantilla || "",
+              },
+              { merge: true }
+            );
+          }
+        }
+      }
+
+      await updateDoc(doc(db, "Usuarios", usuarioId), cambios);
+
       setUsuarios((prev) =>
-        prev.map((u) => (u.id === usuarioId ? { ...u, tipoPremium: tipo as "gold" | "lite" } : u))
+        prev.map((u) =>
+          u.id === usuarioId ? { ...u, ...cambios } : u
+        )
       );
+
       setUsuarioSeleccionado((prev) =>
-        prev ? { ...prev, tipoPremium: tipo as "gold" | "lite" } : prev
+        prev ? { ...prev, ...cambios } : prev
       );
+
+      // 🔄 recargar negocio actualizado
+      const snapNegocio = await getDoc(doc(db, "Negocios", usuarioId));
+      if (snapNegocio.exists()) {
+        setNegocioSeleccionado(snapNegocio.data() as Negocio);
+      }
     } catch (err) {
       console.error("Error actualizando tipoPremium:", err);
     }
@@ -116,10 +249,19 @@ export default function PanelAdmin() {
   const asignarPlantilla = async (usuarioId: string, plantilla: string) => {
     try {
       await updateDoc(doc(db, "Usuarios", usuarioId), { plantilla });
+      await setDoc(
+        doc(db, "Negocios", usuarioId),
+        { plantilla },
+        { merge: true }
+      );
+
       setUsuarios((prev) =>
         prev.map((u) => (u.id === usuarioId ? { ...u, plantilla } : u))
       );
       setUsuarioSeleccionado((prev) =>
+        prev ? { ...prev, plantilla } : prev
+      );
+      setNegocioSeleccionado((prev) =>
         prev ? { ...prev, plantilla } : prev
       );
     } catch (err) {
@@ -220,6 +362,20 @@ export default function PanelAdmin() {
               Configuración de {usuarioSeleccionado.nombre}
             </h2>
 
+            {negocioSeleccionado?.slug && (
+              <p className="mb-4 text-sm text-blue-600 break-all">
+                URL actual:{" "}
+                <a
+                  href={`https://agendateonline.com/${negocioSeleccionado.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  https://agendateonline.com/{negocioSeleccionado.slug}
+                </a>
+              </p>
+            )}
+
             {/* Toggle Premium */}
             <div className="mb-4">
               <p className="font-medium mb-2">Estado Premium:</p>
@@ -278,9 +434,9 @@ export default function PanelAdmin() {
                 className="border rounded px-2 py-1 mt-2 w-full"
               >
                 <option value="">-- Seleccionar --</option>
-                {plantillas.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
+                {plantillasDisponibles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
                   </option>
                 ))}
               </select>

@@ -5,6 +5,20 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { guardarConfigNegocio, obtenerConfigNegocio } from "../../lib/firestore";
 
+// 🔑 etiquetas dinámicas por plantilla
+const etiquetasPorPlantilla: Record<string, string> = {
+  barberia: "barbero",
+  dentista: "dentista",
+  tatuajes: "tatuador",
+  peluqueria: "estilista",
+  spa: "masajista",
+};
+
+function getEtiquetaEmpleado(plantilla?: string) {
+  if (!plantilla) return "empleado";
+  return etiquetasPorPlantilla[plantilla.toLowerCase()] || "empleado";
+}
+
 // 🚀 Subida a ImgBB (solo para foto de perfil)
 const subirImagenImgBB = async (file: File): Promise<string | null> => {
   const formData = new FormData();
@@ -22,7 +36,10 @@ const subirImagenImgBB = async (file: File): Promise<string | null> => {
 export default function PanelEmpleadosLite() {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [estado, setEstado] = useState<"cargando" | "listo" | "guardando" | "sin-acceso">("cargando");
+  const [plantilla, setPlantilla] = useState<string>(""); // 👈 traer plantilla del negocio
+  const [estado, setEstado] = useState<
+    "cargando" | "listo" | "guardando" | "sin-acceso"
+  >("cargando");
   const [mensaje, setMensaje] = useState("");
 
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | null>(null);
@@ -52,6 +69,16 @@ export default function PanelEmpleadosLite() {
       const negocioConfig = await obtenerConfigNegocio(usuario.uid);
       if (negocioConfig) {
         setUser(usuario);
+
+        // 👇 buscar plantilla en Negocios/{uid}
+        const negocioRef = doc(db, "Negocios", usuario.uid);
+        const negocioSnap = await getDoc(negocioRef);
+        if (negocioSnap.exists()) {
+          const plantillaFirestore = negocioSnap.data()?.plantilla || "";
+          setPlantilla(plantillaFirestore.toLowerCase());
+          console.log("Plantilla desde Firestore:", plantillaFirestore);
+        }
+
         setConfig({
           ...negocioConfig,
           empleados: negocioConfig.empleados || 1,
@@ -128,7 +155,7 @@ export default function PanelEmpleadosLite() {
       {/* Cantidad de empleados */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Cantidad de empleados
+          Cantidad de {getEtiquetaEmpleado(plantilla)}s
         </label>
         <select
           value={config.empleados || 1}
@@ -194,27 +221,19 @@ export default function PanelEmpleadosLite() {
                   <span className="text-gray-400">+</span>
                 )}
               </label>
-
-              {/* Botón ❌ para borrar foto */}
-              {empleado.fotoPerfil && (
-                <button
-                  type="button"
-                  onClick={() => handleChangeEmpleado(index, "fotoPerfil", "")}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow hover:bg-red-600"
-                >
-                  ×
-                </button>
-              )}
             </div>
 
             {/* Nombre */}
             <input
               type="text"
-              placeholder="Nombre del empleado"
+              placeholder={`Nombre del ${getEtiquetaEmpleado(plantilla)}`}
               value={empleado.nombre}
               onChange={(e) => handleChangeEmpleado(index, "nombre", e.target.value)}
               className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-600"
             />
+
+            {/* Rol dinámico 👇 */}
+            <p className="text-gray-600 text-sm">{getEtiquetaEmpleado(plantilla)}</p>
 
             {/* Botón configurar horario */}
             <button
@@ -245,88 +264,6 @@ export default function PanelEmpleadosLite() {
           {estado === "guardando" ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
-
-      {/* Modal horario */}
-      {empleadoSeleccionado !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">
-              Configurar horario
-            </h2>
-
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Inicio</label>
-                <input
-                  type="time"
-                  value={horarioTemp.inicio}
-                  onChange={(e) => setHorarioTemp({ ...horarioTemp, inicio: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Fin</label>
-                <input
-                  type="time"
-                  value={horarioTemp.fin}
-                  onChange={(e) => setHorarioTemp({ ...horarioTemp, fin: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-
-            {/* Días libres */}
-            <p className="font-semibold mb-3 text-gray-700">Seleccionar días libres</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-              {["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"].map((dia) => {
-                const activo = horarioTemp.diasLibres.includes(dia);
-                return (
-                  <button
-                    key={dia}
-                    type="button"
-                    onClick={() => {
-                      setHorarioTemp((prev) => {
-                        const nuevo = activo
-                          ? prev.diasLibres.filter((d) => d !== dia)
-                          : [...prev.diasLibres, dia];
-                        return { ...prev, diasLibres: nuevo };
-                      });
-                    }}
-                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
-                      activo
-                        ? "bg-green-600 text-white border-green-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-green-400 hover:text-green-600"
-                    }`}
-                  >
-                    {dia}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Botones */}
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setEmpleadoSeleccionado(null)}
-                className="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  const nuevo = [...config.empleadosData];
-                  nuevo[empleadoSeleccionado].calendario = horarioTemp;
-                  setConfig((prev: any) => ({ ...prev, empleadosData: nuevo }));
-                  setEmpleadoSeleccionado(null);
-                }}
-                className="px-6 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white"
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </form>
   );
 }

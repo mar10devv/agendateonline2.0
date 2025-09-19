@@ -8,6 +8,7 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import Calendario from "../Calendario";
@@ -20,7 +21,7 @@ type CalendarioEmpleado = {
 
 type Empleado = {
   nombre: string;
-  fotoPerfil?: string;  // 👈 ahora sí en Empleado
+  fotoPerfil?: string;
   calendario?: CalendarioEmpleado | null;
 };
 
@@ -44,8 +45,22 @@ type Props = {
   slug?: string;
 };
 
+// 🔑 etiquetas dinámicas
+const etiquetasPorPlantilla: Record<string, string> = {
+  barberia: "Barbero",
+  dentista: "Dentista",
+  tatuajes: "Tatuador",
+  peluqueria: "Estilista",
+  spa: "Masajista",
+};
+function getEtiquetaEmpleado(plantilla?: string) {
+  if (!plantilla) return "empleado";
+  return etiquetasPorPlantilla[plantilla.toLowerCase()] || "empleado";
+}
+
 export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) {
   const [user, setUser] = useState<any>(null);
+  const [plantilla, setPlantilla] = useState<string>(""); // 👈 traemos del negocio
 
   const [barberoSeleccionado, setBarberoSeleccionado] =
     useState<Empleado | null>(null);
@@ -74,6 +89,17 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
     return () => unsub();
   }, []);
 
+  // 🔹 Traer plantilla del negocio
+  useEffect(() => {
+    if (!negocioId) return;
+    const negocioRef = doc(db, "Negocios", negocioId);
+    getDoc(negocioRef).then((snap) => {
+      if (snap.exists()) {
+        setPlantilla(snap.data()?.plantilla?.toLowerCase() || "");
+      }
+    });
+  }, [negocioId]);
+
   // 🔹 Escuchar servicios disponibles
   useEffect(() => {
     if (!negocioId) return;
@@ -86,7 +112,7 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
     return () => unsub();
   }, [negocioId]);
 
-  // 🔹 Escuchar horarios ocupados del barbero
+  // 🔹 Escuchar horarios ocupados del empleado
   useEffect(() => {
     if (!barberoSeleccionado || !fechaSeleccionada) return;
     const qTurnos = query(
@@ -185,148 +211,156 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
             </p>
           )}
 
-          {/* Paso 1: elegir barbero */}
-{!barberoSeleccionado && (
-  <div>
-    <h3 className="font-semibold mb-3">Selecciona un barbero:</h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-4">
-      {empleados.map((e, i) => (
-        <div
-          key={i}
-          onClick={() => setBarberoSeleccionado(e)}
-          className="relative w-full max-w-sm h-96 flex flex-col items-center rounded-2xl bg-white shadow-lg cursor-pointer hover:shadow-2xl transition mx-auto"
-        >
-          {/* Banner degradado negro */}
-          <div className="w-full h-48 bg-gradient-to-r from-gray-900 to-black rounded-t-2xl"></div>
+          {/* Paso 1: elegir empleado dinámico */}
+          {!barberoSeleccionado && (
+            <div>
+              <h3 className="font-semibold mb-3">
+                Selecciona un {getEtiquetaEmpleado(plantilla)}:
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-4">
+                {empleados.map((e, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setBarberoSeleccionado(e)}
+                    className="relative w-full max-w-sm h-96 flex flex-col items-center rounded-2xl bg-white shadow-lg cursor-pointer hover:shadow-2xl transition mx-auto"
+                  >
+                    {/* Banner degradado negro */}
+                    <div className="w-full h-48 bg-gradient-to-r from-gray-900 to-black rounded-t-2xl"></div>
 
-          {/* Avatar */}
-          <div className="absolute top-24 w-28 h-28 rounded-full border-4 border-white shadow-md bg-white flex items-center justify-center">
-            <img
-              src={e.fotoPerfil || "/img/default-avatar.png"}
-              alt={e.nombre}
-              className="w-24 h-24 rounded-full object-cover"
-            />
-          </div>
+                    {/* Avatar */}
+                    <div className="absolute top-24 w-28 h-28 rounded-full border-4 border-white shadow-md bg-white flex items-center justify-center">
+                      <img
+                        src={e.fotoPerfil || "/img/default-avatar.png"}
+                        alt={e.nombre}
+                        className="w-24 h-24 rounded-full object-cover"
+                      />
+                    </div>
 
-          {/* Nombre */}
-          <div className="mt-20 text-center">
-            <h4 className="font-semibold text-lg text-gray-800">{e.nombre}</h4>
-            <p className="text-sm text-gray-500">Barbero</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                    {/* Nombre */}
+                    <div className="mt-20 text-center">
+                      <h4 className="font-semibold text-lg text-gray-800">
+                        {e.nombre}
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {getEtiquetaEmpleado(plantilla)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Paso 2: solo o amigos */}
-{barberoSeleccionado && !conAmigos && (
-  <div className="mt-6 flex flex-col items-center text-center">
-    <p className="mb-3 text-lg font-medium">¿Vienes solo o con amigos?</p>
-    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <button
-        onClick={() => {
-          setConAmigos("solo");
-          setCantidadAmigos(1);
-        }}
-        className="px-6 py-3 rounded-lg bg-indigo-600 text-white w-48 sm:w-auto"
-      >
-        Siguiente (Solo)
-      </button>
-      <button
-        onClick={() => setConAmigos("amigos")}
-        className="px-6 py-3 rounded-lg bg-gray-200 w-48 sm:w-auto"
-      >
-        Siguiente (Con amigos)
-      </button>
-    </div>
-    <button
-      onClick={() => setBarberoSeleccionado(null)}
-      className="mt-6 text-sm text-gray-500 underline self-start"
-    >
-      ← Volver a barberos
-    </button>
-  </div>
-)}
-
+          {barberoSeleccionado && !conAmigos && (
+            <div className="mt-6 flex flex-col items-center text-center">
+              <p className="mb-3 text-lg font-medium">
+                ¿Vienes solo o con amigos?
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={() => {
+                    setConAmigos("solo");
+                    setCantidadAmigos(1);
+                  }}
+                  className="px-6 py-3 rounded-lg bg-indigo-600 text-white w-48 sm:w-auto"
+                >
+                  Siguiente (Solo)
+                </button>
+                <button
+                  onClick={() => setConAmigos("amigos")}
+                  className="px-6 py-3 rounded-lg bg-gray-200 w-48 sm:w-auto"
+                >
+                  Siguiente (Con amigos)
+                </button>
+              </div>
+              <button
+                onClick={() => setBarberoSeleccionado(null)}
+                className="mt-6 text-sm text-gray-500 underline self-start"
+              >
+                ← Volver a {getEtiquetaEmpleado(plantilla)}s
+              </button>
+            </div>
+          )}
 
           {/* Paso 3: servicios */}
-{conAmigos && !servicioSeleccionado && (
-  <div className="mt-6 flex flex-col items-center text-center">
-    <h3 className="font-semibold mb-3 text-lg">Selecciona un servicio:</h3>
+          {conAmigos && !servicioSeleccionado && (
+            <div className="mt-6 flex flex-col items-center text-center">
+              <h3 className="font-semibold mb-3 text-lg">
+                Selecciona un servicio:
+              </h3>
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-3xl">
-      {serviciosDisponibles.map((s, i) => (
-        <button
-          key={i}
-          onClick={() => setServicioSeleccionado(s)}
-          className="px-4 py-3 w-full rounded-lg border bg-white shadow hover:bg-indigo-50 transition text-gray-700 font-medium"
-        >
-          {s.servicio} - ${s.precio}
-        </button>
-      ))}
-    </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-3xl">
+                {serviciosDisponibles.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setServicioSeleccionado(s)}
+                    className="px-4 py-3 w-full rounded-lg border bg-white shadow hover:bg-indigo-50 transition text-gray-700 font-medium"
+                  >
+                    {s.servicio} - ${s.precio}
+                  </button>
+                ))}
+              </div>
 
-    <button
-      onClick={() => setConAmigos(null)}
-      className="mt-6 text-sm text-gray-500 underline self-start"
-    >
-      ← Volver
-    </button>
-  </div>
-)}
-
+              <button
+                onClick={() => setConAmigos(null)}
+                className="mt-6 text-sm text-gray-500 underline self-start"
+              >
+                ← Volver
+              </button>
+            </div>
+          )}
 
           {/* Paso 4: fecha/hora */}
-{servicioSeleccionado && (
-  <div className="mt-6 flex flex-col items-center text-center">
-    
-    {/* Si aún no se confirmó el turno → mostrar calendario y título */}
-    {estado !== "exito" && (
-      <>
-        <h3 className="font-semibold mb-3">Selecciona fecha y hora:</h3>
-        <Calendario
-          calendario={barberoSeleccionado?.calendario}
-          horariosOcupados={horariosOcupados}
-          onSeleccionarTurno={(fecha: Date, hora: string | null) => {
-            setFechaSeleccionada(fecha.toISOString().split("T")[0]);
-            setHorarioSeleccionado(hora);
-          }}
-        />
-        <div className="flex flex-col gap-3 mt-4 w-full max-w-sm">
-          <button
-            onClick={guardarTurno}
-            disabled={!fechaSeleccionada || !horarioSeleccionado}
-            className="w-full px-4 py-2 rounded-lg bg-green-600 text-white font-medium disabled:opacity-50"
-          >
-            Confirmar turno
-          </button>
-          <button
-            onClick={() => setServicioSeleccionado(null)}
-            className="text-sm text-gray-500 underline"
-          >
-            ← Volver
-          </button>
-        </div>
-      </>
-    )}
+          {servicioSeleccionado && (
+            <div className="mt-6 flex flex-col items-center text-center">
+              {/* Si aún no se confirmó el turno */}
+              {estado !== "exito" && (
+                <>
+                  <h3 className="font-semibold mb-3">
+                    Selecciona fecha y hora:
+                  </h3>
+                  <Calendario
+                    calendario={barberoSeleccionado?.calendario}
+                    horariosOcupados={horariosOcupados}
+                    onSeleccionarTurno={(fecha: Date, hora: string | null) => {
+                      setFechaSeleccionada(fecha.toISOString().split("T")[0]);
+                      setHorarioSeleccionado(hora);
+                    }}
+                  />
+                  <div className="flex flex-col gap-3 mt-4 w-full max-w-sm">
+                    <button
+                      onClick={guardarTurno}
+                      disabled={!fechaSeleccionada || !horarioSeleccionado}
+                      className="w-full px-4 py-2 rounded-lg bg-green-600 text-white font-medium disabled:opacity-50"
+                    >
+                      Confirmar turno
+                    </button>
+                    <button
+                      onClick={() => setServicioSeleccionado(null)}
+                      className="text-sm text-gray-500 underline"
+                    >
+                      ← Volver
+                    </button>
+                  </div>
+                </>
+              )}
 
-    {/* Si ya se confirmó → mostrar solo el botón verde */}
-    {estado === "exito" && (
-      <button
-        onClick={() =>
-          alert(
-            `📅 Tu turno está reservado para el ${fechaSeleccionada} a las ${horarioSeleccionado}`
-          )
-        }
-        className="mt-6 px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-      >
-        Ver mi turno
-      </button>
-    )}
-  </div>
-)}
-
+              {/* Si ya se confirmó */}
+              {estado === "exito" && (
+                <button
+                  onClick={() =>
+                    alert(
+                      `📅 Tu turno está reservado para el ${fechaSeleccionada} a las ${horarioSeleccionado}`
+                    )
+                  }
+                  className="mt-6 px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+                >
+                  Ver mi turno
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
