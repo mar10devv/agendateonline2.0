@@ -29,80 +29,65 @@ export default function DashboardTemp() {
   const [estado, setEstado] = useState<"cargando" | "listo" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
 
-useEffect(() => {
-  const auth = getAuth();
-  const unsub = onAuthStateChanged(auth, async (usuario) => {
-    if (!usuario) {
-      setEstado("sin-acceso");
-      setMensaje("🔒 No has iniciado sesión.");
-      return;
-    }
-
-    try {
-      // ✅ Revisar si ya tenemos cache
-      const cachePremium = localStorage.getItem("usuarioPremium");
-      const cacheConfig = localStorage.getItem("negocioConfig");
-
-      if (cachePremium === "true" && cacheConfig) {
-        setUser(usuario);
-        setConfig(JSON.parse(cacheConfig));
-        setEstado("listo");
-        return; // 👈 evitamos volver a consultar Firestore
-      }
-
-      const userRef = doc(db, "Usuarios", usuario.uid);
-
-      // 👇 Pedimos al mismo tiempo user y config
-      const [snap, negocioConfig] = await Promise.all([
-        getDoc(userRef),
-        obtenerConfigNegocio(usuario.uid),
-      ]);
-
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          uid: usuario.uid,
-          email: usuario.email,
-          nombre: usuario.displayName || "",
-          foto: usuario.photoURL || "",
-          premium: false,
-          plantilla: null,
-          localesRecientes: [],
-          ubicacion: null,
-          creadoEn: new Date(),
-        });
+  useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, async (usuario) => {
+      if (!usuario) {
         setEstado("sin-acceso");
-        setMensaje("🚫 No tienes acceso al panel.");
+        setMensaje("🔒 No has iniciado sesión.");
         return;
       }
 
-      const data = snap.data();
-      if (data?.premium && negocioConfig) {
-        if (!negocioConfig.slug) {
-          negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
+      try {
+        const userRef = doc(db, "Usuarios", usuario.uid);
+
+        // 👇 Pedimos al mismo tiempo user y config
+        const [snap, negocioConfig] = await Promise.all([
+          getDoc(userRef),
+          obtenerConfigNegocio(usuario.uid),
+        ]);
+
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            uid: usuario.uid,
+            email: usuario.email,
+            nombre: usuario.displayName || "",
+            foto: usuario.photoURL || "",
+            premium: false,
+            tipoPremium: null,
+            creadoEn: new Date(),
+          });
+          setEstado("sin-acceso");
+          setMensaje("🚫 No tienes acceso al panel.");
+          return;
         }
 
-        // ✅ Guardamos en localStorage para no consultar más
-        localStorage.setItem("usuarioPremium", "true");
-        localStorage.setItem("negocioConfig", JSON.stringify(negocioConfig));
+        const data = snap.data();
+        if (data?.premium && data?.tipoPremium === "gold" && negocioConfig) {
+          if (!negocioConfig.slug) {
+            negocioConfig.slug = generarSlug(negocioConfig.nombre || "mi-negocio");
+          }
 
-        setUser(usuario);
-        setConfig(negocioConfig);
-        setEstado("listo");
-      } else {
+          // ✅ Guardamos en localStorage para no consultar más
+          localStorage.setItem("usuarioPremium", "true");
+          localStorage.setItem("negocioConfig", JSON.stringify(negocioConfig));
+
+          setUser(usuario);
+          setConfig(negocioConfig);
+          setEstado("listo");
+        } else {
+          setEstado("sin-acceso");
+          setMensaje("🚫 Solo usuarios con Premium Gold tienen acceso al panel.");
+        }
+      } catch (e) {
+        console.error(e);
         setEstado("sin-acceso");
-        setMensaje("🚫 No tienes acceso al panel.");
+        setMensaje("❌ Error al cargar el panel.");
       }
-    } catch (e) {
-      console.error(e);
-      setEstado("sin-acceso");
-      setMensaje("❌ Error al cargar el panel.");
-    }
-  });
+    });
 
-  return () => unsub();
-}, []);
-
-
+    return () => unsub();
+  }, []);
 
   if (estado === "cargando")
     return (
@@ -135,64 +120,30 @@ useEffect(() => {
           </button>
         </div>
 
-        {/* ✅ Menú principal (cards cuadradas con íconos) */}
+        {/* ✅ Menú principal */}
         <div className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {/* Card Agenda */}
-            <a
-  href="/panel/panel-agenda"
-  className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
->
-  <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
-  <span>Mi Agenda</span>
-</a>
-
-
-            {/* Card Personal */}
-            <a
-              href="/panel/panel-empleados"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-            >
+            <a href="/panel/panel-agenda" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
+              <img src={CalendarioIcon} alt="Agenda" className="w-12 h-12 mb-3" />
+              <span>Mi Agenda</span>
+            </a>
+            <a href="/panel/panel-empleados" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
               <img src={PersonalIcon} alt="Personal" className="w-12 h-12 mb-3" />
               <span>Mi Personal</span>
             </a>
-
-            {/* Card Plantilla */}
-            <a
-              href="/panel/panel-personalizarweb"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-            >
+            <a href="/panel/panel-personalizarweb" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
               <img src={PlantillaIcon} alt="Plantilla" className="w-12 h-12 mb-3" />
               <span>Personalizar mi web</span>
             </a>
-
-            {/* ✅ Soporte Técnico (con SVG) */}
-            <a
-              href="/panel-soporte"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-              aria-label="Soporte técnico"
-            >
+            <a href="/panel-soporte" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
               <img src={SoporteIcon} alt="Soporte técnico" className="w-12 h-12 mb-3" />
-              <span className="text-center leading-tight">
-                Soporte<br />Técnico
-              </span>
+              <span className="text-center leading-tight">Soporte<br />Técnico</span>
             </a>
-
-            {/* ✅ Estadísticas (con SVG) */}
-            <a
-              href="/panel/panel-estadisticas"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-              aria-label="Estadísticas"
-            >
+            <a href="/panel/panel-estadisticas" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
               <img src={EstadisticasIcon} alt="Estadísticas" className="w-12 h-12 mb-3" />
               <span>Estadísticas</span>
             </a>
-
-            {/* Ejemplo 3 (placeholder) */}
-            <a
-              href="/panel/panel-precios"
-              className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition"
-            >
+            <a href="/panel/panel-precios" className="w-full aspect-square bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-lg font-semibold text-gray-700 hover:scale-105 transition">
               <img src={MejorarPlan} alt="Estadísticas" className="w-12 h-12 mb-3" />
               Precios y servicios
             </a>

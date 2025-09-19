@@ -1,21 +1,17 @@
 import React, { useEffect, useState } from "react";
 import {
   onAuthStateChanged,
-  signInWithPopup,
   signOut,
-  setPersistence,
-  browserLocalPersistence,
   type User,
 } from "firebase/auth";
-import { auth, googleProvider, db } from "../../lib/firebase";
+import { auth, db } from "../../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import Menu from "./Menu";
-import { loginConGoogle, logout } from "../../lib/auth";
+import { loginConGoogle } from "../../lib/auth";
 
 type ClienteLink = { label: string; href: string; highlight?: boolean };
 
 const baseLinks: ClienteLink[] = [
-  { label: "Mi Agenda", href: "/usuarios/usuario-agenda", highlight: true },
   { label: "Descargar la app", href: "/app" },
   { label: "Ayuda y servicio al cliente", href: "/ayuda" },
 ];
@@ -25,7 +21,8 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [tipoPremium, setTipoPremium] = useState<"lite" | "gold" | null>(null);
+  const [slug, setSlug] = useState<string | null>(null);
 
   // 🔔 Estado de notificaciones
   const [notificaciones, setNotificaciones] = useState<string[]>([
@@ -40,51 +37,61 @@ export default function Navbar() {
       setCheckingAuth(false);
       if (u) {
         try {
-          const snap = await getDoc(doc(db, "Usuarios", u.uid));
-          setIsPremium(snap.exists() ? snap.data()?.premium ?? false : false);
+          const userSnap = await getDoc(doc(db, "Usuarios", u.uid));
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            setTipoPremium(data?.tipoPremium || null);
+
+            const negocioSnap = await getDoc(doc(db, "Negocios", u.uid));
+            if (negocioSnap.exists()) {
+              setSlug(negocioSnap.data()?.slug || null);
+            }
+          }
         } catch (err) {
           console.error("❌ Error al leer Firestore:", err);
         }
       } else {
-        setIsPremium(null);
+        setTipoPremium(null);
+        setSlug(null);
       }
     });
     return () => unsub();
   }, []);
 
   const handleLogin = async () => {
-  try {
-    await loginConGoogle(); // 👈 ahora usa la función que guarda en Firestore
-  } catch (e) {
-    alert(`No se pudo iniciar sesión: ${String((e as any)?.code || e)}`);
-  }
-};
-
+    try {
+      await loginConGoogle();
+    } catch (e) {
+      alert(`No se pudo iniciar sesión: ${String((e as any)?.code || e)}`);
+    }
+  };
 
   const handleLogout = () => {
     signOut(auth).catch((e) => console.error("[Navbar] signOut error:", e));
   };
 
-  // 🔹 Links dinámicos
+  // 🔹 Links dinámicos para menú
   const linksMenu: ClienteLink[] = [...baseLinks];
-  if (isPremium) {
-    linksMenu.splice(1, 0, { label: "Mi Panel", href: "/panel/paneldecontrol", highlight: true });
+  if (tipoPremium === "gold") {
+    linksMenu.unshift({ label: "Mi Panel", href: "/panel/paneldecontrol", highlight: true });
+  } else if (tipoPremium === "lite" && slug) {
+    linksMenu.unshift({ label: "Mi Agenda", href: `/agenda/${slug}`, highlight: true });
+  } else {
+    linksMenu.unshift({ label: "Mis turnos", href: "/usuarios/usuario-agenda", highlight: true });
   }
 
   return (
     <>
       <header className="fixed top-0 left-0 w-full z-[9999] bg-transparent">
-
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <a
-  href="/"
-  className="text-3xl font-bold tracking-tight text-white font-inter"
->
-  AgéndateOnline
-</a>
-
+              href="/"
+              className="text-3xl font-bold tracking-tight text-white font-inter"
+            >
+              AgéndateOnline
+            </a>
 
             {/* Desktop */}
             <nav className="hidden md:flex items-center gap-3">
@@ -94,21 +101,20 @@ export default function Navbar() {
                 </span>
               ) : user ? (
                 <>
-                  {/* Foto como botón de notificaciones */}
+                  {/* Foto usuario */}
                   <div
                     className="relative cursor-pointer"
                     onClick={() => setNotifOpen(true)}
                   >
                     <img
-  src={user.photoURL ?? ""}
-  alt="Usuario"
-  className="h-8 w-8 rounded-full border-2 border-white"
-  referrerPolicy="no-referrer"
-/>
-
+                      src={user.photoURL ?? ""}
+                      alt="Usuario"
+                      className="h-8 w-8 rounded-full border-2 border-white"
+                      referrerPolicy="no-referrer"
+                    />
                     {notificaciones.length > 0 && (
-  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-yellow-400" />
-)}
+                      <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-yellow-400" />
+                    )}
                   </div>
                 </>
               ) : (
@@ -121,7 +127,6 @@ export default function Navbar() {
                 </button>
               )}
 
-              {/* Menú dropdown */}
               <Menu
                 open={menuOpen}
                 setOpen={setMenuOpen}
@@ -225,28 +230,34 @@ export default function Navbar() {
                   >
                     🚪 Cerrar sesión
                   </button>
-                  {!isPremium && (
-                    <a
-                      href="/panel/panel-registro/"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-                    >
-                      🏢 Registrar empresa
-                    </a>
-                  )}
-                  <a
-                    href="/usuarios/usuario-agenda"
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-350"
-                  >
-                    📅 Mi Agenda
-                  </a>
-                  {isPremium && (
+
+                  {tipoPremium === "gold" && (
                     <a
                       href="/panel/paneldecontrol"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-375"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
                     >
                       🖥 Mi Panel
                     </a>
                   )}
+
+                  {tipoPremium === "lite" && slug && (
+                    <a
+                      href={`/agenda/${slug}`}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+                    >
+                      📅 Mi Agenda
+                    </a>
+                  )}
+
+                  {!tipoPremium && (
+                    <a
+                      href="/usuarios/usuario-agenda"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+                    >
+                      📅 Mi Agenda
+                    </a>
+                  )}
+
                   <a
                     href="/app"
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
@@ -266,47 +277,46 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* 🔔 Modal de notificaciones centrado */}
-{notifOpen && (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-    <div
-      className="absolute inset-0 bg-black/40"
-      onClick={() => setNotifOpen(false)}
-    />
-    <div className="relative bg-white rounded-lg shadow-xl p-6 w-96 z-10 animate-fadeIn">
-      <button
-        onClick={() => setNotifOpen(false)}
-        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-      >
-        ✕
-      </button>
-      <h2 className="text-lg font-semibold mb-4">Notificaciones</h2>
-      {notificaciones.length > 0 ? (
-        <ul className="space-y-2">
-          {notificaciones.map((n, i) => (
-            <li
-              key={i}
-              className="flex justify-between items-center p-2 bg-gray-100 rounded"
+      {/* 🔔 Modal de notificaciones */}
+      {notifOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setNotifOpen(false)}
+          />
+          <div className="relative bg-white rounded-lg shadow-xl p-6 w-96 z-10 animate-fadeIn">
+            <button
+              onClick={() => setNotifOpen(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
             >
-              <span>{n}</span>
-              <button
-                onClick={() =>
-                  setNotificaciones((prev) => prev.filter((_, idx) => idx !== i))
-                }
-                className="text-red-500 hover:text-red-700 text-sm font-bold"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-500">No tienes notificaciones nuevas 🎉</p>
+              ✕
+            </button>
+            <h2 className="text-lg font-semibold mb-4">Notificaciones</h2>
+            {notificaciones.length > 0 ? (
+              <ul className="space-y-2">
+                {notificaciones.map((n, i) => (
+                  <li
+                    key={i}
+                    className="flex justify-between items-center p-2 bg-gray-100 rounded"
+                  >
+                    <span>{n}</span>
+                    <button
+                      onClick={() =>
+                        setNotificaciones((prev) => prev.filter((_, idx) => idx !== i))
+                      }
+                      className="text-red-500 hover:text-red-700 text-sm font-bold"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500">No tienes notificaciones nuevas 🎉</p>
+            )}
+          </div>
+        </div>
       )}
-    </div>
-  </div>
-)}
-
     </>
   );
 }
