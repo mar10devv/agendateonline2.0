@@ -35,7 +35,7 @@ function getEtiquetaEmpleado(plantilla?: string) {
 export default function DashboardAgendaLite() {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [plantilla, setPlantilla] = useState<string>(""); // 👈 traemos de Negocios
+  const [plantilla, setPlantilla] = useState<string>(""); 
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [estado, setEstado] = useState<"cargando" | "listo" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
@@ -97,7 +97,7 @@ export default function DashboardAgendaLite() {
           setConfig(negocioConfig);
           setEmpleadoSeleccionado(negocioConfig.empleadosData?.[0]?.nombre || "");
 
-          // 👇 traer plantilla directamente de Negocios/{id}
+          // 👇 traer plantilla desde Firestore
           const negocioRef = doc(db, "Negocios", usuario.uid);
           const negocioSnap = await getDoc(negocioRef);
           if (negocioSnap.exists()) {
@@ -135,17 +135,17 @@ export default function DashboardAgendaLite() {
     (t) => t.barbero === empleadoSeleccionado && t.fecha === fechaSeleccionada
   );
 
-  // Eliminar turno
-  const eliminarTurno = async (turno: Turno) => {
+  // Cancelar turno
+  const cancelarTurno = async (turno: Turno) => {
     if (!user) return;
-    if (!window.confirm(`¿Eliminar turno de ${turno.cliente} (${turno.hora})?`)) return;
+    if (!window.confirm(`¿Cancelar turno de ${turno.cliente} (${turno.hora})?`)) return;
     try {
       await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
       if (turno.uidCliente) {
         await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
       }
     } catch (err) {
-      console.error("❌ Error al eliminar turno:", err);
+      console.error("❌ Error al cancelar turno:", err);
     }
   };
 
@@ -185,7 +185,6 @@ export default function DashboardAgendaLite() {
         {diasDisponibles.map((d) => {
           const turnosDeEseDia = turnos.filter((t) => t.fecha === d.value);
           const tieneConfirmados = turnosDeEseDia.some((t) => t.estado === "confirmado");
-          const tienePendientes = turnosDeEseDia.some((t) => t.estado === "pendiente");
           const estaSeleccionado = fechaSeleccionada === d.value;
           return (
             <button
@@ -199,8 +198,6 @@ export default function DashboardAgendaLite() {
                     ? "bg-indigo-500 text-white"
                     : tieneConfirmados
                     ? "bg-green-500 text-white"
-                    : tienePendientes
-                    ? "bg-yellow-400 text-white"
                     : d.disabled
                     ? "bg-gray-200 text-gray-400"
                     : "bg-white text-gray-800 border hover:bg-indigo-100"
@@ -258,22 +255,23 @@ export default function DashboardAgendaLite() {
                       <p className="truncate w-full" title={turno.servicio}>
                         {turno.servicio}
                       </p>
-                      <span
-                        className={`px-2 py-1 text-xs rounded inline-block ${
-                          turno.estado === "pendiente"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : turno.estado === "confirmado"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {turno.estado}
-                      </span>
+                      {/* 👇 Ya no mostramos "pendiente" */}
+                      {turno.estado !== "pendiente" && (
+                        <span
+                          className={`px-2 py-1 text-xs rounded inline-block ${
+                            turno.estado === "confirmado"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {turno.estado}
+                        </span>
+                      )}
                       <button
-                        onClick={() => eliminarTurno(turno)}
+                        onClick={() => cancelarTurno(turno)}
                         className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition"
                       >
-                        🗑️ Eliminar
+                        ❌ Cancelar turno
                       </button>
                     </div>
                   ) : (

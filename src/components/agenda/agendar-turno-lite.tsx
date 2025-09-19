@@ -13,6 +13,13 @@ import {
 import { db } from "../../lib/firebase";
 import Calendario from "../Calendario";
 
+// ✅ Importar Firebase Messaging
+import { getMessaging, getToken, deleteToken } from "firebase/messaging";
+
+
+// ✅ Iconos (lucide-react)
+import { Bell, BellOff } from "lucide-react";
+
 type CalendarioEmpleado = {
   inicio: string;
   fin: string;
@@ -60,10 +67,8 @@ function getEtiquetaEmpleado(plantilla?: string) {
 
 export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) {
   const [user, setUser] = useState<any>(null);
-  const [plantilla, setPlantilla] = useState<string>(""); // 👈 traemos del negocio
-
-  const [barberoSeleccionado, setBarberoSeleccionado] =
-    useState<Empleado | null>(null);
+  const [plantilla, setPlantilla] = useState<string>("");
+  const [barberoSeleccionado, setBarberoSeleccionado] = useState<Empleado | null>(null);
   const [conAmigos, setConAmigos] = useState<"solo" | "amigos" | null>(null);
   const [cantidadAmigos, setCantidadAmigos] = useState<number>(1);
 
@@ -75,12 +80,11 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
   >(null);
 
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string | null>(null);
-  const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(
-    null
-  );
+  const [horarioSeleccionado, setHorarioSeleccionado] = useState<string | null>(null);
   const [horariosOcupados, setHorariosOcupados] = useState<string[]>([]);
-
   const [estado, setEstado] = useState<"inicial" | "exito" | "error">("inicial");
+
+  const [notificacionesActivas, setNotificacionesActivas] = useState(false);
 
   // 🔹 Detectar usuario logueado
   useEffect(() => {
@@ -88,6 +92,63 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
+
+  // 🔹 Verificar si el usuario ya tiene token guardado
+  useEffect(() => {
+    if (!user) return;
+    const userRef = doc(db, "Usuarios", user.uid);
+    getDoc(userRef).then((snap) => {
+      if (snap.exists() && snap.data().fcmToken) {
+        setNotificacionesActivas(true);
+      }
+    });
+  }, [user]);
+
+  async function activarNotificaciones() {
+  if (!user) return;
+  try {
+    const messaging = getMessaging();
+
+    const token = await getToken(messaging, {
+      vapidKey: "BJNnasfOFupoOJekoaR91oHhj2aTUg9UVYJzMhCSgKfa-Kjg8Y2Xq99Qb0WBqEGVsmJsaqX0xJEZwoegFLZqEg8"
+    });
+
+    if (token) {
+      await setDoc(doc(db, "Usuarios", user.uid), { fcmToken: token }, { merge: true });
+      setNotificacionesActivas(true);
+      alert("✅ Notificaciones activadas");
+    } else {
+      alert("⚠️ No activaste las notificaciones.");
+    }
+  } catch (err) {
+    console.error("❌ Error activando notificaciones:", err);
+  }
+}
+async function desactivarNotificaciones() {
+  if (!user) return;
+  try {
+    const messaging = getMessaging();
+
+    // Borra el token local en el navegador
+    const ok = await deleteToken(messaging);
+
+    if (ok) {
+      // Limpia el token en Firestore
+      await setDoc(
+        doc(db, "Usuarios", user.uid),
+        { fcmToken: null },
+        { merge: true }
+      );
+      setNotificacionesActivas(false);
+      alert("🔕 Notificaciones desactivadas");
+    } else {
+      alert("⚠️ No se pudo eliminar el token.");
+    }
+  } catch (err) {
+    console.error("❌ Error desactivando notificaciones:", err);
+  }
+}
+
 
   // 🔹 Traer plantilla del negocio
   useEffect(() => {
@@ -128,12 +189,7 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
 
   // 🔹 Guardar turno
   const guardarTurno = async () => {
-    if (
-      !barberoSeleccionado ||
-      !fechaSeleccionada ||
-      !horarioSeleccionado ||
-      !servicioSeleccionado
-    ) {
+    if (!barberoSeleccionado || !fechaSeleccionada || !horarioSeleccionado || !servicioSeleccionado) {
       alert("Completa todos los campos.");
       return;
     }
@@ -201,10 +257,35 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
           <h2 className="text-xl font-bold mb-4 text-center">Agendar Turno</h2>
 
           {estado === "exito" && (
-            <p className="text-green-600 text-center mb-4">
-              ✅ Turno reservado con éxito
-            </p>
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-green-600 font-medium">✅ Turno reservado con éxito</p>
+              <div className="flex items-center gap-3">
+                <a
+                  href="/agenda-usuario"
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+                >
+                  Ver mi turno
+                </a>
+                {/* 🔔 Icono de notificaciones */}
+<button
+  onClick={notificacionesActivas ? desactivarNotificaciones : activarNotificaciones}
+  className={`p-3 rounded-full border ${
+    notificacionesActivas
+      ? "bg-green-100 text-green-600 border-green-300"
+      : "bg-gray-100 text-gray-400 border-gray-300"
+  }`}
+  title={
+    notificacionesActivas
+      ? "Notificaciones activadas. Clic para desactivar."
+      : `Activa las notificaciones y entérate si ${slug || "el negocio"} cancela tu cita`
+  }
+>
+  {notificacionesActivas ? <Bell size={20} /> : <BellOff size={20} />}
+</button>
+              </div>
+            </div>
           )}
+
           {estado === "error" && (
             <p className="text-red-600 text-center mb-4">
               ❌ Error al reservar turno
@@ -314,7 +395,6 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
           {/* Paso 4: fecha/hora */}
           {servicioSeleccionado && (
             <div className="mt-6 flex flex-col items-center text-center">
-              {/* Si aún no se confirmó el turno */}
               {estado !== "exito" && (
                 <>
                   <h3 className="font-semibold mb-3">
@@ -344,20 +424,6 @@ export default function AgendarTurnoLite({ empleados, negocioId, slug }: Props) 
                     </button>
                   </div>
                 </>
-              )}
-
-              {/* Si ya se confirmó */}
-              {estado === "exito" && (
-                <button
-                  onClick={() =>
-                    alert(
-                      `📅 Tu turno está reservado para el ${fechaSeleccionada} a las ${horarioSeleccionado}`
-                    )
-                  }
-                  className="mt-6 px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
-                >
-                  Ver mi turno
-                </button>
               )}
             </div>
           )}
