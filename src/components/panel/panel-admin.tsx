@@ -423,25 +423,32 @@ export default function PanelAdmin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {codigos.map((c) => (
-                      <tr key={c.id} className="text-center">
-                        <td className="p-2 border font-mono">{c.codigo}</td>
-                        <td className="p-2 border">
-                          {c.usado
-                            ? "❌ Usado"
-                            : c.valido
-                            ? "✅ Disponible"
-                            : "⚠️ Invalido"}
-                        </td>
-                        <td className="p-2 border">{c.usadoPor || "-"}</td>
-                        <td className="p-2 border">
-                          {c.fechaCreacion?.toDate
-                            ? c.fechaCreacion.toDate().toLocaleString()
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+  {codigos.map((c) => (
+    <tr key={c.id} className="text-center">
+      <td className="p-2 border font-mono">{c.codigo}</td>
+      <td className="p-2 border">
+        {c.usado
+          ? "❌ Usado"
+          : c.valido
+          ? "✅ Disponible"
+          : "⚠️ Inválido"}
+      </td>
+      <td className="p-2 border">
+        {c.usadoPor
+          ? typeof c.usadoPor === "object"
+            ? c.usadoPor.email || c.usadoPor.nombre || c.usadoPor.uid || "-"
+            : c.usadoPor
+          : "-"}
+      </td>
+      <td className="p-2 border">
+        {c.fechaCreacion?.toDate
+          ? c.fechaCreacion.toDate().toLocaleString()
+          : "-"}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
                 </table>
               )}
             </div>

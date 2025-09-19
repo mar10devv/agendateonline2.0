@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { db } from "../../lib/firebase";
+import { db, auth, googleProvider } from "../../lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { signInWithPopup } from "firebase/auth";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -55,7 +56,10 @@ export default function PanelRegistro() {
   const [codigo, setCodigo] = useState("");
   const [codigoValido, setCodigoValido] = useState<boolean | null>(null);
 
-  // ✅ Validación en Firestore
+  // Paso 5 → confirmación final
+  const [finalizado, setFinalizado] = useState(false);
+
+  // ✅ Validación en Firestore con login
   const verificarCodigo = async () => {
     if (!codigo || codigo.length < 15) {
       alert("⚠️ Ingresa un código válido de 15 cifras");
@@ -63,7 +67,14 @@ export default function PanelRegistro() {
     }
 
     try {
-      const codigoRef = doc(db, "Codigos", codigo);
+      let user = auth.currentUser;
+      if (!user) {
+        // 👉 Forzamos login
+        const result = await signInWithPopup(auth, googleProvider);
+        user = result.user;
+      }
+
+      const codigoRef = doc(db, "CodigosPremium", codigo);
       const codigoSnap = await getDoc(codigoRef);
 
       if (!codigoSnap.exists()) {
@@ -83,11 +94,18 @@ export default function PanelRegistro() {
       // ✅ Código válido → actualizar Firestore
       await updateDoc(codigoRef, {
         valido: false,
-        usadoPor: nombre || "desconocido",
+        usado: true,
+        usadoPor: {
+          uid: user?.uid || "desconocido",
+          email: user?.email || "sin-email",
+          nombre: user?.displayName || nombre || "desconocido",
+        },
+        fechaUso: new Date().toISOString(),
       });
 
       setCodigoValido(true);
-      alert("✅ Código válido. Servicio activado.");
+      setFinalizado(true);
+      setPaso(5); // 👉 Avanzamos al paso 5
     } catch (error) {
       console.error("Error verificando el código:", error);
       alert("⚠️ Ocurrió un error verificando el código.");
@@ -109,7 +127,6 @@ export default function PanelRegistro() {
       {paso === 1 && (
         <>
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Registro de Negocio</h2>
-
           {/* Nombre */}
           <div className="relative mb-3">
             <input
@@ -123,7 +140,6 @@ export default function PanelRegistro() {
             />
             <div className="absolute top-2 right-2">{renderIcon("nombre", nombreValido)}</div>
           </div>
-
           {/* Email */}
           <div className="relative mb-3">
             <input
@@ -137,7 +153,6 @@ export default function PanelRegistro() {
             />
             <div className="absolute top-2 right-2">{renderIcon("email", emailValido)}</div>
           </div>
-
           {/* Teléfono */}
           <div className="relative mb-3">
             <input
@@ -151,7 +166,6 @@ export default function PanelRegistro() {
             />
             <div className="absolute top-2 right-2">{renderIcon("telefono", telefonoValido)}</div>
           </div>
-
           {/* Tipo de negocio */}
           <div className="relative mb-4">
             <select
@@ -170,7 +184,6 @@ export default function PanelRegistro() {
             </select>
             <div className="absolute top-2 right-2">{renderIcon("tipo", tipoValido)}</div>
           </div>
-
           <button
             onClick={handleNext}
             disabled={!formularioValido}
@@ -189,7 +202,6 @@ export default function PanelRegistro() {
       {paso === 2 && (
         <>
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Configura tu agenda</h2>
-
           {/* Selección de días libres */}
           <div className="mb-6">
             <h3 className="block font-medium mb-2">Elegir días libres</h3>
@@ -199,7 +211,6 @@ export default function PanelRegistro() {
             >
               {mostrarDias ? "Ocultar días" : "Ver días"}
             </button>
-
             {mostrarDias && (
               <div className="grid grid-cols-2 gap-2">
                 {diasSemana.map((dia) => (
@@ -219,7 +230,6 @@ export default function PanelRegistro() {
               </div>
             )}
           </div>
-
           {/* Modo de turnos */}
           <div className="mb-6">
             <label className="block font-medium mb-2">¿Cómo quieres manejar tus turnos?</label>
@@ -245,7 +255,6 @@ export default function PanelRegistro() {
               </button>
             </div>
           </div>
-
           {/* Configuración Jornada */}
           {modoTurnos === "jornada" && (
             <div className="mb-6">
@@ -270,7 +279,6 @@ export default function PanelRegistro() {
                   Horas
                 </button>
               </div>
-
               {/* Si selecciona minutos */}
               {subModoJornada === "minutos" && (
                 <div className="grid grid-cols-2 gap-2">
@@ -287,7 +295,6 @@ export default function PanelRegistro() {
                   ))}
                 </div>
               )}
-
               {/* Si selecciona horas */}
               {subModoJornada === "horas" && (
                 <div className="flex gap-2">
@@ -304,7 +311,6 @@ export default function PanelRegistro() {
               )}
             </div>
           )}
-
           {/* Configuración Personalizado */}
           {modoTurnos === "personalizado" && (
             <div className="mb-6">
@@ -319,7 +325,6 @@ export default function PanelRegistro() {
               />
             </div>
           )}
-
           <button
             onClick={handleFinalizar}
             className="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"
@@ -356,7 +361,6 @@ export default function PanelRegistro() {
                 Seleccionar Agenda
               </button>
             </div>
-
             {/* Plan Agenda + Web */}
             <div className="border rounded-lg p-6 shadow hover:shadow-lg transition">
               <h3 className="text-xl font-bold mb-2">Agenda + Web personalizada</h3>
@@ -391,7 +395,6 @@ export default function PanelRegistro() {
       {paso === 4 && (
         <>
           <h2 className="text-2xl font-bold mb-6 text-gray-800">Método de pago</h2>
-
           <div className="mb-4 p-3 bg-gray-100 rounded">
             <p className="text-gray-800">
               Estás contratando:{" "}
@@ -402,7 +405,6 @@ export default function PanelRegistro() {
               </strong>
             </p>
           </div>
-
           <div className="space-y-6">
             {/* Opción Transferencia */}
             <div className="border rounded-lg p-6 shadow">
@@ -422,7 +424,6 @@ export default function PanelRegistro() {
                 Confirmar transferencia
               </button>
             </div>
-
             {/* Opción Código */}
             <div className="border rounded-lg p-6 shadow">
               <h3 className="text-xl font-bold mb-2 text-indigo-600">Pagar vía código</h3>
@@ -443,7 +444,6 @@ export default function PanelRegistro() {
               >
                 Validar código
               </button>
-
               {codigoValido === true && (
                 <p className="mt-2 text-green-600 font-semibold">
                   ✅ Código válido, servicio activado.
@@ -458,6 +458,31 @@ export default function PanelRegistro() {
           </div>
         </>
       )}
+
+      {/* Paso 5 */}
+      {paso === 5 && (
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-green-600 mb-4">
+            🎉 Tu empresa fue validada con éxito
+          </h2>
+          {planSeleccionado === "agenda" ? (
+            <a
+              href={`http://localhost:4321/agenda/${nombre.toLowerCase()}`}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+            >
+              Ver mi agenda
+            </a>
+          ) : (
+            <a
+              href="/panel/paneldecontrol"
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700"
+            >
+              Ver mi panel
+            </a>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
