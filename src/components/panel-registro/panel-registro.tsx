@@ -72,8 +72,9 @@ export default function PanelRegistro() {
   const [diasLibres, setDiasLibres] = useState<string[]>([]);
   const [modoTurnos, setModoTurnos] = useState<"jornada" | "personalizado">("jornada");
   const [subModoJornada, setSubModoJornada] = useState<"minutos" | "horas" | null>(null);
-  const [clientesPorDia, setClientesPorDia] = useState(4);
-  const [horasSeparacion, setHorasSeparacion] = useState(1);
+const [clientesPorDia, setClientesPorDia] = useState<number | null>(4);
+const [horasSeparacion, setHorasSeparacion] = useState<number | null>(1);
+
 
   const toggleDia = (dia: string) => {
     setDiasLibres((prev) =>
@@ -81,25 +82,29 @@ export default function PanelRegistro() {
     );
   };
 
- const handleFinalizar = () => {
+const handleFinalizar = () => {
   if (!modoTurnos) {
     alert("⚠️ Debes seleccionar un modo de turnos (jornada o personalizado).");
     return;
   }
 
-  if (modoTurnos === "jornada" && !subModoJornada) {
-    alert("⚠️ Debes indicar si trabajas por minutos o por horas.");
-    return;
+  if (modoTurnos === "jornada") {
+    if (!subModoJornada) {
+      alert("⚠️ Debes indicar si trabajas por minutos o por horas.");
+      return;
+    }
+
+    if ((horasSeparacion ?? 0) <= 0) {   // 👈 usa fallback en null
+      alert("⚠️ Debes configurar el tiempo de separación entre clientes.");
+      return;
+    }
   }
 
-  if (modoTurnos === "jornada" && horasSeparacion <= 0) {
-    alert("⚠️ Debes configurar el tiempo de separación entre clientes.");
-    return;
-  }
-
-  if (modoTurnos === "personalizado" && clientesPorDia <= 0) {
-    alert("⚠️ Debes indicar cuántos clientes atiendes por día.");
-    return;
+  if (modoTurnos === "personalizado") {
+    if ((clientesPorDia ?? 0) <= 0) {   // 👈 usa fallback en null
+      alert("⚠️ Debes indicar cuántos clientes atiendes por día.");
+      return;
+    }
   }
 
   if (diasLibres.length === 0) {
@@ -107,9 +112,18 @@ export default function PanelRegistro() {
     return;
   }
 
-  // ✅ Si todo está bien, solo avanza
+  // ✅ Normalizar los valores según el modo
+  if (modoTurnos === "personalizado") {
+    setHorasSeparacion(null);
+    setSubModoJornada(null);
+  } else if (modoTurnos === "jornada") {
+    setClientesPorDia(null);
+  }
+
+  // ✅ Si todo está bien, avanza
   setPaso(3);
 };
+
 
 
   // Paso 3 → selección de plan
@@ -406,13 +420,13 @@ await setDoc(
               {subModoJornada === "horas" && (
                 <div className="flex gap-2">
                   <input
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={horasSeparacion}
-                    onChange={(e) => setHorasSeparacion(parseInt(e.target.value))}
-                    className="w-full p-2 border rounded"
-                  />
+  type="number"
+  min={1}
+  max={8}
+  value={horasSeparacion ?? ""}   // 👈 fallback
+  onChange={(e) => setHorasSeparacion(parseInt(e.target.value))}
+  className="w-full p-2 border rounded"
+/>
                   <span className="self-center">horas</span>
                 </div>
               )}
@@ -423,13 +437,13 @@ await setDoc(
             <div className="mb-6">
               <label className="block font-medium mb-2">Clientes por día</label>
               <input
-                type="number"
-                min={4}
-                max={10}
-                value={clientesPorDia}
-                onChange={(e) => setClientesPorDia(parseInt(e.target.value))}
-                className="w-full p-2 border rounded"
-              />
+  type="number"
+  min={4}
+  max={10}
+  value={clientesPorDia ?? ""}   // 👈 fallback
+  onChange={(e) => setClientesPorDia(parseInt(e.target.value))}
+  className="w-full p-2 border rounded"
+/>
             </div>
           )}
           <button

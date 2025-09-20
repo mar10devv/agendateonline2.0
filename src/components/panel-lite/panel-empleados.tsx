@@ -49,52 +49,50 @@ export default function PanelEmpleadosLite() {
   });
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsub = onAuthStateChanged(auth, async (usuario) => {
-      if (!usuario) {
-        setEstado("sin-acceso");
-        setMensaje("🔒 No has iniciado sesión.");
-        return;
+  const auth = getAuth();
+  const unsub = onAuthStateChanged(auth, async (usuario) => {
+    if (!usuario) {
+      setEstado("sin-acceso");
+      setMensaje("🔒 No has iniciado sesión.");
+      return;
+    }
+
+    const userRef = doc(db, "Usuarios", usuario.uid);
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) {
+      setEstado("sin-acceso");
+      setMensaje("🚫 No tienes acceso al panel.");
+      return;
+    }
+
+    const negocioConfig = await obtenerConfigNegocio(usuario.uid);
+    if (negocioConfig) {
+      setUser(usuario);
+
+      // 👇 buscar plantilla en Negocios/{uid}
+      const negocioRef = doc(db, "Negocios", usuario.uid);
+      const negocioSnap = await getDoc(negocioRef);
+      if (negocioSnap.exists()) {
+        const plantillaFirestore = negocioSnap.data()?.plantilla || "";
+        setPlantilla(plantillaFirestore.toLowerCase());
       }
 
-      const userRef = doc(db, "Usuarios", usuario.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        setEstado("sin-acceso");
-        setMensaje("🚫 No tienes acceso al panel.");
-        return;
-      }
+      // ✅ usamos directamente lo que venga de Firestore
+      setConfig({
+        ...negocioConfig,
+        empleados: negocioConfig.empleados || 1,
+        configuracionAgenda: negocioConfig.configuracionAgenda || {},
+        empleadosData: negocioConfig.empleadosData || [],
+      });
 
-      const negocioConfig = await obtenerConfigNegocio(usuario.uid);
-      if (negocioConfig) {
-        setUser(usuario);
+      setEstado("listo");
+    }
+  });
 
-        // 👇 buscar plantilla en Negocios/{uid}
-        const negocioRef = doc(db, "Negocios", usuario.uid);
-        const negocioSnap = await getDoc(negocioRef);
-        if (negocioSnap.exists()) {
-          const plantillaFirestore = negocioSnap.data()?.plantilla || "";
-          setPlantilla(plantillaFirestore.toLowerCase());
-        }
+  return () => unsub();
+}, []);
 
-        setConfig({
-          ...negocioConfig,
-          empleados: negocioConfig.empleados || 1,
-          empleadosData:
-            negocioConfig.empleadosData && negocioConfig.empleadosData.length > 0
-              ? negocioConfig.empleadosData
-              : Array.from({ length: negocioConfig.empleados || 1 }, () => ({
-                  nombre: "",
-                  fotoPerfil: "",
-                  calendario: { inicio: "08:00", fin: "17:00", diasLibres: [] },
-                })),
-        });
-        setEstado("listo");
-      }
-    });
 
-    return () => unsub();
-  }, []);
 
   const handleChangeEmpleado = (index: number, field: string, value: any) => {
     const nuevo = [...config.empleadosData];
@@ -136,10 +134,15 @@ export default function PanelEmpleadosLite() {
           ...empleado,
           fotoPerfil,
           calendario: empleado.calendario || {
-            inicio: "08:00",
-            fin: "17:00",
-            diasLibres: [],
-          },
+  inicio: config.configuracionAgenda?.inicio || "08:00",
+  fin: config.configuracionAgenda?.fin || "17:00",
+  diasLibres: config.configuracionAgenda?.diasLibres || [],
+  modoTurnos: config.configuracionAgenda?.modoTurnos || "jornada",
+  subModoJornada: config.configuracionAgenda?.subModoJornada || null,
+  horasSeparacion: config.configuracionAgenda?.horasSeparacion || 1,
+  clientesPorDia: config.configuracionAgenda?.clientesPorDia || null,
+},
+
         };
       })
     );

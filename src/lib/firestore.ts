@@ -2,6 +2,16 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
+// 👉 Tipo para la configuración de agenda que se guarda en el registro del negocio
+export interface ConfiguracionAgenda {
+  diasLibres: string[];
+  modoTurnos: "jornada" | "personalizado";
+  subModoJornada?: "minutos" | "horas" | null;
+  clientesPorDia?: number;
+  horasSeparacion?: number;
+}
+
+// 👉 Tipo principal de Negocio
 export interface NegocioConfig {
   nombre: string;
   slug: string;
@@ -18,10 +28,15 @@ export interface NegocioConfig {
   empleados?: number;
   empleadosData?: any[];
   trabajos?: any[];
+
+  // 👇 Nuevo: datos de agenda que vienen desde el registro
+  configuracionAgenda?: ConfiguracionAgenda;
 }
 
 // ✅ Obtener config usando UID (único por usuario)
-export async function obtenerConfigNegocio(uid: string): Promise<NegocioConfig | null> {
+export async function obtenerConfigNegocio(
+  uid: string
+): Promise<NegocioConfig | null> {
   try {
     const negocioRef = doc(db, "Negocios", uid);
     const snap = await getDoc(negocioRef);
@@ -33,7 +48,10 @@ export async function obtenerConfigNegocio(uid: string): Promise<NegocioConfig |
 }
 
 // ✅ Guardar config en Negocios/{uid}
-export async function guardarConfigNegocio(uid: string, data: Partial<NegocioConfig>) {
+export async function guardarConfigNegocio(
+  uid: string,
+  data: Partial<NegocioConfig>
+) {
   try {
     const negocioRef = doc(db, "Negocios", uid);
     await setDoc(negocioRef, data, { merge: true });

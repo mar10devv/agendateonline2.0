@@ -1,10 +1,11 @@
 // src/components/panel-lite/panel-agenda.tsx
 import { useEffect, useState, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, onSnapshot, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { obtenerConfigNegocio } from "../../lib/firestore";
 import { useCalendario } from "../../lib/useCalendario";
+import PanelModalHorarios from "./panel-modalHorarios";
 
 type Turno = {
   id: string;
@@ -40,6 +41,9 @@ export default function DashboardAgendaLite() {
   const [estado, setEstado] = useState<"cargando" | "listo" | "sin-acceso">("cargando");
   const [mensaje, setMensaje] = useState("");
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>("");
+
+  // 👉 estado para el modal
+  const [mostrarModal, setMostrarModal] = useState(false);
 
   // Fecha local de hoy
   const hoyLocal = new Date();
@@ -103,7 +107,6 @@ export default function DashboardAgendaLite() {
           if (negocioSnap.exists()) {
             const plantillaFirestore = negocioSnap.data()?.plantilla || "";
             setPlantilla(plantillaFirestore.toLowerCase());
-            console.log("Plantilla desde Firestore:", plantillaFirestore);
           }
 
           const turnosRef = collection(db, "Negocios", usuario.uid, "Turnos");
@@ -125,10 +128,12 @@ export default function DashboardAgendaLite() {
   }, []);
 
   // Calendario con hook
-  const calendarioEmpleado = config?.empleadosData?.find(
-    (e: any) => e.nombre === empleadoSeleccionado
-  )?.calendario;
-  const { diasDisponibles, horariosDisponibles } = useCalendario(calendarioEmpleado, 14);
+const calendarioEmpleado =
+  config?.empleadosData?.find((e: any) => e.nombre === empleadoSeleccionado)?.calendario
+  || config?.configuracionAgenda;
+
+const { diasDisponibles, horariosDisponibles } = useCalendario(calendarioEmpleado, 14);
+
 
   // Turnos del día
   const turnosDelDia = turnos.filter(
@@ -136,27 +141,36 @@ export default function DashboardAgendaLite() {
   );
 
   // Cancelar turno
-const cancelarTurno = async (turno: Turno) => {
-  if (!user) return;
-  if (!window.confirm(`¿Cancelar turno de ${turno.cliente} (${turno.hora})?`)) return;
+  const cancelarTurno = async (turno: Turno) => {
+    if (!user) return;
+    if (!window.confirm(`¿Cancelar turno de ${turno.cliente} (${turno.hora})?`)) return;
 
-  try {
-    // Borramos el turno en el negocio
-    await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
-
-    // Si también está guardado en el usuario, lo borramos
-    if (turno.uidCliente) {
-      await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
+    try {
+      await deleteDoc(doc(db, "Negocios", user.uid, "Turnos", turno.id));
+      if (turno.uidCliente) {
+        await deleteDoc(doc(db, "Usuarios", turno.uidCliente, "Turnos", turno.id));
+      }
+      console.log("✅ Turno cancelado correctamente");
+    } catch (err: any) {
+      console.warn("⚠️ Error post-delete ignorado:", err.message);
     }
+  };
 
-    console.log("✅ Turno cancelado correctamente");
-  } catch (err: any) {
-    // Este error aparece porque Firestore intenta cerrar el stream post-delete.
-    // El turno ya está eliminado, así que lo manejamos como advertencia.
-    console.warn("⚠️ Error post-delete ignorado:", err.message);
-  }
-};
-
+  // 👉 Guardar configuración desde el modal
+  const guardarConfiguracion = async (inicio: string, fin?: string) => {
+    if (!user) return;
+    try {
+      const negocioRef = doc(db, "Negocios", user.uid);
+      await updateDoc(negocioRef, {
+        "configuracionAgenda.inicio": inicio,
+        ...(fin ? { "configuracionAgenda.fin": fin } : {}),
+      });
+      console.log("✅ Horarios guardados:", inicio, fin || "");
+      setMostrarModal(false);
+    } catch (err) {
+      console.error("❌ Error al guardar horarios:", err);
+    }
+  };
 
   if (estado === "cargando") return <p className="text-center">Cargando agenda...</p>;
   if (estado === "sin-acceso") return <p className="text-red-600 text-center mt-10">{mensaje}</p>;
@@ -166,9 +180,7 @@ const cancelarTurno = async (turno: Turno) => {
     <div className="flex flex-col gap-6">
       {/* Filtro empleados */}
       <div className="flex items-center gap-2">
-        <label className="font-medium">
-          {getEtiquetaEmpleado(plantilla)}:
-        </label>
+        <label className="font-medium">{getEtiquetaEmpleado(plantilla)}:</label>
         <select
           value={empleadoSeleccionado}
           onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
@@ -235,63 +247,76 @@ const cancelarTurno = async (turno: Turno) => {
         </h2>
 
         {!calendarioEmpleado?.inicio || !calendarioEmpleado?.fin ? (
-          <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
-            <p className="text-yellow-700 font-medium">
-              ⚠️ Primero configura el horario y días libres de este{" "}
-              {getEtiquetaEmpleado(plantilla).toLowerCase()}.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {horariosDisponibles.map((h) => {
-              const turno = turnosDelDia.find((t) => t.hora === h);
-              return (
-                <div
-                  key={h}
-                  className={`p-4 rounded-lg shadow border text-center ${
-                    turno ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+  <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow flex flex-col gap-4 items-center">
+    <p className="text-yellow-700 font-medium">
+      ⚠️ Configura tu agenda: horario de apertura y cierre, agrega servicios y una bonita foto de perfil para tus clientes.
+    </p>
+    <button
+      onClick={() => setMostrarModal(true)}
+      className="px-5 py-2 bg-indigo-600 text-white font-medium rounded-lg shadow hover:bg-indigo-700 transition"
+    >
+      ⚙️ Configurar agenda
+    </button>
+  </div>
+) : (
+  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    {horariosDisponibles.map((h) => {
+      const turno = turnosDelDia.find((t) => t.hora === h);
+      return (
+        <div
+          key={h}
+          className={`p-4 rounded-lg shadow border text-center ${
+            turno ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+          }`}
+        >
+          <p className="font-medium">{h}</p>
+          {turno ? (
+            <div className="text-sm text-gray-700 mt-1 space-y-1">
+              <p className="font-semibold truncate w-full" title={turno.cliente}>
+                {turno.cliente}
+              </p>
+              <p className="text-xs text-gray-600 truncate w-full" title={turno.email}>
+                {turno.email}
+              </p>
+              <p className="truncate w-full" title={turno.servicio}>
+                {turno.servicio}
+              </p>
+              {turno.estado !== "pendiente" && (
+                <span
+                  className={`px-2 py-1 text-xs rounded inline-block ${
+                    turno.estado === "confirmado"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
                   }`}
                 >
-                  <p className="font-medium">{h}</p>
-                  {turno ? (
-                    <div className="text-sm text-gray-700 mt-1 space-y-1">
-                      <p className="font-semibold truncate w-full" title={turno.cliente}>
-                        {turno.cliente}
-                      </p>
-                      <p className="text-xs text-gray-600 truncate w-full" title={turno.email}>
-                        {turno.email}
-                      </p>
-                      <p className="truncate w-full" title={turno.servicio}>
-                        {turno.servicio}
-                      </p>
-                      {/* 👇 Ya no mostramos "pendiente" */}
-                      {turno.estado !== "pendiente" && (
-                        <span
-                          className={`px-2 py-1 text-xs rounded inline-block ${
-                            turno.estado === "confirmado"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {turno.estado}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => cancelarTurno(turno)}
-                        className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition"
-                      >
-                        ❌ Cancelar turno
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 mt-1">Disponible</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  {turno.estado}
+                </span>
+              )}
+              <button
+                onClick={() => cancelarTurno(turno)}
+                className="mt-2 px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                ❌ Cancelar turno
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">Disponible</p>
+          )}
+        </div>
+      );
+    })}
+  </div>
+)}
+
       </div>
+
+      {mostrarModal && (
+  <PanelModalHorarios
+    negocioId={user?.uid}   // 👈 id del negocio en Firestore
+    onClose={() => setMostrarModal(false)}
+  />
+)}
+
     </div>
   );
 }

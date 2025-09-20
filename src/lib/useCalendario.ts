@@ -1,89 +1,79 @@
 // src/lib/useCalendario.ts
 import { useMemo } from "react";
 
-type CalendarioEmpleado = {
-  inicio?: string;       // "08:00"
-  fin?: string;          // "17:00"
-  diasLibres?: string[]; // ["domingo", "lunes"]
+type ConfiguracionAgenda = {
+  modoTurnos: "personalizado" | "jornada";
+  clientesPorDia?: number;     // usado en modo personalizado
+  horasSeparacion?: number;    // minutos por cliente en modo jornada
+  diasLibres?: string[];
+  inicio: string;              // "08:00"
+  fin: string;                 // "17:00"
 };
 
 export function useCalendario(
-  calendario?: CalendarioEmpleado | null,
-  dias: number = 14
+  calendario: ConfiguracionAgenda | null,
+  diasAdelante = 14
 ) {
   return useMemo(() => {
     if (!calendario?.inicio || !calendario?.fin) {
-      console.warn("⚠️ Calendario no configurado para este empleado");
+      console.warn("⚠️ Calendario no configurado");
       return { diasDisponibles: [], horariosDisponibles: [] };
     }
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // 📅 Generar días disponibles
+    const ahora = new Date();
+    const diasDisponibles = Array.from({ length: diasAdelante }, (_, i) => {
+      const d = new Date();
+      d.setDate(ahora.getDate() + i);
 
-    const [hFin, mFin] = calendario.fin.split(":").map(Number);
-    const finHoy = new Date(hoy);
-    finHoy.setHours(hFin, mFin, 0, 0);
-
-    if (new Date() >= finHoy) {
-      hoy.setDate(hoy.getDate() + 1);
-    }
-
-    // 🔹 Función para normalizar (quita acentos y pasa a minúsculas)
-    const normalizar = (str: string) =>
-      str
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
-    // 🔹 Arrays fijos para días/meses
-    const diasSemana = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-    const meses = [
-      "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-      "Jul", "Ago", "Sept", "Oct", "Nov", "Dic",
-    ];
-
-    const diasDisponibles = Array.from({ length: dias }, (_, i) => {
-      const d = new Date(hoy);
-      d.setDate(hoy.getDate() + i);
-
-      const dayName = diasSemana[d.getDay()]; // ✅ fijo según getDay()
-      const dayNum = d.getDate().toString().padStart(2, "0");
-      const monthName = meses[d.getMonth()];
-
-      // 🚨 Comparar por texto normalizado
+      const dayName = d.toLocaleDateString("es-ES", { weekday: "long" });
       const disabled = calendario.diasLibres?.some(
-        (diaLibre) => normalizar(diaLibre) === normalizar(
-          d.toLocaleDateString("es-ES", { weekday: "long" })
-        )
-      ) ?? false;
+        (dl) =>
+          dl.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
+          dayName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      );
 
       return {
         date: d,
-        label: `${dayName} ${dayNum}/${monthName}`,
+        label: d.toLocaleDateString("es-ES", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        }),
         value: d.toISOString().split("T")[0],
         disabled,
       };
     });
 
-    // 🔹 Generar horarios disponibles (intervalos de 30 min)
+    // ⏰ Calcular horarios disponibles
     const horariosDisponibles: string[] = [];
-    const [hInicio, mInicio] = calendario.inicio.split(":").map(Number);
-    let hora = hInicio;
-    let minuto = mInicio;
+    const [hIni, mIni] = calendario.inicio.split(":").map(Number);
+    const [hFin, mFin] = calendario.fin.split(":").map(Number);
 
-    while (hora < hFin || (hora === hFin && minuto <= mFin)) {
-      const h = hora.toString().padStart(2, "0");
-      const m = minuto.toString().padStart(2, "0");
-      horariosDisponibles.push(`${h}:${m}`);
+    const start = hIni * 60 + mIni; // minutos desde medianoche
+    const end = hFin * 60 + mFin;
+    const totalMinutes = end - start;
 
-      if (minuto === 0) {
-        minuto = 30;
-      } else {
-        minuto = 0;
-        hora++;
+    if (calendario.modoTurnos === "personalizado" && calendario.clientesPorDia) {
+      // 👉 Distribuir X clientes en todo el rango
+      const step = Math.floor(totalMinutes / calendario.clientesPorDia);
+      for (let i = 0; i < calendario.clientesPorDia; i++) {
+        const t = start + i * step;
+        const hh = String(Math.floor(t / 60)).padStart(2, "0");
+        const mm = String(t % 60).padStart(2, "0");
+        horariosDisponibles.push(`${hh}:${mm}`);
+      }
+    } else if (calendario.modoTurnos === "jornada" && calendario.horasSeparacion) {
+      // 👉 Usar duración fija por cliente
+      let t = start;
+      while (t + calendario.horasSeparacion <= end) {
+        const hh = String(Math.floor(t / 60)).padStart(2, "0");
+        const mm = String(t % 60).padStart(2, "0");
+        horariosDisponibles.push(`${hh}:${mm}`);
+        t += calendario.horasSeparacion;
       }
     }
 
     return { diasDisponibles, horariosDisponibles };
-  }, [calendario, dias]);
+  }, [calendario, diasAdelante]);
 }

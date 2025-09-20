@@ -1,15 +1,19 @@
+// src/components/Calendario.tsx
 import React, { useState, useEffect } from "react";
 import { useCalendario } from "../lib/useCalendario";
 
 type CalendarioEmpleado = {
-  inicio: string;
-  fin: string;
-  diasLibres: string[];
+  inicio: string;       // "08:30"
+  fin: string;          // "17:30"
+  diasLibres?: string[];
+  configuracionAgenda?: {
+    clientesPorDia?: number;
+  };
 };
 
 type Props = {
   calendario?: CalendarioEmpleado | null;
-  onSeleccionarTurno?: (fecha: Date, hora: string | null) => void; // 👈 hora opcional
+  onSeleccionarTurno?: (fecha: Date, hora: string | null) => void;
   horariosOcupados?: string[];
 };
 
@@ -29,7 +33,7 @@ export default function Calendario({
     if (primerDia) {
       setFechaSeleccionada(primerDia.date);
       setHoraSeleccionada(null);
-      onSeleccionarTurno?.(primerDia.date, null); // 👈 así forzamos el render de horarios
+      onSeleccionarTurno?.(primerDia.date, null);
     }
   }, [diasDisponibles]);
 
@@ -38,7 +42,7 @@ export default function Calendario({
     return (
       <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
         <p className="text-yellow-700 font-medium mb-3">
-          ⚠️ Este barbero/profesional no tiene su calendario configurado.
+          ⚠️ Este profesional no tiene su calendario configurado.
         </p>
         <button
           type="button"
@@ -64,7 +68,7 @@ export default function Calendario({
               if (!disabled) {
                 setFechaSeleccionada(date);
                 setHoraSeleccionada(null);
-                onSeleccionarTurno?.(date, null); // 👈 actualizamos también aquí
+                onSeleccionarTurno?.(date, null);
               }
             }}
             className={`py-3 rounded-lg font-semibold transition ${

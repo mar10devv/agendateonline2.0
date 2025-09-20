@@ -106,10 +106,11 @@ export default function DashboardAgenda() {
     return () => unsub();
   }, []);
 
-  // 🔹 Lógica del calendario con hook unificado
-  const calendarioBarbero = config?.empleadosData?.find(
-    (e: any) => e.nombre === barberoSeleccionado
-  )?.calendario;
+ // 🔹 Lógica del calendario con hook unificado
+const calendarioBarbero =
+  config?.empleadosData?.find((e: any) => e.nombre === barberoSeleccionado)
+    ?.calendario || config?.configuracionAgenda;
+
 
   const { diasDisponibles, horariosDisponibles } = useCalendario(
     calendarioBarbero,
