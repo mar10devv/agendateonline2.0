@@ -128,9 +128,15 @@ export default function DashboardAgendaLite() {
   }, []);
 
   // Calendario con hook
-const calendarioEmpleado =
-  config?.empleadosData?.find((e: any) => e.nombre === empleadoSeleccionado)?.calendario
-  || config?.configuracionAgenda;
+const calendarioBase = config?.configuracionAgenda || {};
+const calendarioEmpleadoSeleccionado = config?.empleadosData?.find(
+  (e: any) => e.nombre === empleadoSeleccionado
+)?.calendario || {};
+
+const calendarioEmpleado = {
+  ...calendarioBase,
+  ...calendarioEmpleadoSeleccionado,
+};
 
 const { diasDisponibles, horariosDisponibles } = useCalendario(calendarioEmpleado, 14);
 
@@ -246,7 +252,8 @@ const { diasDisponibles, horariosDisponibles } = useCalendario(calendarioEmplead
           })()}
         </h2>
 
-        {!calendarioEmpleado?.inicio || !calendarioEmpleado?.fin ? (
+        {!(calendarioEmpleado?.inicio && calendarioEmpleado?.fin) ? (
+
   <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow flex flex-col gap-4 items-center">
     <p className="text-yellow-700 font-medium">
       ⚠️ Configura tu agenda: horario de apertura y cierre, agrega servicios y una bonita foto de perfil para tus clientes.

@@ -43,15 +43,11 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
     const q = query(collection(db, "Negocios"), where("slug", "==", slugCheck));
     const snap = await getDocs(q);
 
-    // Si está vacío → disponible
     if (snap.empty) return true;
-
-    // Si existe, verificar que el único doc encontrado sea el mismo negocio actual
     if (snap.size === 1 && snap.docs[0].id === negocioId) {
-      return true; // es su propio slug, válido
+      return true;
     }
-
-    return false; // ocupado por otro negocio
+    return false;
   };
 
   // Validar slug mientras el usuario escribe
@@ -73,6 +69,7 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
     return () => clearTimeout(timeout);
   }, [nuevoNombre, negocioId]);
 
+  // Mostrar flecha de scroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -115,7 +112,7 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
 
       setMensaje("✅ Nombre de la agenda actualizado.");
 
-      // 👇 Recargar la página en la nueva URL
+      // 👇 Refrescar página en la nueva URL
       setTimeout(() => {
         window.location.href = `/agenda/${nuevoSlug}`;
       }, 800);
@@ -125,6 +122,13 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
     } finally {
       setGuardando(false);
     }
+  };
+
+  // 👇 Nuevo helper: refrescar siempre después de guardar servicios u otros cambios
+  const handleRefresh = () => {
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
   };
 
   return (
@@ -161,7 +165,6 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
               className="w-full md:w-3/4 mx-auto px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600"
             />
 
-            {/* Validación slug */}
             {nuevoNombre.trim() && (
               <p className="mt-2 text-sm">
                 {checking ? (
@@ -185,7 +188,8 @@ export default function ConfigModalLite({ negocioId, slug, onClose }: Props) {
           </div>
 
           {/* Servicios */}
-          <PanelServiciosLite negocioId={negocioId} />
+          {/* 🔄 Pasamos handleRefresh para que se recargue cuando guarde */}
+          <PanelServiciosLite negocioId={negocioId} onSaved={handleRefresh} />
 
           {/* Flecha */}
           {mostrarFlecha && (

@@ -8,6 +8,7 @@ import PapeleraIcon from "../../assets/papelera-svg.svg?url";
 
 type Props = {
   negocioId: string;
+  onSaved?: () => void; // 👈 nueva prop opcional
 };
 
 type Servicio = {

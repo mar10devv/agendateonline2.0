@@ -176,7 +176,16 @@ const plantillaNormalizada = tipoNegocio
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, ""); // quita acentos
 
-      await setDoc(
+// 👇 Configuración base de agenda (del paso 2)
+const configuracionBase = {
+  diasLibres,
+  modoTurnos,
+  subModoJornada,
+  clientesPorDia,
+  horasSeparacion,
+};
+
+await setDoc(
   doc(db, "Negocios", user.uid),
   {
     nombre,
@@ -185,24 +194,29 @@ const plantillaNormalizada = tipoNegocio
     tipoNegocio,
     slug,
     urlPersonal: `http://localhost:4321/agenda/${slug}`,
-    plantilla: plantillaNormalizada, // ✅ tipo de negocio normalizado
+    plantilla: plantillaNormalizada,
     ownerUid: user.uid,
     plan: planSeleccionado,
     premium: true,
     tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
     fechaRegistro: new Date().toISOString(),
 
-    // 👇 Configuración de agenda (del paso 2)
-    configuracionAgenda: {
-      diasLibres,
-      modoTurnos,
-      subModoJornada,
-      clientesPorDia,
-      horasSeparacion,
-    },
+    // 🔹 Configuración general
+    configuracionAgenda: configuracionBase,
+
+    // 🔹 Duplicado inicial para empleados
+    empleados: 1,
+    empleadosData: [
+      {
+        nombre: user.displayName || nombre || "Empleado 1",
+        fotoPerfil: user.photoURL || "",
+        calendario: configuracionBase,
+      },
+    ],
   },
   { merge: true }
 );
+
 
 await setDoc(
   doc(db, "Usuarios", user.uid),
@@ -402,34 +416,36 @@ await setDoc(
               </div>
               {/* Si selecciona minutos */}
               {subModoJornada === "minutos" && (
-                <div className="grid grid-cols-2 gap-2">
-                  {[20, 30, 40, 50].map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setHorasSeparacion(m / 60)}
-                      className={`p-2 rounded ${
-                        horasSeparacion === m / 60 ? "bg-green-600 text-white" : "bg-gray-200"
-                      }`}
-                    >
-                      {m} min
-                    </button>
-                  ))}
-                </div>
-              )}
+  <div className="grid grid-cols-2 gap-2">
+    {[20, 30, 40, 50].map((m) => (
+      <button
+        key={m}
+        onClick={() => setHorasSeparacion(m)}   // 👈 ahora guarda 20, 30, 40...
+        className={`p-2 rounded ${
+          horasSeparacion === m ? "bg-green-600 text-white" : "bg-gray-200"
+        }`}
+      >
+        {m} min
+      </button>
+    ))}
+  </div>
+)}
+
               {/* Si selecciona horas */}
               {subModoJornada === "horas" && (
-                <div className="flex gap-2">
-                  <input
-  type="number"
-  min={1}
-  max={8}
-  value={horasSeparacion ?? ""}   // 👈 fallback
-  onChange={(e) => setHorasSeparacion(parseInt(e.target.value))}
-  className="w-full p-2 border rounded"
-/>
-                  <span className="self-center">horas</span>
-                </div>
-              )}
+  <div className="flex gap-2">
+    <input
+      type="number"
+      min={1}
+      max={8}
+      value={horasSeparacion ? horasSeparacion / 60 : ""} // 👈 dividir para mostrar en horas
+      onChange={(e) => setHorasSeparacion(parseInt(e.target.value) * 60)} // 👈 guardar en minutos
+      className="w-full p-2 border rounded"
+    />
+    <span className="self-center">horas</span>
+  </div>
+)}
+
             </div>
           )}
           {/* Configuración Personalizado */}

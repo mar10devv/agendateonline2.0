@@ -26,7 +26,7 @@ export default function PanelModalHorarios({ negocioId, onClose }: Props) {
     cargarDatos();
   }, [negocioId]);
 
-  // 💾 Guardar sin borrar el resto de la configuración
+  // 💾 Guardar horarios en negocio y empleados
   const handleSave = async () => {
     if (!horaInicio || !horaFin) {
       alert("Debes seleccionar hora de inicio y hora de fin");
@@ -36,18 +36,41 @@ export default function PanelModalHorarios({ negocioId, onClose }: Props) {
     try {
       const negocioRef = doc(db, "Negocios", negocioId);
       const snap = await getDoc(negocioRef);
-      const oldCfg = snap.exists() ? snap.data().configuracionAgenda || {} : {};
+      if (!snap.exists()) return;
 
-      await updateDoc(negocioRef, {
-        configuracionAgenda: {
-          ...oldCfg,           // 👈 mantiene clientesPorDia, modoTurnos, etc.
+      const data = snap.data();
+      const oldCfg = data.configuracionAgenda || {};
+      const empleadosData = data.empleadosData || [];
+
+      // 🔄 actualizar configuracionAgenda
+      const nuevaConfig = {
+        ...oldCfg,
+        inicio: horaInicio,
+        fin: horaFin,
+      };
+
+      // 🔄 actualizar cada empleado
+      const nuevosEmpleados = empleadosData.map((emp: any) => ({
+        ...emp,
+        calendario: {
+          ...(emp.calendario || {}),
           inicio: horaInicio,
           fin: horaFin,
         },
+      }));
+
+      await updateDoc(negocioRef, {
+        configuracionAgenda: nuevaConfig,
+        empleadosData: nuevosEmpleados,
       });
 
-      console.log("✅ Horarios guardados correctamente");
+      console.log("✅ Horarios guardados correctamente en negocio y empleados");
+
+      // 👇 cerrar modal y refrescar ventana
       onClose();
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
       console.error("❌ Error al guardar horarios:", err);
     }
