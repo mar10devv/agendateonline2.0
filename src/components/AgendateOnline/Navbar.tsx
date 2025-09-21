@@ -70,15 +70,30 @@ export default function Navbar() {
     signOut(auth).catch((e) => console.error("[Navbar] signOut error:", e));
   };
 
-  // 🔹 Links dinámicos para menú
-  const linksMenu: ClienteLink[] = [...baseLinks];
-  if (tipoPremium === "gold") {
-    linksMenu.unshift({ label: "Mi Panel", href: "/panel/paneldecontrol", highlight: true });
-  } else if (tipoPremium === "lite" && slug) {
-    linksMenu.unshift({ label: "Mi Agenda", href: `/agenda/${slug}`, highlight: true });
-  } else {
-    linksMenu.unshift({ label: "Mis turnos", href: "/usuarios/usuario-agenda", highlight: true });
-  }
+// 🔹 Links dinámicos para menú
+const linksMenu: ClienteLink[] = [
+  { label: "Mis turnos", href: "/usuarios/usuario-agenda", highlight: true },
+  ...baseLinks,
+];
+
+// Si es premium gold → aparece primero
+if (tipoPremium === "gold") {
+  linksMenu.unshift({
+    label: "Mi Panel",
+    href: "/panel/paneldecontrol",
+    highlight: true,
+  });
+}
+
+// Si es premium lite → aparece después de "Mis turnos"
+if (tipoPremium === "lite" && slug) {
+  linksMenu.splice(1, 0, {
+    label: "Mi Agenda",
+    href: `/agenda/${slug}`,
+    highlight: true,
+  });
+}
+
 
   return (
     <>

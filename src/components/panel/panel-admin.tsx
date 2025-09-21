@@ -552,51 +552,51 @@ const usuariosFiltrados = usuarios.filter((u) => {
               {loadingCodigos ? (
   <p className="text-gray-600">Cargando códigos...</p>
 ) : (
-  <table className="w-full text-sm border">
-    <thead className="bg-gray-100">
-      <tr>
-        <th className="p-2 border">Código</th>
-        <th className="p-2 border">Estado</th>
-        <th className="p-2 border">Usado por</th>
-        <th className="p-2 border">Fecha</th>
-        <th className="p-2 border">Acciones</th> {/* 👈 nueva columna */}
-      </tr>
-    </thead>
-    <tbody>
-      {codigos.map((c) => (
-  <tr key={c.id} className="text-center">
-    <td className="p-2 border font-mono">{c.codigo}</td>
-    <td className="p-2 border">
-      {c.usado
-        ? "❌ Usado"
-        : c.valido
-        ? "✅ Disponible"
-        : "⚠️ Inválido"}
-    </td>
-    <td className="p-2 border">
-      {c.usadoPor ? (c.slugUsado || "Sin slug") : "-"}
-    </td>
-    <td className="p-2 border">
-      {c.fechaCreacion?.toDate
-        ? c.fechaCreacion.toDate().toLocaleString()
-        : "-"}
-    </td>
-    <td className="p-2 border">
-      <button
-  onClick={() => eliminarCodigo(c.id, c.usadoPor || undefined)}
-  className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
->
-  Borrar
-</button>
-
-
-    </td>
-  </tr>
-))}
-
-    </tbody>
-  </table>
+  <div className="overflow-x-auto">
+    <table className="min-w-max w-full text-sm border">
+      <thead className="bg-gray-100">
+        <tr>
+          <th className="p-2 border">Código</th>
+          <th className="p-2 border">Estado</th>
+          <th className="p-2 border">Usado por</th>
+          <th className="p-2 border">Fecha</th>
+          <th className="p-2 border">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {codigos.map((c) => (
+          <tr key={c.id} className="text-center">
+            <td className="p-2 border font-mono">{c.codigo}</td>
+            <td className="p-2 border">
+              {c.usado
+                ? "❌ Usado"
+                : c.valido
+                ? "✅ Disponible"
+                : "⚠️ Inválido"}
+            </td>
+            <td className="p-2 border">
+              {c.usadoPor ? (c.slugUsado || "Sin slug") : "-"}
+            </td>
+            <td className="p-2 border">
+              {c.fechaCreacion?.toDate
+                ? c.fechaCreacion.toDate().toLocaleString()
+                : "-"}
+            </td>
+            <td className="p-2 border">
+              <button
+                onClick={() => eliminarCodigo(c.id, c.usadoPor || undefined)}
+                className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+              >
+                Borrar
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
 )}
+
 
             </div>
           )}
