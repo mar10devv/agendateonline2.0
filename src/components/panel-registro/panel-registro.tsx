@@ -657,7 +657,7 @@ if (tieneNegocio === null) {
           </h2>
           {planSeleccionado === "agenda" && slugGenerado ? (
             <a
-              href={`https://agendateonline2.netlify.app//agenda/${slugGenerado}`}
+              href={`https://agendateonline.com/agenda/${slugGenerado}`}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
             >
               Ver mi agenda
