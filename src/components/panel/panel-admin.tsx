@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
+
 type Usuario = {
   id: string;
   nombre?: string;
@@ -91,16 +92,42 @@ const [filtro, setFiltro] = useState<"todos" | "gratis" | "lite" | "gold">("todo
     }
   };
 
+// 🔹 Borra un negocio con sus subcolecciones + el usuario
+async function eliminarNegocioConSubcolecciones(uid: string) {
+  try {
+    const negocioRef = doc(db, "Negocios", uid);
+
+    // 1️⃣ Borrar Turnos
+    const turnosSnap = await getDocs(collection(negocioRef, "Turnos"));
+    for (const t of turnosSnap.docs) {
+      await deleteDoc(t.ref);
+    }
+
+    // 2️⃣ Borrar Precios
+    const preciosSnap = await getDocs(collection(negocioRef, "Precios"));
+    for (const p of preciosSnap.docs) {
+      await deleteDoc(p.ref);
+    }
+
+    // 3️⃣ Borrar el documento principal del negocio
+    await deleteDoc(negocioRef);
+
+    // 4️⃣ Borrar también el documento del usuario
+    await deleteDoc(doc(db, "Usuarios", uid));
+
+    console.log(`✅ Negocio ${uid}, sus turnos, precios y usuario eliminados.`);
+  } catch (err) {
+    console.error("❌ Error al borrar negocio completo:", err);
+  }
+}
+
 // 🔹 Eliminar código + negocio + usuario si corresponde
 const eliminarCodigo = async (codigoId: string, userId?: string) => {
-  if (!window.confirm("⚠️ Esta acción eliminará el código y, si existe, también el negocio y el usuario asociado. ¿Estás seguro?")) return;
+  if (!window.confirm("⚠️ Esta acción eliminará el código y, si existe, también el negocio, sus turnos/precios y el usuario asociado. ¿Estás seguro?")) return;
 
   try {
     if (userId) {
-      // Si el código ya fue usado: borrar negocio + usuario
-      await deleteDoc(doc(db, "Negocios", userId));
-      await deleteDoc(doc(db, "Usuarios", userId));
-      console.log(`Negocio y usuario con UID ${userId} eliminados`);
+      await eliminarNegocioConSubcolecciones(userId);
     }
 
     // Siempre borramos el código premium
@@ -113,6 +140,7 @@ const eliminarCodigo = async (codigoId: string, userId?: string) => {
     alert("❌ No se pudo eliminar todo correctamente. Revisa la consola.");
   }
 };
+
 
 // 🔹 Cargar códigos desde Firestore con slug del negocio y ordenados por fecha
 const cargarCodigos = async () => {

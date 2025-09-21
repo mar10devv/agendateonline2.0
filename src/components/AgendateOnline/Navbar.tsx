@@ -31,32 +31,63 @@ export default function Navbar() {
   ]);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      setCheckingAuth(false);
-      if (u) {
-        try {
-          const userSnap = await getDoc(doc(db, "Usuarios", u.uid));
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            setTipoPremium(data?.tipoPremium || null);
+ useEffect(() => {
+  // 1️⃣ Leer cache local al inicio
+  const cachedPremium = localStorage.getItem("tipoPremium");
+  const cachedSlug = localStorage.getItem("slug");
 
-            const negocioSnap = await getDoc(doc(db, "Negocios", u.uid));
-            if (negocioSnap.exists()) {
-              setSlug(negocioSnap.data()?.slug || null);
+  if (cachedPremium) setTipoPremium(cachedPremium as "lite" | "gold");
+  if (cachedSlug) setSlug(cachedSlug);
+
+  // 2️⃣ Suscribirse a cambios de auth
+  const unsub = onAuthStateChanged(auth, async (u) => {
+    setUser(u);
+    setCheckingAuth(false);
+
+    if (u) {
+      try {
+        const userSnap = await getDoc(doc(db, "Usuarios", u.uid));
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          const premium = data?.tipoPremium || null;
+          setTipoPremium(premium);
+
+          // Guardar en cache
+          if (premium) {
+            localStorage.setItem("tipoPremium", premium);
+          } else {
+            localStorage.removeItem("tipoPremium");
+          }
+
+          const negocioSnap = await getDoc(doc(db, "Negocios", u.uid));
+          if (negocioSnap.exists()) {
+            const newSlug = negocioSnap.data()?.slug || null;
+            setSlug(newSlug);
+
+            // Guardar en cache
+            if (newSlug) {
+              localStorage.setItem("slug", newSlug);
+            } else {
+              localStorage.removeItem("slug");
             }
           }
-        } catch (err) {
-          console.error("❌ Error al leer Firestore:", err);
         }
-      } else {
-        setTipoPremium(null);
-        setSlug(null);
+      } catch (err) {
+        console.error("❌ Error al leer Firestore:", err);
       }
-    });
-    return () => unsub();
-  }, []);
+    } else {
+      setTipoPremium(null);
+      setSlug(null);
+
+      // Limpiar cache
+      localStorage.removeItem("tipoPremium");
+      localStorage.removeItem("slug");
+    }
+  });
+
+  return () => unsub();
+}, []);
+
 
   const handleLogin = async () => {
     try {
