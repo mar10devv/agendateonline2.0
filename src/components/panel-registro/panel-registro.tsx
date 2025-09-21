@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { db, auth, googleProvider } from "../../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -16,14 +16,19 @@ function normalizarTexto(texto: string) {
 }
 
 // 🔑 Base desde email (antes del @)
-function baseDesdeEmail(email: string, nombre?: string) {
-  if (!email) return normalizarTexto(nombre || "usuario");
+function baseDesdeEmail(email: string) {
+  if (!email) return "usuario";
   return normalizarTexto(email.split("@")[0]);
 }
 
+
 // 🔑 Generar slug único en Firestore
 async function generarSlugUnico(nombre: string, email: string) {
-  const base = baseDesdeEmail(email, nombre);
+  // ahora primero usa "nombre", y si no existe usa email
+  const base = nombre
+    ? normalizarTexto(nombre)
+    : baseDesdeEmail(email);
+
   let slug = base;
 
   let existe = true;
@@ -42,8 +47,30 @@ async function generarSlugUnico(nombre: string, email: string) {
   return slug;
 }
 
+
 export default function PanelRegistro() {
   const [paso, setPaso] = useState(1);
+
+  // 👉 control de acceso
+const [tieneNegocio, setTieneNegocio] = useState<boolean | null>(null);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const negocioSnap = await getDoc(doc(db, "Negocios", user.uid));
+      if (negocioSnap.exists()) {
+        setTieneNegocio(true); // ✅ ya tiene negocio
+      } else {
+        setTieneNegocio(false); // ✅ no tiene negocio
+      }
+    } else {
+      setTieneNegocio(null); // ✅ no está logueado
+    }
+    setLoading(false);
+  });
+  return () => unsub();
+}, []);
 
   // Paso 1
   const [nombre, setNombre] = useState("");
@@ -201,6 +228,9 @@ await setDoc(
     tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
     fechaRegistro: new Date().toISOString(),
 
+    // 👇 Guardar la key de registro
+    codigoRegistro: codigo,
+
     // 🔹 Configuración general
     configuracionAgenda: configuracionBase,
 
@@ -226,6 +256,7 @@ await setDoc(
     rol: "negocio",
     premium: true,
     tipoPremium: planSeleccionado === "agenda" ? "lite" : "gold",
+    codigoRegistro: codigo,
   },
   { merge: true }
 );
@@ -256,6 +287,28 @@ await setDoc(
     );
   };
 
+  // ✅ chequeos de acceso
+if (loading) {
+  return <div className="text-center py-10">⏳ Cargando...</div>;
+}
+
+if (tieneNegocio === true) {
+  return (
+    <div className="text-center py-10 text-red-600 font-semibold">
+      🚫 Ya tienes tu negocio registrado
+    </div>
+  );
+}
+
+if (tieneNegocio === null) {
+  return (
+    <div className="text-center py-10 text-gray-700">
+      🔑 Debes iniciar sesión para registrar tu negocio
+    </div>
+  );
+}
+
+
   return (
     <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-lg">
       {/* Paso 1 */}
@@ -266,7 +319,7 @@ await setDoc(
           <div className="relative mb-3">
             <input
               type="text"
-              placeholder="Nombre del negocio (slug)"
+              placeholder="Nombre del negocio"
               value={nombre}
               onChange={(e) => setNombre(e.target.value.replace(/\s+/g, ""))}
               onBlur={() => setTouched((prev) => ({ ...prev, nombre: true }))}

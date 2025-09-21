@@ -10,6 +10,7 @@ import {
   where,
   setDoc,
   serverTimestamp,
+   deleteDoc, 
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -29,6 +30,10 @@ type Negocio = {
   slug?: string;
   urlPersonal?: string;
   plantilla?: string;
+  telefono?: string;
+  emailContacto?: string;
+  nombre?: string;
+  tipoPremium?: string;
 };
 
 export default function PanelAdmin() {
@@ -42,6 +47,10 @@ export default function PanelAdmin() {
 
   // 👉 nueva tab
   const [activeTab, setActiveTab] = useState<"usuarios" | "codigos">("usuarios");
+  
+  // 🔹 Filtro de usuarios
+const [filtro, setFiltro] = useState<"todos" | "gratis" | "lite" | "gold">("todos");
+
 
   // 👉 estados para codigos premium
   const [codigos, setCodigos] = useState<any[]>([]);
@@ -82,18 +91,77 @@ export default function PanelAdmin() {
     }
   };
 
-  // 🔹 Cargar códigos desde Firestore
-  const cargarCodigos = async () => {
-    setLoadingCodigos(true);
-    try {
-      const snap = await getDocs(collection(db, "CodigosPremium"));
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setCodigos(data);
-    } catch (err) {
-      console.error("Error cargando códigos:", err);
+// 🔹 Eliminar código + negocio + usuario si corresponde
+const eliminarCodigo = async (codigoId: string, userId?: string) => {
+  if (!window.confirm("⚠️ Esta acción eliminará el código y, si existe, también el negocio y el usuario asociado. ¿Estás seguro?")) return;
+
+  try {
+    if (userId) {
+      // Si el código ya fue usado: borrar negocio + usuario
+      await deleteDoc(doc(db, "Negocios", userId));
+      await deleteDoc(doc(db, "Usuarios", userId));
+      console.log(`Negocio y usuario con UID ${userId} eliminados`);
     }
-    setLoadingCodigos(false);
-  };
+
+    // Siempre borramos el código premium
+    await deleteDoc(doc(db, "CodigosPremium", codigoId));
+
+    alert("✅ Código eliminado correctamente.");
+    cargarCodigos(); // refresca la tabla
+  } catch (err) {
+    console.error("Error eliminando:", err);
+    alert("❌ No se pudo eliminar todo correctamente. Revisa la consola.");
+  }
+};
+
+// 🔹 Cargar códigos desde Firestore con slug del negocio y ordenados por fecha
+const cargarCodigos = async () => {
+  setLoadingCodigos(true);
+  try {
+    const snap = await getDocs(collection(db, "CodigosPremium"));
+
+    let data = await Promise.all(
+      snap.docs.map(async (d) => {
+        const codigoData = d.data();
+        let slug = null;
+
+        // 👇 si ya fue usado, buscamos el slug en Negocios
+        if (codigoData.usadoPor) {
+          const negocioRef = doc(db, "Negocios", codigoData.usadoPor);
+          const negocioSnap = await getDoc(negocioRef);
+          if (negocioSnap.exists()) {
+            slug = negocioSnap.data().slug;
+          }
+        }
+
+        return {
+          id: d.id,
+          ...codigoData,
+          slugUsado: slug,
+        };
+      })
+    );
+
+    // 👉 Ordenar por fechaCreacion (nuevos arriba)
+data.sort((a: any, b: any) => {
+  const fechaA = a.fechaCreacion?.toDate
+    ? a.fechaCreacion.toDate().getTime()
+    : 0;
+  const fechaB = b.fechaCreacion?.toDate
+    ? b.fechaCreacion.toDate().getTime()
+    : 0;
+  return fechaB - fechaA; // descendente → más nuevos primero
+});
+
+
+    setCodigos(data);
+  } catch (err) {
+    console.error("Error cargando códigos:", err);
+  }
+  setLoadingCodigos(false);
+};
+
+
 
   // 🔑 Normaliza string
   function normalizarTexto(texto: string) {
@@ -294,6 +362,16 @@ export default function PanelAdmin() {
     }
   };
 
+  // 🔹 Aplica el filtro sobre los usuarios
+const usuariosFiltrados = usuarios.filter((u) => {
+  if (filtro === "todos") return true;
+  if (filtro === "gratis") return !u.premium;
+  if (filtro === "lite") return u.tipoPremium === "lite";
+  if (filtro === "gold") return u.tipoPremium === "gold";
+  return true;
+});
+
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-700">
@@ -319,35 +397,81 @@ export default function PanelAdmin() {
           <h1 className="text-xl md:text-2xl font-bold">Panel de Administración</h1>
         </div>
 
-        {/* 🔹 Tabs */}
-        <div className="flex border-b bg-gray-50">
-          <button
-            onClick={() => setActiveTab("usuarios")}
-            className={`flex-1 py-3 text-center font-medium ${
-              activeTab === "usuarios"
-                ? "text-blue-600 border-b-2 border-blue-600 bg-white"
-                : "text-gray-600 hover:text-blue-600"
-            }`}
-          >
-            Usuarios
-          </button>
-          <button
-            onClick={() => setActiveTab("codigos")}
-            className={`flex-1 py-3 text-center font-medium ${
-              activeTab === "codigos"
-                ? "text-blue-600 border-b-2 border-blue-600 bg-white"
-                : "text-gray-600 hover:text-blue-600"
-            }`}
-          >
-            Códigos Premium
-          </button>
-        </div>
+        {/* 🔹 Tabs principales */}
+<div className="flex border-b bg-gray-50">
+  <button
+    onClick={() => setActiveTab("usuarios")}
+    className={`flex-1 py-3 text-center font-medium ${
+      activeTab === "usuarios"
+        ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+        : "text-gray-600 hover:text-blue-600"
+    }`}
+  >
+    Usuarios
+  </button>
+  <button
+    onClick={() => setActiveTab("codigos")}
+    className={`flex-1 py-3 text-center font-medium ${
+      activeTab === "codigos"
+        ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+        : "text-gray-600 hover:text-blue-600"
+    }`}
+  >
+    Códigos Premium
+  </button>
+</div>
+
+{/* 🔹 Sub-filtros solo si está en usuarios */}
+{activeTab === "usuarios" && (
+  <div className="flex border-b bg-gray-100">
+    <button
+      onClick={() => setFiltro("todos")}
+      className={`flex-1 py-2 text-center text-sm font-medium ${
+        filtro === "todos"
+          ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+          : "text-gray-600 hover:text-blue-600"
+      }`}
+    >
+      Todos
+    </button>
+    <button
+      onClick={() => setFiltro("gratis")}
+      className={`flex-1 py-2 text-center text-sm font-medium ${
+        filtro === "gratis"
+          ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+          : "text-gray-600 hover:text-blue-600"
+      }`}
+    >
+      Gratis
+    </button>
+    <button
+      onClick={() => setFiltro("lite")}
+      className={`flex-1 py-2 text-center text-sm font-medium ${
+        filtro === "lite"
+          ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+          : "text-gray-600 hover:text-blue-600"
+      }`}
+    >
+      Premium Lite
+    </button>
+    <button
+      onClick={() => setFiltro("gold")}
+      className={`flex-1 py-2 text-center text-sm font-medium ${
+        filtro === "gold"
+          ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+          : "text-gray-600 hover:text-blue-600"
+      }`}
+    >
+      Premium Gold
+    </button>
+  </div>
+)}
 
         {/* 🔹 Contenido de cada tab */}
         <div className="p-6">
           {activeTab === "usuarios" && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-              {usuarios.map((u) => {
+              {usuariosFiltrados.map((u) => {
                 const foto =
                   u.fotoPerfil && u.fotoPerfil.trim() !== ""
                     ? u.fotoPerfil
@@ -358,44 +482,59 @@ export default function PanelAdmin() {
                       )}&background=random`;
 
                 return (
-                  <div
-                    key={u.id}
-                    onClick={() => setUsuarioSeleccionado(u)}
-                    className="w-full h-52 bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-center text-gray-700 hover:scale-105 transition cursor-pointer p-3"
-                  >
-                    <img
-                      src={foto}
-                      alt={u.nombre || "Usuario"}
-                      className="w-16 h-16 rounded-full mb-3 border-2 border-gray-300 object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="font-semibold">
-                      {u.nombre || "Sin nombre"}
-                    </span>
-                    <span className="text-xs opacity-70 truncate w-full max-w-[120px]">
-                      {u.email}
-                    </span>
-                    <span
-                      className={`mt-2 px-2 py-1 text-xs rounded ${
-                        !u.premium
-                          ? "bg-gray-300"
-                          : u.tipoPremium === "gold"
-                          ? "bg-green-500 text-white"
-                          : u.tipoPremium === "lite"
-                          ? "bg-yellow-500 text-white"
-                          : "bg-blue-400 text-white"
-                      }`}
-                    >
-                      {!u.premium
-                        ? "Gratis"
-                        : u.tipoPremium === "gold"
-                        ? "Premium Gold"
-                        : u.tipoPremium === "lite"
-                        ? "Premium Lite"
-                        : "Premium"}
-                    </span>
-                  </div>
-                );
+  <div
+    key={u.id}
+    onClick={async () => {
+      setUsuarioSeleccionado(u);
+
+      try {
+        const negocioSnap = await getDoc(doc(db, "Negocios", u.id));
+        if (negocioSnap.exists()) {
+          setNegocioSeleccionado(negocioSnap.data() as Negocio);
+        } else {
+          setNegocioSeleccionado(null);
+        }
+      } catch (err) {
+        console.error("Error cargando negocio:", err);
+        setNegocioSeleccionado(null);
+      }
+    }}
+    className="w-full h-52 bg-gray-100 rounded-xl shadow-2xl flex flex-col items-center justify-center text-center text-gray-700 hover:scale-105 transition cursor-pointer p-3"
+  >
+    <img
+      src={foto}
+      alt={u.nombre || "Usuario"}
+      className="w-16 h-16 rounded-full mb-3 border-2 border-gray-300 object-cover"
+      referrerPolicy="no-referrer"
+    />
+    <span className="font-semibold">
+      {u.nombre || "Sin nombre"}
+    </span>
+    <span className="text-xs opacity-70 truncate w-full max-w-[120px]">
+      {u.email}
+    </span>
+    <span
+      className={`mt-2 px-2 py-1 text-xs rounded ${
+        !u.premium
+          ? "bg-gray-300"
+          : u.tipoPremium === "gold"
+          ? "bg-green-500 text-white"
+          : u.tipoPremium === "lite"
+          ? "bg-yellow-500 text-white"
+          : "bg-blue-400 text-white"
+      }`}
+    >
+      {!u.premium
+        ? "Gratis"
+        : u.tipoPremium === "gold"
+        ? "Premium Gold"
+        : u.tipoPremium === "lite"
+        ? "Premium Lite"
+        : "Premium"}
+    </span>
+  </div>
+);
+
               })}
             </div>
           )}
@@ -411,155 +550,177 @@ export default function PanelAdmin() {
               </button>
 
               {loadingCodigos ? (
-                <p className="text-gray-600">Cargando códigos...</p>
-              ) : (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2 border">Código</th>
-                      <th className="p-2 border">Estado</th>
-                      <th className="p-2 border">Usado por</th>
-                      <th className="p-2 border">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-  {codigos.map((c) => (
-    <tr key={c.id} className="text-center">
-      <td className="p-2 border font-mono">{c.codigo}</td>
-      <td className="p-2 border">
-        {c.usado
-          ? "❌ Usado"
-          : c.valido
-          ? "✅ Disponible"
-          : "⚠️ Inválido"}
-      </td>
-      <td className="p-2 border">
-        {c.usadoPor
-          ? typeof c.usadoPor === "object"
-            ? c.usadoPor.email || c.usadoPor.nombre || c.usadoPor.uid || "-"
-            : c.usadoPor
-          : "-"}
-      </td>
-      <td className="p-2 border">
-        {c.fechaCreacion?.toDate
-          ? c.fechaCreacion.toDate().toLocaleString()
-          : "-"}
-      </td>
-    </tr>
-  ))}
-</tbody>
+  <p className="text-gray-600">Cargando códigos...</p>
+) : (
+  <table className="w-full text-sm border">
+    <thead className="bg-gray-100">
+      <tr>
+        <th className="p-2 border">Código</th>
+        <th className="p-2 border">Estado</th>
+        <th className="p-2 border">Usado por</th>
+        <th className="p-2 border">Fecha</th>
+        <th className="p-2 border">Acciones</th> {/* 👈 nueva columna */}
+      </tr>
+    </thead>
+    <tbody>
+      {codigos.map((c) => (
+  <tr key={c.id} className="text-center">
+    <td className="p-2 border font-mono">{c.codigo}</td>
+    <td className="p-2 border">
+      {c.usado
+        ? "❌ Usado"
+        : c.valido
+        ? "✅ Disponible"
+        : "⚠️ Inválido"}
+    </td>
+    <td className="p-2 border">
+      {c.usadoPor ? (c.slugUsado || "Sin slug") : "-"}
+    </td>
+    <td className="p-2 border">
+      {c.fechaCreacion?.toDate
+        ? c.fechaCreacion.toDate().toLocaleString()
+        : "-"}
+    </td>
+    <td className="p-2 border">
+      <button
+  onClick={() => eliminarCodigo(c.id, c.usadoPor || undefined)}
+  className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+>
+  Borrar
+</button>
 
-                </table>
-              )}
+
+    </td>
+  </tr>
+))}
+
+    </tbody>
+  </table>
+)}
+
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal configuración usuario */}
       {usuarioSeleccionado && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-[90%] max-w-md relative">
-            <button
-              onClick={() => setUsuarioSeleccionado(null)}
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-bold mb-4">
-              Configuración de {usuarioSeleccionado.nombre}
-            </h2>
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-xl p-6 w-[90%] max-w-md relative">
+      <button
+        onClick={() => setUsuarioSeleccionado(null)}
+        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+      >
+        ✕
+      </button>
 
-            {negocioSeleccionado?.slug && (
-              <p className="mb-4 text-sm text-blue-600 break-all">
-                URL actual:{" "}
-                <a
-                  href={`https://agendateonline.com/${negocioSeleccionado.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  https://agendateonline.com/{negocioSeleccionado.slug}
-                </a>
-              </p>
-            )}
+      <h2 className="text-xl font-bold mb-4">
+        Configuración de {usuarioSeleccionado.nombre}
+      </h2>
 
-            {/* Toggle Premium */}
-            <div className="mb-4">
-              <p className="font-medium mb-2">Estado Premium:</p>
-              <label className="relative inline-block w-[3.5em] h-[2em]">
-                <input
-                  type="checkbox"
-                  checked={usuarioSeleccionado.premium}
-                  onChange={() =>
-                    actualizarPremium(
-                      usuarioSeleccionado.id,
-                      !usuarioSeleccionado.premium
-                    )
-                  }
-                  className="opacity-0 w-0 h-0 peer"
-                />
-                <span
-                  className="
-                    absolute cursor-pointer top-0 left-0 right-0 bottom-0
-                    bg-gray-300 rounded-full transition-colors duration-300
-                    peer-checked:bg-green-500
-                    after:content-[''] after:absolute after:h-[1.4em] after:w-[1.4em]
-                    after:rounded-full after:left-[0.3em] after:top-[0.3em]
-                    after:bg-white after:shadow-md after:transition-transform after:duration-300
-                    peer-checked:after:translate-x-[1.5em]
-                  "
-                ></span>
-              </label>
-            </div>
+      {/* Datos del usuario */}
+<div className="mb-4 text-sm text-gray-700 space-y-2">
+  <p><strong>📧 Correo:</strong> {usuarioSeleccionado.email}</p>
+  <p><strong>🏷️ Slug:</strong> {negocioSeleccionado?.slug || "Sin negocio"}</p>
+  <p><strong>📞 Teléfono:</strong> {negocioSeleccionado?.telefono || "No registrado"}</p>
 
-            {/* Tipo Premium */}
-            {usuarioSeleccionado.premium && (
-              <div className="mb-4">
-                <p className="font-medium mb-2">Tipo de Premium:</p>
-                <select
-                  value={usuarioSeleccionado.tipoPremium || ""}
-                  onChange={(e) =>
-                    actualizarTipoPremium(usuarioSeleccionado.id, e.target.value)
-                  }
-                  className="border rounded px-2 py-1 mt-2 w-full"
-                >
-                  <option value="">-- Seleccionar --</option>
-                  <option value="gold">Premium Gold</option>
-                  <option value="lite">Premium Lite</option>
-                </select>
-              </div>
-            )}
+  {negocioSeleccionado?.slug && (
+    <p>
+      <strong>🌐 URL:</strong>{" "}
+      <a
+        href={
+          negocioSeleccionado?.tipoPremium === "lite"
+            ? `https://agendateonline.com/agenda/${negocioSeleccionado.slug}`
+            : `https://agendateonline.com/${negocioSeleccionado.slug}`
+        }
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-600 underline break-all"
+      >
+        {negocioSeleccionado?.tipoPremium === "lite"
+          ? `https://agendateonline.com/agenda/${negocioSeleccionado.slug}`
+          : `https://agendateonline.com/${negocioSeleccionado.slug}`}
+      </a>
+    </p>
+  )}
+</div>
 
-            {/* Plantilla */}
-            <div className="mb-4">
-              <p className="font-medium">Plantilla:</p>
-              <select
-                value={usuarioSeleccionado.plantilla || ""}
-                onChange={(e) => asignarPlantilla(usuarioSeleccionado.id, e.target.value)}
-                className="border rounded px-2 py-1 mt-2 w-full"
-              >
-                <option value="">-- Seleccionar --</option>
-                {plantillasDisponibles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            {/* Estadísticas */}
-            <button
-              onClick={() =>
-                (window.location.href = `/panel/panel-estadisticas?user=${usuarioSeleccionado.id}`)
-              }
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-            >
-              Ver estadísticas
-            </button>
-          </div>
+      {/* Toggle Premium */}
+      <div className="mb-4">
+        <p className="font-medium mb-2">Estado Premium:</p>
+        <label className="relative inline-block w-[3.5em] h-[2em]">
+          <input
+            type="checkbox"
+            checked={usuarioSeleccionado.premium}
+            onChange={() =>
+              actualizarPremium(
+                usuarioSeleccionado.id,
+                !usuarioSeleccionado.premium
+              )
+            }
+            className="opacity-0 w-0 h-0 peer"
+          />
+          <span
+            className="
+              absolute cursor-pointer top-0 left-0 right-0 bottom-0
+              bg-gray-300 rounded-full transition-colors duration-300
+              peer-checked:bg-green-500
+              after:content-[''] after:absolute after:h-[1.4em] after:w-[1.4em]
+              after:rounded-full after:left-[0.3em] after:top-[0.3em]
+              after:bg-white after:shadow-md after:transition-transform after:duration-300
+              peer-checked:after:translate-x-[1.5em]
+            "
+          ></span>
+        </label>
+      </div>
+
+      {/* Tipo Premium */}
+      {usuarioSeleccionado.premium && (
+        <div className="mb-4">
+          <p className="font-medium mb-2">Tipo de Premium:</p>
+          <select
+            value={usuarioSeleccionado.tipoPremium || ""}
+            onChange={(e) =>
+              actualizarTipoPremium(usuarioSeleccionado.id, e.target.value)
+            }
+            className="border rounded px-2 py-1 mt-2 w-full"
+          >
+            <option value="">-- Seleccionar --</option>
+            <option value="gold">Premium Gold</option>
+            <option value="lite">Premium Lite</option>
+          </select>
         </div>
       )}
+
+      {/* Plantilla */}
+      <div className="mb-4">
+        <p className="font-medium">Plantilla:</p>
+        <select
+          value={usuarioSeleccionado.plantilla || ""}
+          onChange={(e) => asignarPlantilla(usuarioSeleccionado.id, e.target.value)}
+          className="border rounded px-2 py-1 mt-2 w-full"
+        >
+          <option value="">-- Seleccionar --</option>
+          {plantillasDisponibles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Botón estadísticas con SVG */}
+      <button
+        onClick={() => alert("📊 Estadísticas próximamente...")}
+        className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+      >
+        <img src="/src/assets/estadisticas-svg.svg" alt="estadísticas" className="w-5 h-5" />
+        Ver estadísticas
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
