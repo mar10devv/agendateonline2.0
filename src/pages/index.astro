@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import NavBar from "../components/AgendateOnline/Navbar.tsx";
 import HeroInicio from "../components/AgendateOnline/HeroInicio.tsx";
+import AgendateOnlineInfo from "../components/AgendateOnline/agendateOnlineInfo";
 
 const { title = "AgéndateOnline" } = Astro.props;
 ---
@@ -14,6 +15,7 @@ const { title = "AgéndateOnline" } = Astro.props;
   <body class="bg-neutral-50 text-neutral-900">
     <NavBar client:load />
 <HeroInicio client:load />
+<AgendateOnlineInfo client:load />
 <slot />
     
   </body>
