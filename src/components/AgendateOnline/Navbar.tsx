@@ -233,15 +233,37 @@ if (tipoPremium === "lite" && slug) {
         </div>
       </header>
 
-      {/* Mobile sidebar */}
+
+{/* Mobile sidebar */}
 {mobileOpen && (
-  <div className="fixed inset-0 z-[9999] flex justify-end">
+  <div className="fixed inset-0 z-[10001] flex justify-end">
     <div
       className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn"
       onClick={() => setMobileOpen(false)}
     />
     <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
       <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
+        
+        {/* Botón hamburguesa/X animado dentro del sidebar */}
+        <label className="hamburger cursor-pointer absolute top-3 right-3">
+          <input
+            type="checkbox"
+            checked={mobileOpen}              // 👉 sincronizado con el estado
+            onChange={() => setMobileOpen(false)} // 👉 al clic cierra sidebar
+            className="hidden"
+          />
+          <svg
+            viewBox="0 0 32 32"
+            className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
+          >
+            <path
+              className="line line-top-bottom stroke-white"
+              d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
+            />
+            <path className="line stroke-white" d="M7 16 27 16" />
+          </svg>
+        </label>
+
         {user ? (
           <div className="flex items-center gap-3 animate-fadeIn delay-150">
             <img
@@ -321,14 +343,14 @@ if (tipoPremium === "lite" && slug) {
             )}
 
             {!tipoPremium && (
-              <a
-                href="/usuarios/usuario-agenda"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-              >
-                <img src={agendaIcon} alt="Mi Agenda" className="w-5 h-5" />
-                Mi Agenda
-              </a>
-            )}
+  <a
+    href="/registro"
+    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 animate-fadeIn delay-300"
+  >
+    Obtener mi agenda
+  </a>
+)}
+
 
             {/* Admin extra */}
             {isAdmin && (
