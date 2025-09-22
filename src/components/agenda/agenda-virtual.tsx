@@ -17,8 +17,9 @@ import PanelEmpleadosLite from "../panel-lite/panel-empleados";
 import AgendarTurnoLite from "./agendar-turno-lite";
 import ConfigModalLite from "../panel-lite/panel-modal";
 
-// SVG de configuración
+// SVGs de configuración y link
 import ConfigIcon from "../../assets/config-svg.svg?url";
+import LinkIcon from "../../assets/link-svg.svg?url";
 
 type Props = {
   negocioId: string; // viene del uid del negocio
@@ -109,12 +110,15 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
     return () => unsub();
   }, [negocioId]);
 
-  // 🔹 Actualizar título de la pestaña cuando cambia el slug
-  useEffect(() => {
-    if (slug) {
-      document.title = slug; // 👈 ahora solo muestra el slug
-    }
-  }, [slug]);
+ // 🔹 Actualizar título de la pestaña cuando cambia el slug
+useEffect(() => {
+  if (slug) {
+    // Capitalizar primera letra y mantener el resto como estaba
+    const titulo = slug.charAt(0).toUpperCase() + slug.slice(1);
+    document.title = titulo;
+  }
+}, [slug]);
+
 
   // Loader
   if (estado === "cargando") {
@@ -172,27 +176,46 @@ export default function AgendaVirtual({ negocioId, empleados }: Props) {
       <>
         <div className="w-full p-6 md:p-10 flex justify-center">
           <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+
             {/* Cabecera */}
-            <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
-              <h1 className="text-xl md:text-2xl font-bold">
-  Agenda de {slug.charAt(0).toUpperCase() + slug.slice(1)}
-</h1>
+<div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+  <h1 className="text-xl md:text-2xl font-bold">
+    Agenda de {slug.charAt(0).toUpperCase() + slug.slice(1)}
+  </h1>
 
+  {/* Botones lado derecho */}
+  <div className="flex items-center gap-2">
+    {/* Botón Link */}
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(`${window.location.origin}/agenda/${slug}`);
+        alert("🔗 Link de tu agenda copiado al portapapeles");
+      }}
+      className="p-2 rounded-full hover:bg-indigo-700 transition"
+    >
+      <img
+        src={LinkIcon}
+        alt="Compartir enlace"
+        className="w-6 h-6 filter invert"
+      />
+    </button>
 
-              {/* Botón config visible solo para el dueño */}
-              {esDuenio && (
-                <button
-                  onClick={() => setShowConfig(true)}
-                  className="ml-4 p-2 rounded-full hover:bg-indigo-700 transition"
-                >
-                  <img
-                    src={ConfigIcon}
-                    alt="configuración"
-                    className="w-6 h-6 filter invert"
-                  />
-                </button>
-              )}
-            </div>
+    {/* Botón config visible solo para el dueño */}
+    {esDuenio && (
+      <button
+        onClick={() => setShowConfig(true)}
+        className="p-2 rounded-full hover:bg-indigo-700 transition"
+      >
+        <img
+          src={ConfigIcon}
+          alt="configuración"
+          className="w-6 h-6 filter invert"
+        />
+      </button>
+    )}
+  </div>
+</div>
+
 
             {/* Tabs */}
             <div className="flex border-b bg-gray-50">
