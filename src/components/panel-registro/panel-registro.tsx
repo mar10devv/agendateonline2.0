@@ -2,9 +2,16 @@ import { useState, useEffect } from "react";
 import { db, auth, googleProvider } from "../../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
+import Loader from "../ui/loaders";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+type LoaderProps = {
+  mensaje?: string;
+  color?: string;      // 👉 ahora sí existe
+  textColor?: string;  // 👉 ahora sí existe
+};
 
 // 🔑 Normaliza string
 function normalizarTexto(texto: string) {
@@ -287,10 +294,19 @@ await setDoc(
     );
   };
 
-  // ✅ chequeos de acceso
+{/* Loarder de cargando */}
 if (loading) {
-  return <div className="text-center py-10">⏳ Cargando...</div>;
+  return (
+    <div className="flex justify-center items-center py-10">
+      <Loader
+        mensaje="Cargando datos..."
+        textColor="text-white"
+        circleColor="#ffffff"   // ✅ hex en lugar de bg-white
+      />
+    </div>
+  );
 }
+
 
 if (tieneNegocio === true) {
   return (
