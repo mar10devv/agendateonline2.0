@@ -1,8 +1,14 @@
 ---
-import Layout from "../../layouts/Layout.astro";
 import AgendaUsuarioo from "../../components/Usuarios/AgendaDelUsuario";
 ---
 
-<Layout title="Mi Agenda">
-  <AgendaUsuarioo client:load />
-</Layout>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mi Agenda</title>
+  </head>
+  <body class="min-h-screen">
+    <AgendaUsuarioo client:load />
+  </body>
+</html>

@@ -17,6 +17,8 @@ import CalendarioIcon from "../../assets/calendario-svg.svg?url";
 import RelojIcon from "../../assets/reloj-svg.svg?url";
 import PapeleraIcon from "../../assets/papelera-svg.svg?url";
 import EditarIcon from "../../assets/editar-svg.svg?url";
+import AgendaIcon from "../../assets/agenda-svg.svg?url";
+
 
 type Turno = {
   id: string;
@@ -93,20 +95,28 @@ export default function AgendaUsuario() {
   };
 
   return (
-    <section className="py-10 px-6">
-      <h2 className="text-2xl font-bold mb-6">📅 Mi Agenda</h2>
+  <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-600 flex justify-center items-start">
+    <section className="w-full max-w-5xl py-10 px-6">
+
+      {/* Título en blanco con icono SVG */}
+<h2 className="flex items-center gap-2 text-2xl font-bold mb-6 text-white">
+  <img src={AgendaIcon} alt="Agenda" className="w-7 h-7 invert brightness-0" />
+  Mi Agenda
+</h2>
+
+
 
       {cargando ? (
-        <p className="text-gray-600">Cargando tus turnos...</p>
+        <p className="text-white/90">Cargando tus turnos...</p>
       ) : turnos.length === 0 ? (
-        <p className="text-gray-600">No tienes turnos reservados.</p>
+        <p className="text-white/90">No has reservado turnos.</p>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-  {turnos.map((t) => (
-    <li
-      key={t.id}
-      className="relative border rounded-xl p-5 bg-white shadow-md hover:shadow-lg transition"
-    >
+          {turnos.map((t) => (
+            <li
+              key={t.id}
+              className="relative border rounded-xl p-5 bg-white shadow-md hover:shadow-lg transition"
+            >
               {/* Botón more */}
               <button
                 className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100"
@@ -170,5 +180,7 @@ export default function AgendaUsuario() {
         </ul>
       )}
     </section>
-  );
+  </div>
+);
 }
+

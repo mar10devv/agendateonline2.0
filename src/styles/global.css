@@ -192,3 +192,36 @@
   stroke-dasharray: 20 300;
   stroke-dashoffset: -32.42;
 }
+
+
+@layer utilities {
+  @keyframes tabActive {
+    from {
+      background-color: #70c489;
+      color: white;
+    }
+    to {
+      background-color: #e8e8e8;
+      color: black;
+      font-weight: 600;
+    }
+  }
+  .animate-tabActive {
+    animation: tabActive 0.15s forwards;
+  }
+
+  @keyframes contentFade {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-contentFade {
+    animation: contentFade 0.3s ease-in-out;
+  }
+}
+

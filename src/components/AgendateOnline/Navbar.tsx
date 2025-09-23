@@ -344,7 +344,7 @@ if (tipoPremium === "lite" && slug) {
 
             {!tipoPremium && (
   <a
-    href="/registro"
+    href="/panel/panel-registro"
     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 animate-fadeIn delay-300"
   >
     Obtener mi agenda
