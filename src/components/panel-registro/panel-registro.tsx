@@ -3,6 +3,8 @@ import { db, auth, googleProvider } from "../../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { signInWithPopup, onAuthStateChanged } from "firebase/auth";
 import Loader from "../ui/loaders";
+import FormRegisterEmpresa from "../ui/form-registerEmpresa";
+import FormRegisterEmpresa2 from "../ui/form-registerEmpresa2";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -328,217 +330,42 @@ if (tieneNegocio === null) {
   return (
     <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-lg">
       {/* Paso 1 */}
-      {paso === 1 && (
-        <>
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">Registro de Negocio</h2>
-          {/* Nombre */}
-          <div className="relative mb-3">
-            <input
-              type="text"
-              placeholder="Nombre del negocio"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value.replace(/\s+/g, ""))}
-              onBlur={() => setTouched((prev) => ({ ...prev, nombre: true }))}
-              className="w-full p-2 border rounded pr-8"
-              required
-            />
-            <div className="absolute top-2 right-2">{renderIcon("nombre", nombreValido)}</div>
-          </div>
-          {/* Email */}
-          <div className="relative mb-3">
-            <input
-              type="email"
-              placeholder="Correo electrónico"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
-              className="w-full p-2 border rounded pr-8"
-              required
-            />
-            <div className="absolute top-2 right-2">{renderIcon("email", emailValido)}</div>
-          </div>
-          {/* Teléfono */}
-          <div className="relative mb-3">
-            <input
-              type="tel"
-              placeholder="Número de teléfono"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              onBlur={() => setTouched((prev) => ({ ...prev, telefono: true }))}
-              className="w-full p-2 border rounded pr-8"
-              required
-            />
-            <div className="absolute top-2 right-2">{renderIcon("telefono", telefonoValido)}</div>
-          </div>
-          {/* Tipo de negocio */}
-          <div className="relative mb-4">
-            <select
-              value={tipoNegocio}
-              onChange={(e) => setTipoNegocio(e.target.value)}
-              onBlur={() => setTouched((prev) => ({ ...prev, tipo: true }))}
-              className="w-full p-2 border rounded pr-8"
-              required
-            >
-              <option value="">Selecciona tipo de negocio</option>
-              {tiposDeNegocio.map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {tipo}
-                </option>
-              ))}
-            </select>
-            <div className="absolute top-2 right-2">{renderIcon("tipo", tipoValido)}</div>
-          </div>
-          <button
-            onClick={handleNext}
-            disabled={!formularioValido}
-            className={`w-full p-2 rounded text-white ${
-              formularioValido
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-          >
-            Siguiente
-          </button>
-        </>
-      )}
+{paso === 1 && (
+  <FormRegisterEmpresa
+    valoresIniciales={{
+      nombreEmpresa: nombre,
+      correo: email,
+      telefono: telefono,
+      tipoNegocio: tipoNegocio,
+    }}
+    onSubmit={(valores) => {
+      setNombre(valores.nombreEmpresa || "");
+      setEmail(valores.correo || "");
+      setTelefono(valores.telefono || "");
+      setTipoNegocio(valores.tipoNegocio || "");
 
+      // 👉 si el form ya estaba válido (botón azul),
+      // avanzamos directo al paso 2
+      setPaso(2);
+    }}
+  />
+)}
       {/* Paso 2 */}
-      {paso === 2 && (
-        <>
-          <h2 className="text-2xl font-bold mb-4 text-gray-800">Configura tu agenda</h2>
-          {/* Selección de días libres */}
-          <div className="mb-6">
-            <h3 className="block font-medium mb-2">Elegir días libres</h3>
-            <button
-              onClick={() => setMostrarDias(!mostrarDias)}
-              className="w-full py-2 mb-2 rounded text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              {mostrarDias ? "Ocultar días" : "Ver días"}
-            </button>
-            {mostrarDias && (
-              <div className="grid grid-cols-2 gap-2">
-                {diasSemana.map((dia) => (
-                  <button
-                    key={dia}
-                    type="button"
-                    onClick={() => toggleDia(dia)}
-                    className={`p-2 rounded border ${
-                      diasLibres.includes(dia)
-                        ? "bg-green-600 text-white"
-                        : "bg-gray-200 text-gray-800"
-                    }`}
-                  >
-                    {dia}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* Modo de turnos */}
-          <div className="mb-6">
-            <label className="block font-medium mb-2">¿Cómo quieres manejar tus turnos?</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setModoTurnos("jornada");
-                  setSubModoJornada(null);
-                }}
-                className={`flex-1 py-2 rounded ${
-                  modoTurnos === "jornada" ? "bg-blue-600 text-white" : "bg-gray-200"
-                }`}
-              >
-                Jornada 8h
-              </button>
-              <button
-                onClick={() => setModoTurnos("personalizado")}
-                className={`flex-1 py-2 rounded ${
-                  modoTurnos === "personalizado" ? "bg-blue-600 text-white" : "bg-gray-200"
-                }`}
-              >
-                Personalizado
-              </button>
-            </div>
-          </div>
-          {/* Configuración Jornada */}
-          {modoTurnos === "jornada" && (
-            <div className="mb-6">
-              <label className="block font-medium mb-2">
-                ¿Cuánto tiempo demora en atender un cliente?
-              </label>
-              <div className="flex gap-2 mb-3">
-                <button
-                  onClick={() => setSubModoJornada("minutos")}
-                  className={`flex-1 py-2 rounded ${
-                    subModoJornada === "minutos" ? "bg-indigo-600 text-white" : "bg-gray-200"
-                  }`}
-                >
-                  Minutos
-                </button>
-                <button
-                  onClick={() => setSubModoJornada("horas")}
-                  className={`flex-1 py-2 rounded ${
-                    subModoJornada === "horas" ? "bg-indigo-600 text-white" : "bg-gray-200"
-                  }`}
-                >
-                  Horas
-                </button>
-              </div>
-              {/* Si selecciona minutos */}
-              {subModoJornada === "minutos" && (
-  <div className="grid grid-cols-2 gap-2">
-    {[20, 30, 40, 50].map((m) => (
-      <button
-        key={m}
-        onClick={() => setHorasSeparacion(m)}   // 👈 ahora guarda 20, 30, 40...
-        className={`p-2 rounded ${
-          horasSeparacion === m ? "bg-green-600 text-white" : "bg-gray-200"
-        }`}
-      >
-        {m} min
-      </button>
-    ))}
-  </div>
-)}
+{paso === 2 && (
+  <FormRegisterEmpresa2
+    onSubmit={(valores) => {
+      // guardamos en los estados locales lo que venga del form
+      setDiasLibres(valores.diasLibres);
+      setModoTurnos(valores.modoTurnos || "jornada");
+      setSubModoJornada(valores.subModoJornada || null);
+      setHorasSeparacion(valores.horasSeparacion ?? null);
+      setClientesPorDia(valores.clientesPorDia ?? null);
 
-              {/* Si selecciona horas */}
-              {subModoJornada === "horas" && (
-  <div className="flex gap-2">
-    <input
-      type="number"
-      min={1}
-      max={8}
-      value={horasSeparacion ? horasSeparacion / 60 : ""} // 👈 dividir para mostrar en horas
-      onChange={(e) => setHorasSeparacion(parseInt(e.target.value) * 60)} // 👈 guardar en minutos
-      className="w-full p-2 border rounded"
-    />
-    <span className="self-center">horas</span>
-  </div>
+      // cuando el form se valide pasa al paso 3
+      setPaso(3);
+    }}
+  />
 )}
-
-            </div>
-          )}
-          {/* Configuración Personalizado */}
-          {modoTurnos === "personalizado" && (
-            <div className="mb-6">
-              <label className="block font-medium mb-2">Clientes por día</label>
-              <input
-  type="number"
-  min={4}
-  max={10}
-  value={clientesPorDia ?? ""}   // 👈 fallback
-  onChange={(e) => setClientesPorDia(parseInt(e.target.value))}
-  className="w-full p-2 border rounded"
-/>
-            </div>
-          )}
-          <button
-            onClick={handleFinalizar}
-            className="w-full bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700"
-          >
-            Continuar a precios
-          </button>
-        </>
-      )}
 
       {/* Paso 3 */}
       {paso === 3 && (
@@ -668,7 +495,7 @@ if (tieneNegocio === null) {
       {/* Paso 5 */}
       {paso === 5 && (
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-green-600 mb-4">
+          <h2 className="text-2xl font-bold text-blue-600 mb-4">
             🎉 Tu empresa fue validada con éxito
           </h2>
           {planSeleccionado === "agenda" && slugGenerado ? (
