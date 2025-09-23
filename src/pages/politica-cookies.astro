@@ -1,0 +1,75 @@
+---
+const title = "Política de Cookies - AgéndateOnline";
+const description = "Leé cómo AgéndateOnline utiliza cookies para mejorar tu experiencia de navegación, analizar el uso de la plataforma y ofrecerte un servicio personalizado.";
+const url = "https://www.agendateonline.com/politica-cookies";
+const image = "https://www.agendateonline.com/preview2.jpg"; // misma imagen de tu OG
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO básico -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={image} />
+    <meta property="og:site_name" content="AgéndateOnline" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+
+    <!-- Indexable -->
+    <meta name="robots" content="index, follow" />
+  </head>
+  <body class="min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-sans leading-relaxed flex items-center justify-center">
+  <main class="max-w-3xl px-6 py-12 bg-white/10 backdrop-blur-md rounded-lg shadow-lg text-center">
+
+      <h1 class="text-3xl font-bold mb-6">Política de Cookies</h1>
+      <p class="mb-4">
+        En <strong>AgéndateOnline</strong> utilizamos cookies para mejorar tu experiencia de navegación,
+        analizar el uso de nuestra plataforma y ofrecerte un servicio más personalizado.
+      </p>
+
+      <h2 class="text-xl font-semibold mt-8 mb-2">¿Qué son las cookies?</h2>
+      <p class="mb-4">
+        Las cookies son pequeños archivos de texto que se almacenan en tu dispositivo cuando visitás un sitio web.
+        Sirven para recordar tus preferencias, mejorar el rendimiento y facilitar ciertas funcionalidades.
+      </p>
+
+      <h2 class="text-xl font-semibold mt-8 mb-2">Tipos de cookies que usamos</h2>
+      <ul class="list-disc list-inside space-y-2 mb-4">
+        <li><strong>Cookies necesarias:</strong> esenciales para el funcionamiento de la plataforma (ejemplo: mantener tu sesión iniciada).</li>
+        <li><strong>Cookies de rendimiento:</strong> nos ayudan a entender cómo usás el sitio para mejorar la experiencia.</li>
+        <li><strong>Cookies de personalización:</strong> guardan tus preferencias (ejemplo: idioma o configuraciones).</li>
+      </ul>
+
+      <h2 class="text-xl font-semibold mt-8 mb-2">Cómo gestionar las cookies</h2>
+      <p class="mb-4">
+        Podés aceptar o rechazar las cookies desde nuestro banner, o bien configurar tu navegador
+        para bloquearlas o eliminarlas en cualquier momento.
+      </p>
+
+      <h2 class="text-xl font-semibold mt-8 mb-2">Más información</h2>
+      <p class="mb-4">
+        Para cualquier consulta sobre el uso de cookies en nuestra plataforma, podés contactarnos a 
+        <a href="mailto:soporte@agendateonline.com" class="underline text-yellow-300 hover:text-yellow-200">
+          soporte@agendateonline.com
+        </a>.
+      </p>
+
+      <p class="mt-8 text-sm opacity-80">
+        Última actualización: {new Date().toLocaleDateString("es-ES")}
+      </p>
+    </main>
+  </body>
+</html>

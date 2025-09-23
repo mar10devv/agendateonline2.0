@@ -3,6 +3,7 @@ import "../styles/global.css";
 import NavBar from "../components/AgendateOnline/Navbar.tsx";
 import HeroInicio from "../components/AgendateOnline/HeroInicio.tsx";
 import AgendateOnlineInfo from "../components/AgendateOnline/agendateOnlineInfo";
+import CookieCard from "../components/ui/cookieCard";
 
 // Props para SEO (pueden sobreescribirse desde cada página si hace falta)
 const {
@@ -38,6 +39,7 @@ const {
     <NavBar client:load />
     <HeroInicio client:load />
     <AgendateOnlineInfo client:load />
+    <CookieCard client:load />
     <slot />
   </body>
 </html>
