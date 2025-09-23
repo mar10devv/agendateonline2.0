@@ -4,19 +4,39 @@ import NavBar from "../components/AgendateOnline/Navbar.tsx";
 import HeroInicio from "../components/AgendateOnline/HeroInicio.tsx";
 import AgendateOnlineInfo from "../components/AgendateOnline/agendateOnlineInfo";
 
-const { title = "AgéndateOnline" } = Astro.props;
+// Props para SEO (podés sobreescribir desde cada página si querés)
+const {
+  title = "AgéndateOnline - Reservá turnos fácil 🚀",
+  description = "Tus clientes reservan sus turnos online y vos ganás tiempo ⏰. Agenda gratis para barberías, peluquerías, spa, dentistas y más.",
+  image = "https://www.agendateonline.com/preview2.jpg",
+  url = "https://www.agendateonline.com"
+} = Astro.props;
 ---
+
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" /> <!-- 👈 FALTA -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- ✅ Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={image} />
+
+    <!-- ✅ Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
   </head>
   <body class="bg-neutral-50 text-neutral-900">
     <NavBar client:load />
-<HeroInicio client:load />
-<AgendateOnlineInfo client:load />
-<slot />
-    
+    <HeroInicio client:load />
+    <AgendateOnlineInfo client:load />
+    <slot />
   </body>
 </html>
