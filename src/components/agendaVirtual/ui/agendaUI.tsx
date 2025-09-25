@@ -111,78 +111,92 @@ export default function AgendaVirtualUI({
 
   return (
     <div className="w-full min-h-screen bg-neutral-900 text-white">
+
       {/* Banner */}
-      <div className="hidden md:flex justify-center">
-        <div className="w-[70%] h-80 relative rounded-b-2xl overflow-hidden">
-          <img
-            src={negocio.bannerUrl || logo || "/banner-default.jpg"}
-            alt={negocio.nombre}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      </div>
+<div className="hidden md:flex justify-center">
+  <div className="w-[70%] h-80 relative rounded-b-2xl overflow-hidden">
+    <img
+      src={
+        logo // 👈 estado actualizado al subir foto
+          ? logo
+          : negocio.bannerUrl
+          ? negocio.bannerUrl
+          : negocio.perfilLogo
+          ? negocio.perfilLogo
+          : "/banner-default.webp"
+      }
+      alt={negocio.nombre}
+      className="w-full h-full object-cover"
+    />
+  </div>
+</div>
+
 
       {/* Contenido */}
       <div className="relative md:-mt-16 px-4 pb-10">
         <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Columna derecha (perfil) */}
-          <div className="order-1 mt-8 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg">
-            {/* Logo negocio */}
-            <div className="mt-8 relative">
-              {logo ? (
-                <img
-                  src={logo}
-                  alt="Logo negocio"
-                  className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-white"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold mb-4 border-4 border-black">
-                  {negocio.nombre.charAt(0)}
-                </div>
-              )}
+<div className="order-1 mt-8 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg">
+  {/* Logo negocio */}
+  <div className="mt-8 relative w-24 h-24">
+    {logo ? (
+      <img
+        src={logo}
+        alt="Logo negocio"
+        className="w-24 h-24 rounded-full object-cover border-4 border-white"
+      />
+    ) : (
+      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+        {negocio.nombre.charAt(0)}
+      </div>
+    )}
 
-              {modo === "dueño" && (
-                <>
-                  <label
-                    htmlFor="upload-logo"
-                    className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
-                  >
-                    +
-                  </label>
-                  <input
-                    id="upload-logo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </>
-              )}
+    {/* Botón para subir logo */}
+    {modo === "dueño" && (
+      <>
+        <label
+          htmlFor="upload-logo"
+          className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
+        >
+          +
+        </label>
+        <input
+          id="upload-logo"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </>
+    )}
 
-              {subiendo && (
-                <p className="absolute -bottom-5 text-xs text-gray-400">
-                  Subiendo...
-                </p>
-              )}
-            </div>
+    {/* Loader overlay */}
+    {subiendo && (
+      <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full">
+        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )}
+  </div>
 
-            <h3 className="text-lg font-semibold">
-              {modo === "dueño" && usuario?.nombre
-                ? usuario.nombre
-                : negocio.nombre}
-            </h3>
+  {/* Nombre negocio / usuario */}
+  <h3 className="text-lg font-semibold mt-4">
+    {modo === "dueño" && usuario?.nombre ? usuario.nombre : negocio.nombre}
+  </h3>
 
-            {modo === "cliente" && (
-              <button className="mt-4 bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-gray-200">
-                Reservar
-              </button>
-            )}
+  {/* Botón reservar para clientes */}
+  {modo === "cliente" && (
+    <button className="mt-4 bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-gray-200">
+      Reservar
+    </button>
+  )}
 
-            <div className="mt-6 text-xs text-gray-400 space-y-2">
-              {negocio.direccion && <p>📍 {negocio.direccion}</p>}
-              <p className="underline cursor-pointer">Contactar</p>
-            </div>
-          </div>
+  {/* Dirección / contacto */}
+  <div className="mt-6 text-xs text-gray-400 space-y-2">
+    {negocio.direccion && <p>📍 {negocio.direccion}</p>}
+    <p className="underline cursor-pointer">Contactar</p>
+  </div>
+</div> {/* 👈 cierre correcto de la columna derecha */}
+
 
           {/* Columna izquierda -> servicios y empleados */}
           <div className="order-2 md:order-1 md:col-span-2 space-y-8">
