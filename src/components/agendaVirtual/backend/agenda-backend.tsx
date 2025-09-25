@@ -1,41 +1,23 @@
-
-// BACK END SRC/COMPONENTS/AGENDAVIRTUAL/AGENDA-BACKEND.TS
+// src/components/agendaVirtual/backend/agenda-backend.ts
 import {
   getAuth,
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  type User,
 } from "firebase/auth";
 import {
   doc,
-  getDoc,
   collection,
   query,
   where,
   getDocs,
+  updateDoc,
+  addDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
-export type Negocio = {
-  id?: string; // 🔹 agregamos opcionalmente el id del doc
-  nombre: string;
-  slug: string;
-  direccion?: string;
-  ownerUid: string;
-  tipoPremium?: "gratis" | "lite" | "gold";
-  logoUrl?: string;
-  bannerUrl?: string;
-  empleadosData?: Empleado[];
-};
-
-export type Empleado = {
-  id?: string;
-  nombre: string;
-  foto?: string;
-  especialidad?: string;
-};
-
+// 🔒 Tipos
 export type Turno = {
   id: string;
   cliente: string;
@@ -48,67 +30,195 @@ export type Turno = {
   uidCliente?: string;
 };
 
-// 🔹 Obtener negocio por slug
-export async function getNegocio(slug: string): Promise<Negocio | null> {
-  const q = query(collection(db, "Negocios"), where("slug", "==", slug));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Negocio;
-}
+export type Empleado = {
+  nombre: string;
+  foto?: string;
+  especialidad?: string;
+  calendario?: any;
+};
 
-// 🔹 Detectar usuario logueado y rol (dueño / cliente)
-export function detectarUsuario(
-  slug: string,
-  callback: (
-    estado: "cargando" | "no-sesion" | "listo",
-    modo: "dueño" | "cliente",
-    user: User | null,
-    negocio: Negocio | null
-  ) => void
-) {
-  const auth = getAuth();
-  callback("cargando", "cliente", null, null);
+export type Servicio = {
+  id?: string;
+  servicio: string; // 👈 consistente con PreciosControlPanel
+  precio: number;
+  duracion: number;
+};
 
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      callback("no-sesion", "cliente", null, null);
-      return;
-    }
+export type Negocio = {
+  nombre: string;
+  direccion: string;
+  slug: string;
+  perfilLogo?: string;
+  bannerUrl?: string;
+  plantilla?: string;
+  tipoPremium?: "gratis" | "lite" | "gold";
+  empleadosData?: Empleado[];
+  servicios?: Servicio[];
+};
 
-    const negocio = await getNegocio(slug);
-    if (!negocio) {
-      callback("listo", "cliente", user, null);
-      return;
-    }
-
-    if (user.uid === negocio.ownerUid) {
-      callback("listo", "dueño", user, negocio);
-    } else {
-      callback("listo", "cliente", user, negocio);
-    }
-  });
-}
-
-// 🔹 Obtener empleados de un negocio
-export async function getEmpleados(slug: string): Promise<Empleado[]> {
-  const negocio = await getNegocio(slug);
-  return negocio?.empleadosData || [];
-}
-
-// 🔹 Obtener turnos de un negocio en una fecha
-export async function getTurnos(slug: string, fecha: string): Promise<Turno[]> {
-  const q = query(
-    collection(db, "Turnos"),
-    where("slugNegocio", "==", slug),
-    where("fecha", "==", fecha)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Turno[];
-}
-
-// 🔹 Login con Google
+// 🔐 Login con Google
 export async function loginConGoogle() {
   const auth = getAuth();
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider);
+}
+
+// 🧠 Detecta usuario y carga negocio + servicios
+export async function detectarUsuario(
+  slug: string,
+  callback: (
+    estado: "cargando" | "listo" | "no-sesion",
+    modo: "dueño" | "cliente",
+    user: any,
+    negocio: Negocio | null
+  ) => void
+) {
+  const auth = getAuth();
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return callback("no-sesion", "cliente", null, null);
+
+    const negocioDocs = await getDocs(
+      query(collection(db, "Negocios"), where("slug", "==", slug))
+    );
+    if (negocioDocs.empty) {
+      return callback("no-sesion", "cliente", user, null);
+    }
+
+    const negocioSnap = negocioDocs.docs[0];
+    const negocioId = negocioSnap.id;
+    const negocioData = negocioSnap.data();
+
+    // 🔹 Obtener servicios desde la subcolección Precios
+    const preciosRef = collection(db, "Negocios", negocioId, "Precios");
+    const preciosSnap = await getDocs(preciosRef);
+    const servicios = preciosSnap.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
+    );
+
+    const negocio: Negocio = {
+      nombre: negocioData.nombre || "",
+      direccion: negocioData.direccion || "",
+      slug: negocioData.slug || "",
+      perfilLogo: negocioData.perfilLogo,
+      bannerUrl: negocioData.bannerUrl,
+      plantilla: negocioData.plantilla,
+      tipoPremium: negocioData.tipoPremium || "gratis",
+      empleadosData: negocioData.empleadosData || [],
+      servicios,
+    };
+
+    const modo = user.uid === negocioId ? "dueño" : "cliente";
+    callback("listo", modo, user, negocio);
+  });
+}
+
+// 👥 Obtener empleados
+export async function getEmpleados(slug: string): Promise<Empleado[]> {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) return [];
+
+  const negocioData = negocioDocs.docs[0].data();
+  const empleadosData = negocioData.empleadosData || [];
+
+  return empleadosData.map((e: any) => ({
+    nombre: e.nombre,
+    foto: e.foto || e.fotoPerfil || "",
+    especialidad: e.especialidad || "",
+    calendario: e.calendario || {},
+  }));
+}
+
+// 📆 Obtener turnos por fecha
+export async function getTurnos(slug: string, fecha: string): Promise<Turno[]> {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) return [];
+
+  const negocioId = negocioDocs.docs[0].id;
+  const turnosRef = collection(db, "Negocios", negocioId, "Turnos");
+  const turnosSnap = await getDocs(turnosRef);
+
+  return turnosSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((t: any) => t.fecha === fecha) as Turno[];
+}
+
+// 🖼️ Subir logo del negocio con ImgBB y guardarlo en perfilLogo
+export async function subirLogoNegocio(file: File): Promise<string> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) throw new Error("No hay usuario autenticado");
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(
+    `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+  if (!data?.data?.display_url) {
+    throw new Error("❌ Error al subir imagen a ImgBB");
+  }
+
+  const url = data.data.display_url;
+
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("ownerUid", "==", user.uid))
+  );
+  if (negocioDocs.empty) {
+    throw new Error("❌ No se encontró negocio para este usuario");
+  }
+
+  const negocioId = negocioDocs.docs[0].id;
+  const negocioRef = doc(db, "Negocios", negocioId);
+
+  await updateDoc(negocioRef, { perfilLogo: url });
+
+  return url;
+}
+
+// ➕ Agregar servicio a la subcolección "Precios"
+export async function agregarServicio(
+  slug: string,
+  servicio: { nombre: string; precio: number; duracion?: number }
+) {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) throw new Error("❌ Negocio no encontrado");
+
+  const negocioId = negocioDocs.docs[0].id;
+  const preciosRef = collection(db, "Negocios", negocioId, "Precios");
+
+  await addDoc(preciosRef, {
+    servicio: servicio.nombre,
+    precio: servicio.precio,
+    duracion: servicio.duracion || 0,
+  });
+}
+
+// 👂 Escuchar servicios en tiempo real
+export async function escucharServicios(
+  slug: string,
+  callback: (servicios: Servicio[]) => void
+) {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) return callback([]);
+
+  const negocioId = negocioDocs.docs[0].id;
+  const preciosRef = collection(db, "Negocios", negocioId, "Precios");
+
+  onSnapshot(preciosRef, (snapshot) => {
+    const servicios = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
+    );
+    callback(servicios);
+  });
 }

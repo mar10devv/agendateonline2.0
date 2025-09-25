@@ -50,19 +50,22 @@ export default function AgendaVirtual() {
     );
   }
 
-  if (estado === "no-sesion") {
-    return (
-      <div className="text-white text-center p-10">
-        <p className="mb-4">Debes iniciar sesión para ver la agenda</p>
+if (estado === "no-sesion") {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-black text-white">
+      <div className="text-center space-y-4">
+        <p className="text-lg font-medium">Debes iniciar sesión para ver la agenda</p>
         <button
           onClick={loginConGoogle}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl transition"
         >
           Iniciar sesión con Google
         </button>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   if (!negocio) {
     return (
