@@ -1,8 +1,13 @@
 ---
-import Prueba from "../components/pruebas";
-
+import TestNegocio from "../components/agendaVirtual/backend/agenda-backend";
 ---
 
-<main class="min-h-screen flex items-center justify-center bg-gray-100">
-  <Prueba client:load />
-</main>
+<html lang="es">
+  <head>
+    <title>Banco de Pruebas</title>
+  </head>
+  <body class="bg-gray-100 text-black p-8">
+    <h1 class="text-3xl font-bold mb-6">Banco de Pruebas 🔍</h1>
+    <TestNegocio client:load />
+  </body>
+</html>
