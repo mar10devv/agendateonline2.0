@@ -65,9 +65,10 @@ export default function ModalAgregarServicios({
     );
   };
 
-  const handleAgregar = () => {
-    setServicios([...servicios, { servicio: "", precio: 0, duracion: 30 }]);
-  };
+const handleAgregar = () => {
+  setServicios([{ servicio: "", precio: 0, duracion: 30 }, ...servicios]);
+};
+
 
   const handleEliminar = async (index: number) => {
     const servicio = servicios[index];

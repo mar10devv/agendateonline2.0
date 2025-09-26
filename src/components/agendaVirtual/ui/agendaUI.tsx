@@ -331,304 +331,136 @@ useEffect(() => {
       
 
       {/* Contenido */}
-      <div className="relative md:-mt-16 px-4 pb-10">
-        <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Columna derecha */}
-<div className="order-1 mt-8 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
-  
-  {/* ⚙️ Tuerca arriba a la derecha */}
-  {modo === "dueño" && (
-    <button
-      onClick={() => alert("Abrir configuración del negocio")}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar negocio"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-  )}
-
-  {/* Logo */}
-  <div className="mt-8 relative w-24 h-24">
-    {logo ? (
-      <img
-        src={logo}
-        alt="Logo negocio"
-        className="w-24 h-24 rounded-full object-cover border-4 border-white"
-      />
-    ) : (
-      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
-        {nombreNegocio.charAt(0)}
-      </div>
-    )}
-
-    {modo === "dueño" && (
-      <>
-        <label
-          htmlFor="upload-logo"
-          className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
-        >
-          +
-        </label>
-        <input
-          id="upload-logo"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </>
-    )}
-
-    {subiendo && (
-      <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-full">
-        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )}
-  </div>
-
-  {/* Nombre negocio editable */}
-  <div className="relative group mt-4">
-    {modo === "dueño" ? (
-      editandoNombre ? (
-        <div className="inline-flex items-center gap-2">
-          <input
-            type="text"
-            value={nuevoNombreNegocio}
-            onChange={(e) => setNuevoNombreNegocio(e.target.value)}
-            className="w-40 text-sm font-medium text-center bg-neutral-700 text-white rounded px-2 py-1"
-            autoFocus
-          />
+<div className="relative md:-mt-16 px-4 pb-10">
+  <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+    
+    {/* Columna derecha */}
+    <div className="order-1 mt-8 md:order-2 flex flex-col gap-6">
+      
+      {/* 🔹 Perfil + redes + descripción */}
+      <div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+        {/* ⚙️ Tuerca */}
+        {modo === "dueño" && (
           <button
-            onClick={handleGuardarNombre}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded px-3 py-1"
+            onClick={() => alert("Abrir configuración del negocio")}
+            className="absolute top-4 right-4"
           >
-            Guardar
+            <img
+              src={ConfigIcon}
+              alt="Configurar negocio"
+              className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+            />
           </button>
+        )}
+
+        {/* Logo */}
+        <div className="mt-8 relative w-24 h-24">
+          {logo ? (
+            <img
+              src={logo}
+              alt="Logo negocio"
+              className="w-24 h-24 rounded-full object-cover border-4 border-white"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+              {nombreNegocio.charAt(0)}
+            </div>
+          )}
+
+          {modo === "dueño" && (
+            <>
+              <label
+                htmlFor="upload-logo"
+                className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
+              >
+                +
+              </label>
+              <input
+                id="upload-logo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </>
+          )}
         </div>
-      ) : (
-        <h3 className="text-lg font-semibold">{nombreNegocio}</h3>
-      )
-    ) : (
-      <h3 className="text-lg font-semibold">{nombreNegocio}</h3>
-    )}
 
-    {modo === "dueño" && !editandoNombre && (
-      <button
-        onClick={() => setEditandoNombre(true)}
-        className="absolute -top-2 -right-6 opacity-0 group-hover:opacity-100 transition"
-      >
-        <img
-          src="/src/assets/editar-svg.svg"
-          alt="Editar"
-          className="w-4 h-4 filter invert"
-        />
-      </button>
-    )}
-  </div>
+        {/* Nombre */}
+        <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>
 
-  {modo === "cliente" && (
-    <button className="mt-4 bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-gray-200">
-      Reservar
-    </button>
-  )}
+        {/* Redes */}
+        <div className="mt-6 flex items-center justify-center gap-4">
+          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-pink-600 transition">
+            <Instagram className="w-4 h-4 text-white" />
+          </a>
+          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-blue-600 transition">
+            <Facebook className="w-4 h-4 text-white" />
+          </a>
+          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-green-600 transition">
+            <Phone className="w-4 h-4 text-white" />
+          </a>
+        </div>
 
-  {/* Dirección + redes */}
-  <div className="mt-6 text-xs text-gray-400 space-y-2 w-full">
-    {negocio.direccion && <p>📍 {negocio.direccion}</p>}
-
-    {/* Redes sociales */}
-    <div className="flex items-center justify-center gap-4 mt-3">
-      <a
-        href="https://instagram.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-pink-600 transition"
-        title="Instagram"
-      >
-        <Instagram className="w-4 h-4 text-white" />
-      </a>
-
-      <a
-        href="https://facebook.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-blue-600 transition"
-        title="Facebook"
-      >
-        <Facebook className="w-4 h-4 text-white" />
-      </a>
-
-      <a
-        href="https://wa.me/59800000000"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-green-600 transition"
-        title="WhatsApp"
-      >
-        <Phone className="w-4 h-4 text-white" />
-      </a>
-    </div>
-  </div>
-
-{/* Descripción editable */}
-<div className="mt-8 w-full px-2">
-  {modo === "dueño" ? (
-    <div className="flex flex-col items-stretch gap-2 w-full">
-      <textarea
-        maxLength={200}
-        rows={4} // 👈 más grande de inicio
-        style={{
-          minHeight: "4rem",
-          overflow: editandoDescripcion ? "auto" : "hidden", // 👈 scroll solo en edición
-        }}
-        placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
-        className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
-          editandoDescripcion ? "bg-neutral-700 rounded p-2" : "bg-transparent"
-        }`}
-        value={nuevaDescripcion}
-        onFocus={() => setEditandoDescripcion(true)}
-        onBlur={() => {
-          if (nuevaDescripcion.trim() === (negocio.descripcion || "")) {
-            setEditandoDescripcion(false);
-          }
-        }}
-        onInput={(e) => {
-          const el = e.target as HTMLTextAreaElement;
-          el.style.height = "auto"; // reset altura
-          el.style.height = el.scrollHeight + "px"; // ajusta al contenido
-          setNuevaDescripcion(el.value);
-        }}
-      />
-      {editandoDescripcion && (
-        <button
-          onClick={handleGuardarDescripcion}
-          disabled={nuevaDescripcion.trim() === (negocio.descripcion || "")}
-          className={`px-4 py-2 rounded font-medium transition ${
-            nuevaDescripcion.trim() === (negocio.descripcion || "")
-              ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white"
-          }`}
-        >
-          Guardar
-        </button>
-      )}
-    </div>
-  ) : (
-    <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
-      {negocio.descripcion || "Este negocio aún no tiene descripción."}
-    </p>
-  )}
-</div>
-
-
-
-{/* 📍 Ubicación */}
-<div className="mt-20 w-full flex flex-col items-center gap-2">
-
-  {/* 👉 Botón inicial si aún no hay ubicación */}
-  {modo === "dueño" && !ubicacion && (
-    <button
-      onClick={handleGuardarUbicacion}
-      disabled={estadoUbicacion === "cargando"}
-      className={`px-4 py-2 rounded-md flex items-center gap-2 transition ${
-        estadoUbicacion === "cargando"
-          ? "bg-gray-600 text-white"
-          : estadoUbicacion === "exito"
-          ? "bg-green-600 text-white"
-          : "bg-indigo-600 hover:bg-indigo-700 text-white"
-      }`}
-    >
-      {estadoUbicacion === "cargando" && (
-        <>
-          <LoaderSpinner size={20} color="white" />
-          Buscando nueva ubicación...
-        </>
-      )}
-      {estadoUbicacion === "exito" && "✅ Se cargó la nueva ubicación"}
-      {estadoUbicacion === "idle" && "Usar mi ubicación actual"}
-    </button>
-  )}
-
-  {ubicacion && (
-    <div className="w-full flex flex-col gap-4">
-      {/* Mapa */}
-      <div className="h-64 rounded-md overflow-hidden border">
-        <MapContainer
-          key={`${ubicacion.lat}-${ubicacion.lng}`}
-          center={[ubicacion.lat, ubicacion.lng]}
-          zoom={16}
-          style={{ width: "100%", height: "100%" }}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap contributors'
-          />
-          <Marker
-            position={[ubicacion.lat, ubicacion.lng]}
-            icon={customIcon}
-            draggable={modo === "dueño"} // 👈 solo dueño puede mover
-            eventHandlers={
-              modo === "dueño"
-                ? {
-                    dragend: async (e) => {
-                      const newPos = e.target.getLatLng();
-                      const direccion = await obtenerDireccion(newPos.lat, newPos.lng);
-
-                      const nuevaUbicacion = {
-                        lat: newPos.lat,
-                        lng: newPos.lng,
-                        direccion,
-                      };
-
-                      await guardarUbicacionNegocio(negocio.slug, nuevaUbicacion);
-                      setUbicacion(nuevaUbicacion);
-                    },
-                  }
-                : {}
-            }
-          >
-            {modo === "dueño" && (
-              <Popup>Mueve el pin si la ubicación no es correcta</Popup>
-            )}
-          </Marker>
-        </MapContainer>
+        {/* Descripción */}
+        <div className="mt-6 w-full px-2">
+          <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
+            {negocio.descripcion || "Este negocio aún no tiene descripción."}
+          </p>
+        </div>
       </div>
+      {/* 🔹 Fin Perfil */}
 
-      {/* 👇 Botón actualizar ubicación */}
-      {modo === "dueño" && (
-        <div className="flex justify-center">
+      {/* 🔹 Ubicación */}
+      <div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+        {!ubicacion && modo === "dueño" && (
           <button
             onClick={handleGuardarUbicacion}
             disabled={estadoUbicacion === "cargando"}
-            className={`px-4 py-2 rounded-md flex items-center gap-2 transition ${
-              estadoUbicacion === "cargando"
-                ? "bg-gray-600 text-white"
-                : estadoUbicacion === "exito"
-                ? "bg-green-600 text-white"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
-            }`}
+            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white"
           >
-            {estadoUbicacion === "cargando" && (
-              <>
-                <LoaderSpinner size={20} color="white" />
-                Buscando nueva ubicación...
-              </>
-            )}
-            {estadoUbicacion === "exito" && "✅ Se cargó la nueva ubicación"}
-            {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+            📍 Usar mi ubicación actual
           </button>
-        </div>
-      )}
-    </div>
-  )}
-</div>
+        )}
 
+        {ubicacion && (
+          <div className="w-full flex flex-col gap-4">
+            <div className="h-64 rounded-md overflow-hidden border">
+              <MapContainer
+                key={`${ubicacion.lat}-${ubicacion.lng}`}
+                center={[ubicacion.lat, ubicacion.lng]}
+                zoom={16}
+                style={{ width: "100%", height: "100%" }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OpenStreetMap contributors'
+                />
+                <Marker
+                  position={[ubicacion.lat, ubicacion.lng]}
+                  icon={customIcon}
+                >
+                  {modo === "dueño" && (
+                    <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+                  )}
+                </Marker>
+              </MapContainer>
+            </div>
 
-</div>
+            {modo === "dueño" && (
+              <button
+                onClick={handleGuardarUbicacion}
+                disabled={estadoUbicacion === "cargando"}
+                className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                📍 Actualizar ubicación
+              </button>
+            )}
+          </div>
+        )}
 
+         </div>
+      </div>
           {/* Columna izquierda -> servicios y empleados */}
           <div className="order-2 md:order-1 md:col-span-2 space-y-8">
             
