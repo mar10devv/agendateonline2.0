@@ -4,16 +4,18 @@ import "animate.css";
 
 type ModalAvisoProps = {
   abierto: boolean;
-  onClose: () => void;
+  onClose: () => void;          // cerrar sin confirmar
+  onConfirm?: () => void;       // confirmar acción (opcional)
   titulo?: string;
-  children: React.ReactNode;
-  animacionEntrada?: string; // ej: "animate__bounceIn"
-  animacionSalida?: string;  // ej: "animate__fadeOut"
+  children: React.ReactNode;    // contenido del modal
+  animacionEntrada?: string;    // ej: "animate__bounceIn"
+  animacionSalida?: string;     // ej: "animate__fadeOut"
 };
 
 const ModalAviso: React.FC<ModalAvisoProps> = ({
   abierto,
   onClose,
+  onConfirm,
   titulo,
   children,
   animacionEntrada = "animate__bounceIn",
@@ -21,6 +23,18 @@ const ModalAviso: React.FC<ModalAvisoProps> = ({
 }) => {
   const [visible, setVisible] = useState(false);
   const [animClass, setAnimClass] = useState("");
+
+  // 🚫 Bloquear scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (abierto) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [abierto]);
 
   useEffect(() => {
     if (abierto) {
@@ -31,7 +45,7 @@ const ModalAviso: React.FC<ModalAvisoProps> = ({
       const timer = setTimeout(() => {
         setVisible(false);
         setAnimClass("");
-      }, 600); // coincide con la duración promedio de Animate.css
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [abierto]);
@@ -39,18 +53,29 @@ const ModalAviso: React.FC<ModalAvisoProps> = ({
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-md">
       <div
-        className={`bg-white rounded-xl shadow-lg w-[90%] max-w-sm p-6 text-center ${animClass}`}
+        className={`bg-neutral-900 text-white rounded-xl shadow-2xl w-[90%] max-w-sm p-6 text-center ${animClass}`}
       >
         {titulo && <h2 className="text-lg font-semibold mb-4">{titulo}</h2>}
-        <div className="mb-6 text-gray-700">{children}</div>
-        <button
-          onClick={onClose}
-          className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
-        >
-          OK
-        </button>
+        <div className="mb-6 text-gray-300">{children}</div>
+
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-lg bg-gray-700 text-gray-200 font-medium hover:bg-gray-600 transition"
+          >
+            Cancelar
+          </button>
+          {onConfirm && (
+            <button
+              onClick={onConfirm}
+              className="px-5 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition"
+            >
+              Eliminar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

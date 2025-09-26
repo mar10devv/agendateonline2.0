@@ -1,6 +1,8 @@
 // src/lib/firebase.ts
 import { getFirestore } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
+import { getStorage } from "firebase/storage";
+
 import {
   getAuth,
   setPersistence,
@@ -23,6 +25,7 @@ console.log("👉 Firebase config cargado en cliente:", firebaseConfig);
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // ✅ Auth
 export const auth = getAuth(app);
@@ -43,6 +46,8 @@ if (typeof window !== "undefined") {
           const registration = await navigator.serviceWorker.register(
             "/firebase-messaging-sw.js"
           );
+
+          
           console.log("✅ Service Worker registrado:", registration);
 
           messaging = getMessaging(app);

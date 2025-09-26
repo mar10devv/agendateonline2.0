@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import ConfigIcon from "../../../assets/config-svg.svg?url";
 import { obtenerDireccion } from "../../../lib/geocoding";
 import { useRef } from "react";
-
+import ModalEmpleadosUI from "./modalEmpleadosUI";
 import { 
   doc, 
   updateDoc, 
@@ -95,6 +95,9 @@ type Props = {
   };
 };
 
+
+
+
 export default function AgendaVirtualUI({
   empleados,
   turnos,
@@ -147,6 +150,7 @@ const handleMouseDown = (e: React.MouseEvent) => {
 // 👇 Estados para descripción
 const [nuevaDescripcion, setNuevaDescripcion] = useState(negocio.descripcion || "");
 const [editandoDescripcion, setEditandoDescripcion] = useState(false);
+const [modalAbierto, setModalAbierto] = useState(false);
 
 
 const handleGuardarUbicacion = () => {
@@ -747,15 +751,13 @@ useEffect(() => {
   )}
 </div>
 
-
-
 {/* Empleados */}
 <div className="bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
   <h2 className="text-lg font-semibold mb-4">Empleados</h2>
-
-  {modo === "dueño" && (
+{modo === "dueño" && (
+  <>
     <button
-      onClick={() => alert("Abrir configuración de empleados")}
+      onClick={() => setModalAbierto(true)}
       className="absolute top-4 right-4"
     >
       <img
@@ -764,7 +766,15 @@ useEffect(() => {
         className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
       />
     </button>
-  )}
+
+    {/* Modal empleados */}
+    <ModalEmpleadosUI
+      abierto={modalAbierto}
+      onCerrar={() => setModalAbierto(false)}
+    />
+  </>
+)}
+
 
   <div className="flex ml-20 gap-6 flex-wrap mt-2">
     {empleados && empleados.length > 0 ? (
