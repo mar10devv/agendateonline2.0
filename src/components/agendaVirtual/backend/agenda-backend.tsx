@@ -31,6 +31,7 @@ export type Turno = {
 };
 
 export type Empleado = {
+  id?: string;
   nombre: string;
   foto?: string;
   especialidad?: string;
@@ -39,7 +40,7 @@ export type Empleado = {
 
 export type Servicio = {
   id?: string;
-  servicio: string; // 👈 consistente con PreciosControlPanel
+  servicio: string;
   precio: number;
   duracion: number;
 };
@@ -54,6 +55,9 @@ export type Negocio = {
   tipoPremium?: "gratis" | "lite" | "gold";
   empleadosData?: Empleado[];
   servicios?: Servicio[];
+  fotoPerfil?: string;           // 👈 foto de un único empleado
+  configuracionAgenda?: any;
+  descripcion?: string;          // 👈 agregado ahora
 };
 
 // 🔐 Login con Google
@@ -95,24 +99,28 @@ export async function detectarUsuario(
       (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
     );
 
-    const negocio: Negocio = {
-      nombre: negocioData.nombre || "",
-      direccion: negocioData.direccion || "",
-      slug: negocioData.slug || "",
-      perfilLogo: negocioData.perfilLogo,
-      bannerUrl: negocioData.bannerUrl,
-      plantilla: negocioData.plantilla,
-      tipoPremium: negocioData.tipoPremium || "gratis",
-      empleadosData: negocioData.empleadosData || [],
-      servicios,
-    };
+const negocio: Negocio = {
+  nombre: negocioData.nombre || "",
+  direccion: negocioData.direccion || "",
+  slug: negocioData.slug || "",
+  perfilLogo: negocioData.perfilLogo,
+  bannerUrl: negocioData.bannerUrl,
+  plantilla: negocioData.plantilla,
+  tipoPremium: negocioData.tipoPremium || "gratis",
+  empleadosData: negocioData.empleadosData || [],
+  servicios,
+  fotoPerfil: negocioData.fotoPerfil || "",
+  configuracionAgenda: negocioData.configuracionAgenda || {},
+  descripcion: negocioData.descripcion || "", // 👈 agregado
+};
+
 
     const modo = user.uid === negocioId ? "dueño" : "cliente";
     callback("listo", modo, user, negocio);
   });
 }
 
-// 👥 Obtener empleados
+// 👥 Obtener empleados (una sola vez)
 export async function getEmpleados(slug: string): Promise<Empleado[]> {
   const negocioDocs = await getDocs(
     query(collection(db, "Negocios"), where("slug", "==", slug))
@@ -120,14 +128,76 @@ export async function getEmpleados(slug: string): Promise<Empleado[]> {
   if (negocioDocs.empty) return [];
 
   const negocioData = negocioDocs.docs[0].data();
-  const empleadosData = negocioData.empleadosData || [];
 
-  return empleadosData.map((e: any) => ({
-    nombre: e.nombre,
-    foto: e.foto || e.fotoPerfil || "",
+// ⚡ Si existe array empleadosData, lo uso
+if (Array.isArray(negocioData.empleadosData) && negocioData.empleadosData.length > 0) {
+  return negocioData.empleadosData.map((e: any) => ({
+    id: e.id || "",
+    nombre: e.nombre || "",
+    foto: e.foto || e.fotoPerfil || "",  // 👈 normalizamos aquí
     especialidad: e.especialidad || "",
     calendario: e.calendario || {},
   }));
+}
+
+
+  // ⚡ Si no hay empleadosData, construyo uno con los campos del negocio
+  return [
+    {
+      id: negocioDocs.docs[0].id,
+      nombre: negocioData.nombre || "Empleado",
+      foto: negocioData.foto || negocioData.fotoPerfil || "",
+      especialidad: negocioData.plantilla || "",
+      calendario: negocioData.configuracionAgenda || {},
+    },
+  ];
+}
+
+// 👂 Escuchar empleados en tiempo real
+export async function escucharEmpleados(
+  slug: string,
+  callback: (empleados: Empleado[]) => void
+): Promise<() => void> {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) {
+    callback([]);
+    return () => {};
+  }
+
+  const negocioId = negocioDocs.docs[0].id;
+  const empleadosRef = collection(db, "Negocios", negocioId, "Empleados");
+
+  const unsubscribe = onSnapshot(empleadosRef, (snapshot) => {
+    if (snapshot.empty) {
+      // ⚡ Si no hay subcolección, devuelvo el único empleado con fotoPerfil
+      const negocioData = negocioDocs.docs[0].data();
+      callback([
+        {
+          id: negocioId,
+          nombre: negocioData.nombre || "Empleado",
+          foto: negocioData.foto || negocioData.fotoPerfil || "",
+          especialidad: negocioData.plantilla || "",
+          calendario: negocioData.configuracionAgenda || {},
+        },
+      ]);
+    } else {
+      const empleados = snapshot.docs.map((doc) => {
+        const data = doc.data() as any;
+        return {
+          id: doc.id,
+          nombre: data.nombre,
+          foto: data.foto || data.fotoPerfil || "",
+          especialidad: data.especialidad || "",
+          calendario: data.calendario || {},
+        } as Empleado;
+      });
+      callback(empleados);
+    }
+  });
+
+  return unsubscribe;
 }
 
 // 📆 Obtener turnos por fecha
@@ -146,7 +216,7 @@ export async function getTurnos(slug: string, fecha: string): Promise<Turno[]> {
     .filter((t: any) => t.fecha === fecha) as Turno[];
 }
 
-// 🖼️ Subir logo del negocio con ImgBB y guardarlo en perfilLogo
+// 🖼️ Subir logo del negocio
 export async function subirLogoNegocio(file: File): Promise<string> {
   const auth = getAuth();
   const user = auth.currentUser;
@@ -182,7 +252,7 @@ export async function subirLogoNegocio(file: File): Promise<string> {
   return url;
 }
 
-// ➕ Agregar servicio a la subcolección "Precios"
+// ➕ Agregar servicio
 export async function agregarServicio(
   slug: string,
   servicio: { nombre: string; precio: number; duracion?: number }
@@ -206,19 +276,73 @@ export async function agregarServicio(
 export async function escucharServicios(
   slug: string,
   callback: (servicios: Servicio[]) => void
-) {
+): Promise<() => void> {
   const negocioDocs = await getDocs(
     query(collection(db, "Negocios"), where("slug", "==", slug))
   );
-  if (negocioDocs.empty) return callback([]);
+  if (negocioDocs.empty) {
+    callback([]);
+    return () => {};
+  }
 
   const negocioId = negocioDocs.docs[0].id;
   const preciosRef = collection(db, "Negocios", negocioId, "Precios");
 
-  onSnapshot(preciosRef, (snapshot) => {
+  const unsubscribe = onSnapshot(preciosRef, (snapshot) => {
     const servicios = snapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
     );
     callback(servicios);
   });
+
+  return unsubscribe;
+}
+
+// ✏️ Actualizar nombre negocio
+export async function actualizarNombreNegocio(
+  slug: string,
+  nuevoNombre: string
+) {
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) throw new Error("❌ Negocio no encontrado");
+
+  const negocioId = negocioDocs.docs[0].id;
+  const negocioRef = doc(db, "Negocios", negocioId);
+  await updateDoc(negocioRef, { nombre: nuevoNombre });
+}
+
+// ✏️ Actualizar nombre + slug
+export async function actualizarNombreYSlug(
+  slugActual: string,
+  nuevoNombre: string
+) {
+  const nuevoSlug = nuevoNombre
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9\-]/g, "");
+
+  const existeSnap = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", nuevoSlug))
+  );
+  if (!existeSnap.empty) {
+    throw new Error("❌ Ya existe un negocio con ese nombre/slug.");
+  }
+
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slugActual))
+  );
+  if (negocioDocs.empty) throw new Error("❌ Negocio no encontrado");
+
+  const negocioId = negocioDocs.docs[0].id;
+  const negocioRef = doc(db, "Negocios", negocioId);
+
+  await updateDoc(negocioRef, {
+    nombre: nuevoNombre,
+    slug: nuevoSlug,
+  });
+
+  return nuevoSlug;
 }
