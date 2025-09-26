@@ -3,6 +3,7 @@ import ConfigIcon from "../../../assets/config-svg.svg?url";
 import { obtenerDireccion } from "../../../lib/geocoding";
 import { useRef } from "react";
 import ModalEmpleadosUI from "./modalEmpleadosUI";
+import ModalAgregarServicios from "../modalAgregarServicios";
 import { 
   doc, 
   updateDoc, 
@@ -69,6 +70,7 @@ type Servicio = {
 };
 
 type Negocio = {
+  id: string;  
   nombre: string;
   direccion?: string;
   slug: string;
@@ -96,8 +98,6 @@ type Props = {
 };
 
 
-
-
 export default function AgendaVirtualUI({
   empleados,
   turnos,
@@ -112,9 +112,8 @@ export default function AgendaVirtualUI({
   const [logo, setLogo] = useState(negocio.perfilLogo || "");
 
   // 👇 Estados para servicios
-  const [agregando, setAgregando] = useState(false);
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoPrecio, setNuevoPrecio] = useState("");
+  const [modalServiciosAbierto, setModalServiciosAbierto] = useState(false);
+
 
   // 👇 Estados para editar nombre/slug
   const [editandoNombre, setEditandoNombre] = useState(false);
@@ -233,21 +232,6 @@ const handleGuardarDescripcion = async () => {
   }
 };
 
-  const handleGuardarServicio = async () => {
-    if (!nuevoNombre.trim() || !nuevoPrecio) return;
-    try {
-      await agregarServicio(negocio.slug, {
-        nombre: nuevoNombre,
-        precio: Number(nuevoPrecio),
-      });
-      setNuevoNombre("");
-      setNuevoPrecio("");
-      setAgregando(false);
-    } catch (err) {
-      console.error("❌ Error al guardar servicio:", err);
-    }
-  };
-
   // 👉 Guardar nuevo nombre + slug
   const handleGuardarNombre = async () => {
     if (!nuevoNombreNegocio.trim()) return;
@@ -344,6 +328,7 @@ useEffect(() => {
           />
         </div>
       </div>
+      
 
       {/* Contenido */}
       <div className="relative md:-mt-16 px-4 pb-10">
@@ -659,42 +644,15 @@ useEffect(() => {
     >
       {/* Rectángulo de agregar servicio siempre primero */}
       {modo === "dueño" && (
-        <>
-          {!agregando ? (
-            <button
-              onClick={() => setAgregando(true)}
-              className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
-            >
-              <span className="text-3xl text-gray-400">+</span>
-            </button>
-          ) : (
-            <div className="flex-shrink-0 flex flex-row items-center justify-between bg-neutral-900 border border-dashed border-gray-500 rounded-xl p-2 gap-2 w-auto">
-              <input
-                type="text"
-                placeholder="Servicio"
-                value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                className="px-2 py-1 rounded bg-neutral-800 text-xs text-white w-28"
-              />
-              <input
-                type="number"
-                placeholder="Precio"
-                value={nuevoPrecio}
-                onChange={(e) => setNuevoPrecio(e.target.value)}
-                className="px-2 py-1 rounded bg-neutral-800 text-xs text-white w-20"
-              />
-              <button
-                onClick={handleGuardarServicio}
-                className="bg-indigo-600 hover:bg-indigo-700 rounded px-3 py-1 text-xs font-medium text-white"
-              >
-                Guardar
-              </button>
-            </div>
-          )}
-        </>
+        <button
+          onClick={() => setModalServiciosAbierto(true)} // 👈 abre el modal
+          className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+        >
+          <span className="text-3xl text-gray-400">+</span>
+        </button>
       )}
 
-      {/* Servicios después */}
+      {/* Servicios cargados */}
       {servicios.map((s, idx) => (
         <div
           key={s.id || idx}
@@ -704,52 +662,35 @@ useEffect(() => {
             {s.servicio}
           </p>
           <span className="text-sm text-gray-400">${s.precio}</span>
+          <span className="text-xs text-gray-500">{s.duracion} min</span>
         </div>
       ))}
     </div>
   ) : (
     <div className="w-full flex justify-start mt-2">
-      {modo === "dueño" && (
-        <>
-          {!agregando ? (
-            <button
-              onClick={() => setAgregando(true)}
-              className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
-            >
-              <span className="text-3xl text-gray-400">+</span>
-            </button>
-          ) : (
-            <div className="flex flex-row items-center justify-between bg-neutral-900 border border-dashed border-gray-500 rounded-xl p-2 gap-2 w-auto">
-              <input
-                type="text"
-                placeholder="Servicio"
-                value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                className="px-2 py-1 rounded bg-neutral-800 text-xs text-white w-28"
-              />
-              <input
-                type="number"
-                placeholder="Precio"
-                value={nuevoPrecio}
-                onChange={(e) => setNuevoPrecio(e.target.value)}
-                className="px-2 py-1 rounded bg-neutral-800 text-xs text-white w-20"
-              />
-              <button
-                onClick={handleGuardarServicio}
-                className="bg-indigo-600 hover:bg-indigo-700 rounded px-3 py-1 text-xs font-medium text-white"
-              >
-                Guardar
-              </button>
-            </div>
-          )}
-        </>
-      )}
-      {modo === "cliente" && (
+      {modo === "dueño" ? (
+        <button
+          onClick={() => setModalServiciosAbierto(true)}
+          className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+        >
+          <span className="text-3xl text-gray-400">+</span>
+        </button>
+      ) : (
         <p className="text-gray-400 text-sm">No hay servicios cargados.</p>
       )}
     </div>
   )}
+
+{/* Modal para agregar servicios */}
+{modo === "dueño" && (
+  <ModalAgregarServicios
+    abierto={modalServiciosAbierto}
+    onCerrar={() => setModalServiciosAbierto(false)}
+    negocioId={negocio.id}   // ✅ ahora es el ID real
+  />
+)}
 </div>
+
 
 {/* Empleados */}
 <div className="bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
@@ -802,8 +743,6 @@ useEffect(() => {
     )}
   </div>
 </div>
-
-
             {/* Calendario */}
             <div className="bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
               <div className="w-full max-w-sm">

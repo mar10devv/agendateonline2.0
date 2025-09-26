@@ -60,6 +60,7 @@ export type Servicio = {
 };
 
 export type Negocio = {
+  id: string; 
   nombre: string;
   direccion: string;
   slug: string;
@@ -149,6 +150,7 @@ export async function detectarUsuario(
     );
 
 const negocio: Negocio = {
+  id: negocioId,   // 👈 agregado aquí
   nombre: negocioData.nombre || "",
   direccion: negocioData.direccion || "",
   slug: negocioData.slug || "",
@@ -159,7 +161,7 @@ const negocio: Negocio = {
   empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
     id: e.id || "",
     nombre: e.nombre || "",
-    foto: e.foto || e.fotoPerfil || "",   // 👈 normalización aquí también
+    foto: e.foto || e.fotoPerfil || "",
     especialidad: e.especialidad || "",
     calendario: e.calendario || {},
   })),
@@ -167,8 +169,9 @@ const negocio: Negocio = {
   fotoPerfil: negocioData.fotoPerfil || "",
   configuracionAgenda: negocioData.configuracionAgenda || {},
   descripcion: negocioData.descripcion || "",
-  ubicacion: negocioData.ubicacion || null, // 👈 agregado
+  ubicacion: negocioData.ubicacion || null,
 };
+
 
     const modo = user.uid === negocioId ? "dueño" : "cliente";
     callback("listo", modo, user, negocio);

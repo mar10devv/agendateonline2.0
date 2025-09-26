@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
+import ModalServicios from "../modalServicios";
 
 import ModalBase from "../../ui/modalGenerico";
 import ModalAviso from "../../ui/modalAviso";
@@ -90,6 +91,9 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
     if (!url) return;
     handleChangeEmpleado(index, "fotoPerfil", url);
   };
+
+  const [empleadoServicios, setEmpleadoServicios] = useState<number | null>(null);
+
 
   // 📌 Guardar cambios
   const handleSubmit = async () => {
@@ -183,16 +187,13 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
                       Configurar horario
                     </button>
                     <button
-                      type="button"
-                      onClick={() =>
-                        alert(
-                          `Abrir servicios para ${empleado.nombre || "empleado"}`
-                        )
-                      }
-                      className="px-4 py-2 bg-purple-600 text-white rounded-md shadow hover:bg-purple-700 transition"
-                    >
-                      Configurar servicios
-                    </button>
+  type="button"
+  onClick={() => setEmpleadoServicios(index)} // 👈 guarda el índice del empleado
+  className="px-4 py-2 bg-purple-600 text-white rounded-md shadow hover:bg-purple-700 transition"
+>
+  Configurar servicios
+</button>
+
                   </div>
                 </div>
               </div>
@@ -281,27 +282,44 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
       )}
 
       {/* Modal aviso eliminación */}
-      {mostrarAviso && (
-        <ModalAviso
-          abierto={mostrarAviso}
-          onClose={() => {
-            setMostrarAviso(false);
-            setEmpleadoAEliminar(null);
-          }}
-          onConfirm={() => {
-            if (empleadoAEliminar !== null) {
-              setConfig((prev: any) =>
-                eliminarEmpleado(prev, empleadoAEliminar)
-              );
-            }
-            setMostrarAviso(false);
-            setEmpleadoAEliminar(null);
-          }}
-          titulo="Eliminar empleado"
-        >
-          ¿Seguro que deseas eliminar este empleado?
-        </ModalAviso>
-      )}
+{mostrarAviso && (
+  <ModalAviso
+    abierto={mostrarAviso}
+    onClose={() => {
+      setMostrarAviso(false);
+      setEmpleadoAEliminar(null);
+    }}
+    onConfirm={() => {
+      if (empleadoAEliminar !== null) {
+        setConfig((prev: any) =>
+          eliminarEmpleado(prev, empleadoAEliminar)
+        );
+      }
+      setMostrarAviso(false);
+      setEmpleadoAEliminar(null);
+    }}
+    titulo="Eliminar empleado"
+  >
+    ¿Seguro que deseas eliminar este empleado?
+  </ModalAviso>
+)}
+
+/* Modal servicios */
+{empleadoServicios !== null && (
+  <ModalServicios
+    abierto={empleadoServicios !== null}
+    onCerrar={() => setEmpleadoServicios(null)}
+    negocioId={user?.uid} // 👈 ID del negocio dueño de los servicios
+    trabajosEmpleado={config.empleadosData[empleadoServicios].trabajos || []}
+    onGuardar={(trabajosActualizados) => {
+      const nuevo = [...config.empleadosData];
+      nuevo[empleadoServicios].trabajos = trabajosActualizados;
+      setConfig({ ...config, empleadosData: nuevo });
+    }}
+  />
+)}
+
+
     </>
   );
 }
