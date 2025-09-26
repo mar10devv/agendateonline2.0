@@ -17,6 +17,20 @@ import {
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
+export async function getNegocioPorSlug(slug: string) {
+  const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+  const snap = await getDocs(q);
+
+  if (snap.empty) return null;
+
+  const negocio = snap.docs[0].data();
+
+  return {
+    id: snap.docs[0].id,
+    ...negocio, // 👈 esto asegura que también venga "ubicacion"
+  };
+}
+
 // 🔒 Tipos
 export type Turno = {
   id: string;
@@ -58,7 +72,42 @@ export type Negocio = {
   fotoPerfil?: string;           // 👈 foto de un único empleado
   configuracionAgenda?: any;
   descripcion?: string;          // 👈 agregado ahora
+  ubicacion?: {                  // 👈 NUEVO
+    lat: number;
+    lng: number;
+    direccion: string;
+  };
 };
+
+
+export async function guardarUbicacionNegocio(
+  slug: string,
+  ubicacion: { lat: number; lng: number; direccion: string }
+) {
+  try {
+    // 🔍 Buscar negocio con ese slug
+    const negocioDocs = await getDocs(
+      query(collection(db, "Negocios"), where("slug", "==", slug))
+    );
+
+    if (negocioDocs.empty) {
+      throw new Error("❌ No se encontró negocio con ese slug");
+    }
+
+    // ✅ Tomar el ID real del documento
+    const negocioId = negocioDocs.docs[0].id;
+    const negocioRef = doc(db, "Negocios", negocioId);
+
+    // 📝 Guardar ubicación en Firestore
+    await updateDoc(negocioRef, { ubicacion });
+
+    console.log("✅ Ubicación guardada en Firestore");
+  } catch (err) {
+    console.error("❌ Error al guardar ubicación:", err);
+    throw err;
+  }
+}
+
 
 // 🔐 Login con Google
 export async function loginConGoogle() {
@@ -107,13 +156,19 @@ const negocio: Negocio = {
   bannerUrl: negocioData.bannerUrl,
   plantilla: negocioData.plantilla,
   tipoPremium: negocioData.tipoPremium || "gratis",
-  empleadosData: negocioData.empleadosData || [],
+  empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
+    id: e.id || "",
+    nombre: e.nombre || "",
+    foto: e.foto || e.fotoPerfil || "",   // 👈 normalización aquí también
+    especialidad: e.especialidad || "",
+    calendario: e.calendario || {},
+  })),
   servicios,
   fotoPerfil: negocioData.fotoPerfil || "",
   configuracionAgenda: negocioData.configuracionAgenda || {},
-  descripcion: negocioData.descripcion || "", // 👈 agregado
+  descripcion: negocioData.descripcion || "",
+  ubicacion: negocioData.ubicacion || null, // 👈 agregado
 };
-
 
     const modo = user.uid === negocioId ? "dueño" : "cliente";
     callback("listo", modo, user, negocio);
@@ -134,11 +189,24 @@ if (Array.isArray(negocioData.empleadosData) && negocioData.empleadosData.length
   return negocioData.empleadosData.map((e: any) => ({
     id: e.id || "",
     nombre: e.nombre || "",
-    foto: e.foto || e.fotoPerfil || "",  // 👈 normalizamos aquí
+    foto: e.fotoPerfil || "",   // 👈 normalizado
     especialidad: e.especialidad || "",
     calendario: e.calendario || {},
   }));
 }
+
+
+  // ⚡ Si no hay empleadosData, construyo uno con los campos del negocio
+  return [
+    {
+      id: negocioDocs.docs[0].id,
+      nombre: negocioData.nombre || "Empleado",
+      foto: negocioData.foto || negocioData.fotoPerfil || "",
+      especialidad: negocioData.plantilla || "",
+      calendario: negocioData.configuracionAgenda || {},
+    },
+  ];
+
 
 
   // ⚡ Si no hay empleadosData, construyo uno con los campos del negocio
@@ -166,39 +234,39 @@ export async function escucharEmpleados(
     return () => {};
   }
 
-  const negocioId = negocioDocs.docs[0].id;
-  const empleadosRef = collection(db, "Negocios", negocioId, "Empleados");
+const negocioId = negocioDocs.docs[0].id;
+const empleadosRef = collection(db, "Negocios", negocioId, "Empleados");
 
-  const unsubscribe = onSnapshot(empleadosRef, (snapshot) => {
-    if (snapshot.empty) {
-      // ⚡ Si no hay subcolección, devuelvo el único empleado con fotoPerfil
-      const negocioData = negocioDocs.docs[0].data();
-      callback([
-        {
-          id: negocioId,
-          nombre: negocioData.nombre || "Empleado",
-          foto: negocioData.foto || negocioData.fotoPerfil || "",
-          especialidad: negocioData.plantilla || "",
-          calendario: negocioData.configuracionAgenda || {},
-        },
-      ]);
-    } else {
-      const empleados = snapshot.docs.map((doc) => {
-        const data = doc.data() as any;
-        return {
-          id: doc.id,
-          nombre: data.nombre,
-          foto: data.foto || data.fotoPerfil || "",
-          especialidad: data.especialidad || "",
-          calendario: data.calendario || {},
-        } as Empleado;
-      });
-      callback(empleados);
-    }
-  });
+const unsubscribe = onSnapshot(empleadosRef, (snapshot) => {
+  if (snapshot.empty) {
+    // ⚡ Si no hay subcolección, devuelvo un único empleado con los datos del negocio
+    const negocioData = negocioDocs.docs[0].data();
+    callback([
+      {
+        id: negocioId,
+        nombre: negocioData.nombre || "Empleado",
+        foto: negocioData.fotoPerfil || "",   // 👈 normalizado
+        especialidad: negocioData.plantilla || "",
+        calendario: negocioData.configuracionAgenda || {},
+      },
+    ]);
+  } else {
+    const empleados = snapshot.docs.map((doc) => {
+      const data = doc.data() as any;
+      return {
+        id: doc.id,
+        nombre: data.nombre || "Empleado",
+        foto: data.fotoPerfil || "",   // 👈 normalizado
+        especialidad: data.especialidad || "",
+        calendario: data.calendario || {},
+      } as Empleado;
+    });
+    callback(empleados);
+  }
+});
 
-  return unsubscribe;
-}
+return unsubscribe;
+ }
 
 // 📆 Obtener turnos por fecha
 export async function getTurnos(slug: string, fecha: string): Promise<Turno[]> {

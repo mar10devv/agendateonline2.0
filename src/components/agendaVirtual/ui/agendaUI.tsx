@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import ConfigIcon from "../../../assets/config-svg.svg?url";
+import { obtenerDireccion } from "../../../lib/geocoding";
+import { useRef } from "react";
+
 import { 
   doc, 
   updateDoc, 
   collection, 
   query, 
   where, 
-  getDocs 
+  getDocs,
+  onSnapshot,
 } from "firebase/firestore";
 
 import { db } from "../../../lib/firebase";
@@ -16,9 +20,25 @@ import {
   agregarServicio,
   actualizarNombreYSlug,
   escucharServicios, 
+  guardarUbicacionNegocio
 } from "../backend/agenda-backend";
 import CalendarioUI from "../ui/calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
+
+// 🌍 Leaflet
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import LoaderSpinner from "../../ui/loaderSpinner"; 
+
+// ✅ Icono personalizado para Leaflet
+const customIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
 
 
 type Turno = {
@@ -55,7 +75,12 @@ type Negocio = {
   perfilLogo?: string;
   bannerUrl?: string;
   servicios?: Servicio[];
-  descripcion?: string;   // 👈 agregado
+  descripcion?: string;
+  ubicacion?: {
+    lat: number;
+    lng: number;
+    direccion: string;
+  };  // 👈 agregado
 };
 
 type Props = {
@@ -94,9 +119,86 @@ export default function AgendaVirtualUI({
   const [nombreNegocio, setNombreNegocio] = useState(negocio.nombre);
 const [servicios, setServicios] = useState<Servicio[]>(negocio.servicios || []);
 
+const scrollRef = useRef<HTMLDivElement>(null);
+
+const handleMouseDown = (e: React.MouseEvent) => {
+  const slider = scrollRef.current;
+  if (!slider) return;
+
+  let startX = e.pageX - slider.offsetLeft;
+  let scrollLeft = slider.scrollLeft;
+
+  const handleMouseMove = (e: MouseEvent) => {
+    const x = e.pageX - slider.offsetLeft;
+    const walk = x - startX;
+    slider.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+  };
+
+  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("mouseup", handleMouseUp);
+};
+
+
 // 👇 Estados para descripción
 const [nuevaDescripcion, setNuevaDescripcion] = useState(negocio.descripcion || "");
 const [editandoDescripcion, setEditandoDescripcion] = useState(false);
+
+
+const handleGuardarUbicacion = () => {
+  if (!navigator.geolocation) {
+    console.error("⚠️ Tu navegador no soporta geolocalización.");
+    return;
+  }
+
+  setEstadoUbicacion("cargando");
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+
+        const direccion = await obtenerDireccion(latitude, longitude);
+
+        const nuevaUbicacion = {
+          lat: latitude,
+          lng: longitude,
+          direccion,
+        };
+
+        await guardarUbicacionNegocio(negocio.slug, nuevaUbicacion);
+        setUbicacion(nuevaUbicacion);
+
+        // ✅ Mostrar estado de éxito
+        setEstadoUbicacion("exito");
+        setTimeout(() => setEstadoUbicacion("idle"), 3000);
+      } catch (err) {
+        console.error("❌ Error al guardar ubicación:", err);
+        setEstadoUbicacion("idle");
+      }
+    },
+    (err) => {
+      console.error("❌ Error al obtener ubicación:", err);
+      setEstadoUbicacion("idle");
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+};
+
+
+// 👇 Estado para manejar ubicación actual
+const [ubicacion, setUbicacion] = useState<Negocio["ubicacion"] | null>(
+  negocio.ubicacion || null
+);
+// 👇 Estado para controlar el botón de ubicación
+const [estadoUbicacion, setEstadoUbicacion] = useState<
+  "idle" | "cargando" | "exito"
+>("idle");
+
 
 const handleGuardarDescripcion = async () => {
   try {
@@ -191,18 +293,32 @@ const handleGuardarDescripcion = async () => {
 useEffect(() => {
   if (!negocio?.slug) return;
 
-  let unsubscribe: () => void;
+  // 👉 Escuchar servicios
+  let unsubscribeServicios: () => void;
 
   escucharServicios(negocio.slug, (servs) => {
     setServicios(servs);
   }).then((unsub) => {
-    unsubscribe = unsub;
+    unsubscribeServicios = unsub;
+  });
+
+  // 👉 Escuchar ubicación del negocio en tiempo real
+  const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
+  const unsubscribeNegocio = onSnapshot(q, (snap) => {
+    if (!snap.empty) {
+      const data = snap.docs[0].data() as Negocio;
+      if (data.ubicacion) {
+        setUbicacion(data.ubicacion);
+      }
+    }
   });
 
   return () => {
-    if (unsubscribe) unsubscribe();
+    if (unsubscribeServicios) unsubscribeServicios();
+    unsubscribeNegocio();
   };
 }, [negocio.slug]);
+
 
   return (
     <div className="w-full min-h-screen bg-neutral-900 text-white">
@@ -368,25 +484,34 @@ useEffect(() => {
     </div>
   </div>
 
-  {/* Descripción editable */}
+{/* Descripción editable */}
 <div className="mt-8 w-full px-2">
   {modo === "dueño" ? (
-    <div className="flex flex-col items-center gap-2 w-full">
+    <div className="flex flex-col items-stretch gap-2 w-full">
       <textarea
         maxLength={200}
+        rows={4} // 👈 más grande de inicio
+        style={{
+          minHeight: "4rem",
+          overflow: editandoDescripcion ? "auto" : "hidden", // 👈 scroll solo en edición
+        }}
         placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
-        className={`w-full text-sm text-center text-white resize-none outline-none transition ${
+        className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
           editandoDescripcion ? "bg-neutral-700 rounded p-2" : "bg-transparent"
         }`}
         value={nuevaDescripcion}
         onFocus={() => setEditandoDescripcion(true)}
         onBlur={() => {
-          // 👇 Solo cierra si no hay cambios
           if (nuevaDescripcion.trim() === (negocio.descripcion || "")) {
             setEditandoDescripcion(false);
           }
         }}
-        onChange={(e) => setNuevaDescripcion(e.target.value)}
+        onInput={(e) => {
+          const el = e.target as HTMLTextAreaElement;
+          el.style.height = "auto"; // reset altura
+          el.style.height = el.scrollHeight + "px"; // ajusta al contenido
+          setNuevaDescripcion(el.value);
+        }}
       />
       {editandoDescripcion && (
         <button
@@ -403,9 +528,112 @@ useEffect(() => {
       )}
     </div>
   ) : (
-    <p className="text-gray-300 text-sm text-center">
+    <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
       {negocio.descripcion || "Este negocio aún no tiene descripción."}
     </p>
+  )}
+</div>
+
+
+
+{/* 📍 Ubicación */}
+<div className="mt-20 w-full flex flex-col items-center gap-2">
+
+  {/* 👉 Botón inicial si aún no hay ubicación */}
+  {modo === "dueño" && !ubicacion && (
+    <button
+      onClick={handleGuardarUbicacion}
+      disabled={estadoUbicacion === "cargando"}
+      className={`px-4 py-2 rounded-md flex items-center gap-2 transition ${
+        estadoUbicacion === "cargando"
+          ? "bg-gray-600 text-white"
+          : estadoUbicacion === "exito"
+          ? "bg-green-600 text-white"
+          : "bg-indigo-600 hover:bg-indigo-700 text-white"
+      }`}
+    >
+      {estadoUbicacion === "cargando" && (
+        <>
+          <LoaderSpinner size={20} color="white" />
+          Buscando nueva ubicación...
+        </>
+      )}
+      {estadoUbicacion === "exito" && "✅ Se cargó la nueva ubicación"}
+      {estadoUbicacion === "idle" && "Usar mi ubicación actual"}
+    </button>
+  )}
+
+  {ubicacion && (
+    <div className="w-full flex flex-col gap-4">
+      {/* Mapa */}
+      <div className="h-64 rounded-md overflow-hidden border">
+        <MapContainer
+          key={`${ubicacion.lat}-${ubicacion.lng}`}
+          center={[ubicacion.lat, ubicacion.lng]}
+          zoom={16}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          <Marker
+            position={[ubicacion.lat, ubicacion.lng]}
+            icon={customIcon}
+            draggable={modo === "dueño"} // 👈 solo dueño puede mover
+            eventHandlers={
+              modo === "dueño"
+                ? {
+                    dragend: async (e) => {
+                      const newPos = e.target.getLatLng();
+                      const direccion = await obtenerDireccion(newPos.lat, newPos.lng);
+
+                      const nuevaUbicacion = {
+                        lat: newPos.lat,
+                        lng: newPos.lng,
+                        direccion,
+                      };
+
+                      await guardarUbicacionNegocio(negocio.slug, nuevaUbicacion);
+                      setUbicacion(nuevaUbicacion);
+                    },
+                  }
+                : {}
+            }
+          >
+            {modo === "dueño" && (
+              <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+            )}
+          </Marker>
+        </MapContainer>
+      </div>
+
+      {/* 👇 Botón actualizar ubicación */}
+      {modo === "dueño" && (
+        <div className="flex justify-center">
+          <button
+            onClick={handleGuardarUbicacion}
+            disabled={estadoUbicacion === "cargando"}
+            className={`px-4 py-2 rounded-md flex items-center gap-2 transition ${
+              estadoUbicacion === "cargando"
+                ? "bg-gray-600 text-white"
+                : estadoUbicacion === "exito"
+                ? "bg-green-600 text-white"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
+          >
+            {estadoUbicacion === "cargando" && (
+              <>
+                <LoaderSpinner size={20} color="white" />
+                Buscando nueva ubicación...
+              </>
+            )}
+            {estadoUbicacion === "exito" && "✅ Se cargó la nueva ubicación"}
+            {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+          </button>
+        </div>
+      )}
+    </div>
   )}
 </div>
 
@@ -414,38 +642,29 @@ useEffect(() => {
 
           {/* Columna izquierda -> servicios y empleados */}
           <div className="order-2 md:order-1 md:col-span-2 space-y-8">
-
-            {/* Servicios */}
+            
+{/* Servicios */}
 <div className="bg-neutral-800 rounded-2xl p-6 shadow-lg">
   <h2 className="text-lg font-semibold mb-4">Servicios</h2>
 
   {servicios && servicios.length > 0 ? (
-  <div className="flex flex-wrap gap-4">
-    {servicios.map((s, idx) => (
-      <div
-        key={s.id || idx}
-        className="flex flex-col justify-center items-center w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center"
-      >
-        {/* 🔹 El nombre nunca rompe el tamaño */}
-        <p className="font-medium text-white text-sm leading-tight break-words truncate w-full">
-          {s.servicio}
-        </p>
-        <span className="text-sm text-gray-400">${s.precio}</span>
-      </div>
-    ))}
-
-      {/* Rectángulo de agregar servicio */}
+    <div
+      ref={scrollRef}
+      onMouseDown={handleMouseDown}
+      className="flex gap-4 overflow-x-auto flex-nowrap scrollbar-hide cursor-grab active:cursor-grabbing"
+    >
+      {/* Rectángulo de agregar servicio siempre primero */}
       {modo === "dueño" && (
         <>
           {!agregando ? (
             <button
               onClick={() => setAgregando(true)}
-              className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+              className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
             >
               <span className="text-3xl text-gray-400">+</span>
             </button>
           ) : (
-            <div className="flex flex-row items-center justify-between bg-neutral-900 border border-dashed border-gray-500 rounded-xl p-2 gap-2 w-auto">
+            <div className="flex-shrink-0 flex flex-row items-center justify-between bg-neutral-900 border border-dashed border-gray-500 rounded-xl p-2 gap-2 w-auto">
               <input
                 type="text"
                 placeholder="Servicio"
@@ -470,6 +689,19 @@ useEffect(() => {
           )}
         </>
       )}
+
+      {/* Servicios después */}
+      {servicios.map((s, idx) => (
+        <div
+          key={s.id || idx}
+          className="flex-shrink-0 flex flex-col justify-center items-center w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center"
+        >
+          <p className="font-medium text-white text-sm leading-tight break-words truncate w-full">
+            {s.servicio}
+          </p>
+          <span className="text-sm text-gray-400">${s.precio}</span>
+        </div>
+      ))}
     </div>
   ) : (
     <div className="w-full flex justify-start mt-2">
@@ -514,6 +746,7 @@ useEffect(() => {
     </div>
   )}
 </div>
+
 
 
 {/* Empleados */}
