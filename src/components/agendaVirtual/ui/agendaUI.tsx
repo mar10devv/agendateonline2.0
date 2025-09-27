@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore";
 
 import { db } from "../../../lib/firebase";
+import FloatingMenu from "../../ui/floatingMenu";
+
 
 import {
   subirLogoNegocio,
@@ -467,7 +469,7 @@ useEffect(() => {
     <div className="flex flex-col gap-6 order-1">
       
       {/* Columna derecha -> Perfil */}
-<div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+<div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0">
   {/* ⚙️ Tuerca */}
   {modo === "dueño" && (
     <button
@@ -588,7 +590,8 @@ useEffect(() => {
 {/* 🔹 Fin Perfil */}
 
 {/* Columna derecha -> Mapa */}
-<div className="order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+{/* Columna derecha -> Mapa */}
+<div className="hidden md:flex order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex-col items-center text-center shadow-lg relative">
   {/* Botón inicial si no hay ubicación */}
   {modo === "dueño" && !ubicacion && (
     <button
@@ -693,8 +696,11 @@ useEffect(() => {
 {/* 🔹 Fin Mapa */}
 
 
-        </div>
+               </div>
       </div>
+
+      {/* 🔹 Botón flotante solo en mobile */}
+      <FloatingMenu />
     </div>
   );
 }
