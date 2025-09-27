@@ -328,24 +328,26 @@ useEffect(() => {
 
   return (
     <div className="w-full min-h-screen bg-neutral-900 text-white">
-      {/* Banner */}
-      <div className="hidden md:flex justify-center">
-        <div className="w-[70%] h-80 relative rounded-b-2xl overflow-hidden">
-          <img
-            src={
-              logo
-                ? logo
-                : negocio.bannerUrl
-                ? negocio.bannerUrl
-                : negocio.perfilLogo
-                ? negocio.perfilLogo
-                : "/banner-default.webp"
-            }
-            alt={nombreNegocio}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      </div>
+  {/* Banner */}
+  <div className="hidden md:flex justify-center">
+  <div className="w-full max-w-7xl h-96 relative rounded-b-2xl overflow-hidden">
+      <img
+        src={
+          logo
+            ? logo
+            : negocio.bannerUrl
+            ? negocio.bannerUrl
+            : negocio.perfilLogo
+            ? negocio.perfilLogo
+            : "/banner-default.webp"
+        }
+        alt={nombreNegocio}
+        className="w-full h-full object-cover"
+      />
+    </div>
+  </div>
+
+
       
 
       {/* Contenido */}
@@ -485,7 +487,7 @@ useEffect(() => {
 
           </div>
               {/* Columna derecha */}
-    <div className="flex flex-col gap-6 order-1">
+<div className="flex flex-col gap-6 order-1 md:pr-6">
       
       {/* Columna derecha -> Perfil */}
 <div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0">
