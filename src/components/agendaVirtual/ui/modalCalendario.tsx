@@ -1,3 +1,4 @@
+// src/components/agendaVirtual/ui/ModalCalendario.tsx
 import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import { db } from "../../../lib/firebase";
@@ -14,6 +15,9 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const [porcentajeSenia, setPorcentajeSenia] = useState<number>(20);
   const [guardando, setGuardando] = useState(false);
   const [mercadoPagoConectado, setMercadoPagoConectado] = useState(false);
+
+  // 👇 CLIENT_ID desde .env
+  const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID || "";
 
   // 🔹 Cargar configuración inicial desde Firestore
   useEffect(() => {
@@ -60,15 +64,22 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
     }
   };
 
-  // 🔹 Conectar con Mercado Pago (abre popup a Netlify Function)
+  // 🔹 Conectar con Mercado Pago
   const handleConectarMercadoPago = () => {
-    const popup = window.open(
-      `/.netlify/functions/mp-callback?negocioId=${negocioId}`,
-      "mpLogin",
-      "width=600,height=700"
-    );
+    if (!CLIENT_ID) {
+      alert("⚠️ Falta configurar PUBLIC_MP_CLIENT_ID en tu .env");
+      return;
+    }
 
-    // Escuchar confirmación desde el backend
+    // redirect_uri con negocioId embebido
+    const redirectUri = `${window.location.origin}/.netlify/functions/mp-callback?negocioId=${negocioId}`;
+
+    // URL de autorización oficial de Mercado Pago
+    const authUrl = `https://auth.mercadopago.com/authorization?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    const popup = window.open(authUrl, "mpLogin", "width=600,height=700");
+
+    // Escuchar confirmación desde el backend (cuando mp-callback termine)
     const listener = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data.type === "MP_CONNECTED") {
