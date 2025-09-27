@@ -21,6 +21,9 @@ import type { Empleado } from "../backend/modalEmpleadosBackend";
 // ⚠️ Ícono de alerta
 import AlertIcon from "../../../assets/alert.svg?url";
 
+// ✅ Loader
+import LoaderSpinner from "../../ui/LoaderSpinner";
+
 type Props = {
   abierto: boolean;
   onCerrar: () => void;
@@ -37,11 +40,14 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | null>(null);
   const [empleadoAEliminar, setEmpleadoAEliminar] = useState<number | null>(null);
   const [mostrarAviso, setMostrarAviso] = useState(false);
+  const [empleadoServicios, setEmpleadoServicios] = useState<number | null>(null);
+
+  // 👇 Estado para loaders de fotos
+  const [cargandoFoto, setCargandoFoto] = useState<{ [key: number]: boolean }>({});
+
   const hayEmpleadoSinEditar = config?.empleadosData?.some(
     (emp: Empleado) => !emp.nombre?.trim()
   );
-
-  const [empleadoServicios, setEmpleadoServicios] = useState<number | null>(null);
 
   // 🔑 Detectar usuario y cargar config
   useEffect(() => {
@@ -87,12 +93,21 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
     setConfig((prev: any) => actualizarEmpleado(prev, index, field, value));
   };
 
-  // 📌 Manejar foto de empleado
+  // 📌 Manejar foto de empleado con loader
   const handleFotoPerfil = async (index: number, file: File | null) => {
     if (!file) return;
-    const url = await subirImagenImgBB(file);
-    if (!url) return;
-    handleChangeEmpleado(index, "fotoPerfil", url);
+    setCargandoFoto((prev) => ({ ...prev, [index]: true })); // 🔥 activar loader
+
+    try {
+      const url = await subirImagenImgBB(file);
+      if (url) {
+        handleChangeEmpleado(index, "fotoPerfil", url);
+      }
+    } catch (err) {
+      console.error("Error subiendo imagen:", err);
+    } finally {
+      setCargandoFoto((prev) => ({ ...prev, [index]: false })); // 🔥 desactivar loader
+    }
   };
 
   // 📌 Guardar cambios
@@ -133,7 +148,6 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
             <div className="flex-1 overflow-y-auto pr-2">
               <div className="flex flex-col gap-6">
                 {config.empleadosData.map((empleado: Empleado, index: number) => {
-                  // ⚡ Validaciones
                   const faltaHorario =
                     !empleado.calendario ||
                     !empleado.calendario.inicio ||
@@ -177,9 +191,14 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
                         />
                         <label
                           htmlFor={`fotoPerfil-${index}`}
-                          className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
+                          className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm relative"
                         >
-                          {empleado.fotoPerfil ? (
+                          {cargandoFoto[index] ? (
+                            // 🔥 Loader dentro del círculo
+                            <div className="flex items-center justify-center w-full h-full bg-neutral-800">
+                              <LoaderSpinner />
+                            </div>
+                          ) : empleado.fotoPerfil ? (
                             <img
                               src={empleado.fotoPerfil}
                               alt=""
@@ -202,6 +221,7 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
                           }
                           className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white focus:ring-2 focus:ring-green-600"
                         />
+
                         <div className="flex gap-3">
                           {/* Botón horario */}
                           <div className="relative flex items-center">
