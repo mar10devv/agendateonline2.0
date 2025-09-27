@@ -7,6 +7,8 @@ import ModalServicios from "../modalServicios";
 
 import ModalBase from "../../ui/modalGenerico";
 import ModalAviso from "../../ui/modalAviso";
+import ModalHorariosEmpleados from "./modalEmpleadosHorarios";
+
 
 import {
   subirImagenImgBB,
@@ -26,9 +28,11 @@ type Props = {
 export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   const [user, setUser] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
-  const [estado, setEstado] = useState<
-    "cargando" | "listo" | "guardando" | "sin-acceso"
-  >("cargando");
+const [estado, setEstado] = useState<
+  "cargando" | "listo" | "guardando" | "exito" | "sin-acceso"
+>("cargando");
+const esGuardando = estado === "guardando";
+
 
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | null>(null);
   const [horarioTemp, setHorarioTemp] = useState({
@@ -99,14 +103,25 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   const [empleadoServicios, setEmpleadoServicios] = useState<number | null>(null);
 
 
-  // 📌 Guardar cambios
-  const handleSubmit = async () => {
-    if (!user) return;
-    setEstado("guardando");
-    await guardarEmpleados(user.uid, config);
-    setEstado("listo");
-    onCerrar();
-  };
+// 📌 Guardar cambios
+const handleSubmit = async () => {
+  if (!user) return;
+
+  setEstado("guardando"); // ⏳ Arrancamos guardando
+  try {
+    await guardarEmpleados(user.uid, config); // ✅ Guardamos en Firebase
+    setEstado("exito"); // 🎉 Mostramos "Guardado con éxito"
+
+    // Después de 2s volvemos a "listo" para permitir otro guardado
+    setTimeout(() => {
+      setEstado("listo");
+    }, 2000);
+  } catch (error) {
+    console.error("Error guardando empleados:", error);
+    setEstado("listo"); // 🔄 volvemos a listo si falla
+  }
+};
+
 
   if (!abierto) return null;
 
@@ -122,8 +137,8 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   {estado === "sin-acceso" && (
     <p className="text-red-400">🚫 No tienes acceso</p>
   )}
-  {estado === "listo" && (
-    <div className="flex flex-col h-[70vh]">
+{(estado === "listo" || estado === "exito" || estado === "guardando") && (
+  <div className="flex flex-col h-[70vh]">
       {/* 🔹 Contenido scrollable */}
       <div className="flex-1 overflow-y-auto pr-2">
         <div className="flex flex-col gap-6">
@@ -211,92 +226,68 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
       {/* 🔹 Botones fijos abajo */}
 <div className="flex flex-col sm:flex-row justify-between sm:justify-end mt-4 pt-4 border-t border-gray-700 bg-neutral-900 gap-3">
   <button
-  onClick={() =>
-    setConfig((prev: any) => ({
-      ...prev,
-      empleadosData: [crearEmpleadoVacio(), ...prev.empleadosData],
-    }))
-  }
-  disabled={hayEmpleadoSinEditar} // 👈 deshabilitado si hay uno en edición
-  className={`px-6 py-3 rounded-xl shadow transition ${
-    hayEmpleadoSinEditar
-      ? "bg-gray-500 cursor-not-allowed opacity-60"
-      : "bg-blue-600 hover:bg-blue-700 text-white"
+    onClick={() =>
+      setConfig((prev: any) => ({
+        ...prev,
+        empleadosData: [crearEmpleadoVacio(), ...prev.empleadosData],
+      }))
+    }
+    disabled={hayEmpleadoSinEditar} // 👈 deshabilitado si hay uno en edición
+    className={`px-6 py-3 rounded-xl shadow transition ${
+      hayEmpleadoSinEditar
+        ? "bg-gray-500 cursor-not-allowed opacity-60"
+        : "bg-blue-600 hover:bg-blue-700 text-white"
+    }`}
+  >
+    ➕ Añadir empleado
+  </button>
+
+  {/* Botón Guardar con labels dinámicos */}
+
+<button
+  onClick={handleSubmit}
+  disabled={esGuardando}
+  className={`px-8 py-3 rounded-xl shadow transition ${
+    esGuardando
+      ? "bg-gray-500 cursor-not-allowed"
+      : "bg-gradient-to-r from-green-600 to-emerald-600 hover:opacity-90 text-white"
   }`}
 >
-  ➕ Añadir empleado
+  {{
+    cargando: "Guardar cambios",
+    listo: "Guardar cambios",
+    guardando: "Guardando...",
+    exito: "✅ Guardado con éxito",
+    "sin-acceso": "Guardar cambios",
+  }[estado]}
 </button>
 
-  <button
-    onClick={handleSubmit}
-    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl shadow hover:opacity-90 transition sm:order-2"
-  >
-    Guardar cambios
-  </button>
 </div>
 
-    </div>
+</div>
   )}
 </ModalBase>
 
 
-      {/* Modal horario */}
-      {empleadoSeleccionado !== null && (
-        <ModalBase
-          abierto={empleadoSeleccionado !== null}
-          onClose={() => setEmpleadoSeleccionado(null)}
-          titulo="Configurar horario"
-          maxWidth="max-w-lg"
-        >
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm">Inicio</label>
-              <input
-                type="time"
-                value={horarioTemp.inicio}
-                onChange={(e) =>
-                  setHorarioTemp({ ...horarioTemp, inicio: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm">Fin</label>
-              <input
-                type="time"
-                value={horarioTemp.fin}
-                onChange={(e) =>
-                  setHorarioTemp({ ...horarioTemp, fin: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
-              />
-            </div>
-          </div>
+      <ModalHorariosEmpleados
+  abierto={empleadoSeleccionado !== null}
+  onClose={() => setEmpleadoSeleccionado(null)}
+  horario={
+    config.empleadosData[empleadoSeleccionado!]?.calendario || {
+      inicio: "08:00",
+      fin: "17:00",
+      diasLibres: [],
+    }
+  }
+  onGuardar={(nuevoHorario) => {
+    const nuevo = [...config.empleadosData];
+    nuevo[empleadoSeleccionado!].calendario = nuevoHorario;
+    setConfig({ ...config, empleadosData: nuevo });
+    setEmpleadoSeleccionado(null);
+  }}
+/>
 
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={() => setEmpleadoSeleccionado(null)}
-              className="px-5 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => {
-                const nuevo = [...config.empleadosData];
-                nuevo[empleadoSeleccionado].calendario = horarioTemp;
-                setConfig((prev: any) => ({
-                  ...prev,
-                  empleadosData: nuevo,
-                }));
-                setEmpleadoSeleccionado(null);
-              }}
-              className="px-6 py-2 rounded-lg bg-green-600 text-white"
-            >
-              Guardar
-            </button>
-          </div>
-        </ModalBase>
-      )}
+
 
       {/* Modal aviso eliminación */}
 {mostrarAviso && (
