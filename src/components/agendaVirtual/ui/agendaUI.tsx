@@ -364,33 +364,29 @@ useEffect(() => {
 
   {servicios && servicios.length > 0 ? (
     <Swiper
-      modules={[Pagination, Autoplay]}   // 👈 quitamos Navigation
-      spaceBetween={16}
-      slidesPerView={1.2}
-      pagination={{ clickable: true }}
-      autoplay={{ delay: 2000 }} // ⚡ más rápido
-      loop={true}
-      className="!w-full !h-auto custom-swiper"
-      breakpoints={{
-        640: { slidesPerView: 2 },
-        768: { slidesPerView: 3 },
-        1024: { slidesPerView: 4 },
-      }}
-    >
-      {/* Servicios cargados */}
-      {servicios.map((s, idx) => (
-        <SwiperSlide key={s.id || idx}>
-          <div className="flex flex-col justify-center items-center 
-                          w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
-            <p className="font-medium text-white text-sm truncate w-full">
-              {s.servicio}
-            </p>
-            <span className="text-sm text-gray-400">${s.precio}</span>
-            <span className="text-xs text-gray-500">{s.duracion} min</span>
-          </div>
-        </SwiperSlide>
-      ))}
-    </Swiper>
+  modules={[Pagination, Autoplay]}
+  spaceBetween={16}
+  slidesPerView={"auto"}   // 👈 ajusta ancho real de cada slide
+  centeredSlides={true}    // 👈 mantiene el carrusel centrado
+  pagination={{ clickable: true }}
+  autoplay={{ delay: 2000 }}
+  loop={true}
+  className="!w-full !h-auto custom-swiper pb-10"
+>
+  {servicios.map((s, idx) => (
+    <SwiperSlide key={s.id || idx} className="!w-auto flex justify-center">
+      <div className="flex flex-col justify-center items-center 
+                      w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
+        <p className="font-medium text-white text-sm truncate w-full">
+          {s.servicio}
+        </p>
+        <span className="text-sm text-gray-400">${s.precio}</span>
+        <span className="text-xs text-gray-500">{s.duracion} min</span>
+      </div>
+    </SwiperSlide>
+  ))}
+</Swiper>
+
   ) : (
     <div className="w-full flex justify-start mt-2">
       {modo === "dueño" ? (
@@ -417,8 +413,6 @@ useEffect(() => {
     />
   )}
 </div>
-
-
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
         <h2 className="text-lg font-semibold mb-4">Empleados</h2>
