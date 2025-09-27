@@ -18,7 +18,8 @@ import { db } from "../../../lib/firebase";
 import FloatingMenu from "../../ui/floatingMenu";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
-
+import ModalPerfil from "../ui/modalPerfil"; // 👈 asegurate de importar el modal
+import { useAgendaCache } from "../../../hooks/useAgendaCache";
 import {
   subirLogoNegocio,
   agregarServicio,
@@ -151,10 +152,13 @@ const handleMouseDown = (e: React.MouseEvent) => {
 };
 
 
+
+
 // 👇 Estados para descripción
 const [nuevaDescripcion, setNuevaDescripcion] = useState(negocio.descripcion || "");
 const [editandoDescripcion, setEditandoDescripcion] = useState(false);
 const [modalAbierto, setModalAbierto] = useState(false);
+const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false);
 
 
 const handleGuardarUbicacion = () => {
@@ -359,34 +363,50 @@ useEffect(() => {
             <div className="flex flex-col gap-6 order-2 md:order-1">
 
             {/* Servicios */}
-<div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg">
+<div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg relative">
+  {/* 🔧 Botón Configuración */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalServiciosAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar servicios"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+  )}
+
   <h2 className="text-lg font-semibold mb-4">Servicios</h2>
 
   {servicios && servicios.length > 0 ? (
     <Swiper
-  modules={[Pagination, Autoplay]}
-  spaceBetween={16}
-  slidesPerView={"auto"}   // 👈 ajusta ancho real de cada slide
-  centeredSlides={true}    // 👈 mantiene el carrusel centrado
-  pagination={{ clickable: true }}
-  autoplay={{ delay: 2000 }}
-  loop={true}
-  className="!w-full !h-auto custom-swiper pb-10"
->
-  {servicios.map((s, idx) => (
-    <SwiperSlide key={s.id || idx} className="!w-auto flex justify-center">
-      <div className="flex flex-col justify-center items-center 
-                      w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
-        <p className="font-medium text-white text-sm truncate w-full">
-          {s.servicio}
-        </p>
-        <span className="text-sm text-gray-400">${s.precio}</span>
-        <span className="text-xs text-gray-500">{s.duracion} min</span>
-      </div>
-    </SwiperSlide>
-  ))}
-</Swiper>
-
+      modules={[Pagination, Autoplay]}
+      spaceBetween={8} // 👈 pequeño espacio entre cards
+      pagination={{ clickable: true }}
+      autoplay={{ delay: 2000, disableOnInteraction: false }}
+      loop={true} // 🔄 carrusel infinito
+      className="!w-full !h-auto custom-swiper pb-10"
+      breakpoints={{
+        320: { slidesPerView: 3 },   // 📱 Mobile
+        640: { slidesPerView: 4 },   // 📲 Tablet
+        1024: { slidesPerView: 4 },  // 💻 PC
+      }}
+    >
+      {servicios.map((s, idx) => (
+        <SwiperSlide key={s.id || idx} className="flex justify-center">
+          <div className="flex flex-col justify-center items-center 
+                          w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
+            <p className="font-medium text-white text-sm truncate w-full">
+              {s.servicio}
+            </p>
+            <span className="text-sm text-gray-400">${s.precio}</span>
+            <span className="text-xs text-gray-500">{s.duracion} min</span>
+          </div>
+        </SwiperSlide>
+      ))}
+    </Swiper>
   ) : (
     <div className="w-full flex justify-start mt-2">
       {modo === "dueño" ? (
@@ -413,6 +433,50 @@ useEffect(() => {
     />
   )}
 </div>
+
+<ModalPerfil
+  abierto={modalPerfilAbierto}
+  onCerrar={() => setModalPerfilAbierto(false)}
+  negocio={negocio}
+  onGuardar={async (data) => {
+    try {
+      // Si viene nombre, usamos actualizarNombreYSlug
+      if (data.nombre && data.nombre !== negocio.nombre) {
+        const nuevoSlug = await actualizarNombreYSlug(negocio.slug, data.nombre);
+        setNombreNegocio(data.nombre);
+
+        // 🔄 Redirigir si el slug cambió
+        if (nuevoSlug !== negocio.slug) {
+          window.location.href = `/agenda/${nuevoSlug}`;
+          return;
+        }
+      }
+
+      // Guardar los otros campos (logo, descripción, redes)
+      const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const negocioId = snap.docs[0].id;
+        const negocioRef = doc(db, "Negocios", negocioId);
+        await updateDoc(negocioRef, {
+          perfilLogo: data.perfilLogo || "",
+          descripcion: data.descripcion || "",
+          redes: data.redes || {},
+        });
+      }
+
+      // Actualizar estado local
+      if (data.perfilLogo) setLogo(data.perfilLogo);
+      if (data.descripcion !== undefined) setNuevaDescripcion(data.descripcion);
+
+    } catch (err) {
+      console.error("❌ Error al guardar perfil:", err);
+      alert("❌ No se pudo guardar los cambios de perfil");
+    } finally {
+      setModalPerfilAbierto(false);
+    }
+  }}
+/>
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
         <h2 className="text-lg font-semibold mb-4">Empleados</h2>
@@ -480,18 +544,18 @@ useEffect(() => {
       {/* Columna derecha -> Perfil */}
 <div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0">
   {/* ⚙️ Tuerca */}
-  {modo === "dueño" && (
-    <button
-      onClick={() => alert("Abrir configuración del negocio")}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar negocio"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-  )}
+{modo === "dueño" && (
+  <button
+    onClick={() => setModalPerfilAbierto(true)}
+    className="absolute top-4 right-4"
+  >
+    <img
+      src={ConfigIcon}
+      alt="Configurar negocio"
+      className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+    />
+  </button>
+)}
 
   {/* Logo */}
 <div className="mt-8 relative w-24 h-24">
@@ -709,8 +773,6 @@ useEffect(() => {
 </div>
 </div>
 {/* 🔹 Fin Mapa */}
-
-
                </div>
       </div>
 
