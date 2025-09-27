@@ -504,37 +504,43 @@ useEffect(() => {
   )}
 
   {/* Logo */}
-  <div className="mt-8 relative w-24 h-24">
-    {logo ? (
-      <img
-        src={logo}
-        alt="Logo negocio"
-        className="w-24 h-24 rounded-full object-cover border-4 border-white"
-      />
-    ) : (
-      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
-        {nombreNegocio.charAt(0)}
-      </div>
-    )}
+<div className="mt-8 relative w-24 h-24">
+  {subiendo ? (
+    // 🔥 Loader mientras se sube
+    <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-white">
+      <LoaderSpinner />
+    </div>
+  ) : logo ? (
+    <img
+      src={logo}
+      alt="Logo negocio"
+      className="w-24 h-24 rounded-full object-cover border-4 border-white"
+    />
+  ) : (
+    <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+      {nombreNegocio.charAt(0)}
+    </div>
+  )}
 
-    {modo === "dueño" && (
-      <>
-        <label
-          htmlFor="upload-logo"
-          className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
-        >
-          +
-        </label>
-        <input
-          id="upload-logo"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </>
-    )}
-  </div>
+  {modo === "dueño" && (
+    <>
+      <label
+        htmlFor="upload-logo"
+        className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
+      >
+        +
+      </label>
+      <input
+        id="upload-logo"
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+    </>
+  )}
+</div>
+
 
   {/* Nombre */}
   <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>

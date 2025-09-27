@@ -17,6 +17,7 @@ export type Empleado = {
   id?: string;
   nombre: string;
   fotoPerfil?: string;
+  nombreArchivo?: string;   // 👈 nuevo campo para evitar duplicados
   trabajos: string[];
   calendario: {
     inicio: string;
@@ -24,6 +25,7 @@ export type Empleado = {
     diasLibres: string[];
   };
 };
+
 
 // 🚀 Subida de imágenes a ImgBB
 export async function subirImagenImgBB(file: File): Promise<string | null> {

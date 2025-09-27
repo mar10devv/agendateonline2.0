@@ -22,7 +22,7 @@ import type { Empleado } from "../backend/modalEmpleadosBackend";
 import AlertIcon from "../../../assets/alert.svg?url";
 
 // ✅ Loader
-import LoaderSpinner from "../../ui/LoaderSpinner";
+import LoaderSpinner from "../../ui/loaderSpinner";
 
 type Props = {
   abierto: boolean;
@@ -93,22 +93,37 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
     setConfig((prev: any) => actualizarEmpleado(prev, index, field, value));
   };
 
-  // 📌 Manejar foto de empleado con loader
-  const handleFotoPerfil = async (index: number, file: File | null) => {
-    if (!file) return;
-    setCargandoFoto((prev) => ({ ...prev, [index]: true })); // 🔥 activar loader
+// 📌 Manejar foto de empleado con control de duplicados + loader
+const handleFotoPerfil = async (index: number, file: File | null) => {
+  if (!file) return;
 
-    try {
-      const url = await subirImagenImgBB(file);
-      if (url) {
-        handleChangeEmpleado(index, "fotoPerfil", url);
-      }
-    } catch (err) {
-      console.error("Error subiendo imagen:", err);
-    } finally {
-      setCargandoFoto((prev) => ({ ...prev, [index]: false })); // 🔥 desactivar loader
+  // ⚡ Revisar si ya existe una URL y un nombre previo guardado
+  const empleado = config.empleadosData[index];
+  const yaTieneUrl = empleado.fotoPerfil && empleado.nombreArchivo;
+
+  if (yaTieneUrl && empleado.nombreArchivo === file.name) {
+    // ✅ No subimos de nuevo, solo usamos la URL existente
+    console.log("Foto ya subida, usando URL existente");
+    handleChangeEmpleado(index, "fotoPerfil", empleado.fotoPerfil);
+    return;
+  }
+
+  // 🚀 Si es nueva, activamos loader y subimos
+  setCargandoFoto((prev) => ({ ...prev, [index]: true }));
+
+  try {
+    const url = await subirImagenImgBB(file);
+    if (url) {
+      handleChangeEmpleado(index, "fotoPerfil", url);
+      handleChangeEmpleado(index, "nombreArchivo", file.name); // 👈 guardamos referencia del archivo
     }
-  };
+  } catch (err) {
+    console.error("Error subiendo imagen:", err);
+  } finally {
+    setCargandoFoto((prev) => ({ ...prev, [index]: false }));
+  }
+};
+
 
   // 📌 Guardar cambios
   const handleSubmit = async () => {
