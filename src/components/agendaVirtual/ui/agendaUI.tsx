@@ -376,8 +376,7 @@ useEffect(() => {
 
       {/* Contenido */}
 <div className="relative md:-mt-16 px-4 pb-10">
-<div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[60%_40%] gap-6 items-start">
-
+<div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[60%_40%] gap-6 items-stretch">
 
       {/* Columna izquierda -> servicios y empleados */}
             <div className="flex flex-col gap-6 order-2 md:order-1">
@@ -582,7 +581,7 @@ useEffect(() => {
 )}
 </div>
             {/* Columna derecha */}
-<div className="flex flex-col gap-6 order-1 md:pr-6">
+<div className="flex flex-col gap-6 md:order-2 md:pr-6">
       
       {/* Columna derecha -> Perfil */}
 <div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0">
