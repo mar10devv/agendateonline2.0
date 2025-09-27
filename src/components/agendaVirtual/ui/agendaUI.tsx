@@ -431,7 +431,7 @@ useEffect(() => {
 )}
 
 
-  <div className="flex ml-20 gap-6 flex-wrap mt-2">
+<div className="flex gap-6 flex-wrap mt-2 justify-center">
     {empleados && empleados.length > 0 ? (
       empleados.map((e, idx) => (
         <button
@@ -458,12 +458,15 @@ useEffect(() => {
   </div>
 </div>
             {/* Calendario */}
-                  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
-        <div className="w-full max-w-sm">
-          <h2 className="text-lg font-semibold mb-4 ml-2">Mi Agenda</h2>
-                <CalendarioUI />
-              </div>
-            </div>
+<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
+  <div className="max-w-sm w-full flex flex-col items-center">
+    <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
+    <div className="flex justify-center">
+      <CalendarioUI />
+    </div>
+  </div>
+</div>
+
           </div>
               {/* Columna derecha */}
     <div className="flex flex-col gap-6 order-1">
@@ -589,7 +592,7 @@ useEffect(() => {
 </div>
 {/* 🔹 Fin Perfil */}
 
-{/* Columna derecha -> Mapa */}
+
 {/* Columna derecha -> Mapa */}
 <div className="hidden md:flex order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex-col items-center text-center shadow-lg relative">
   {/* Botón inicial si no hay ubicación */}

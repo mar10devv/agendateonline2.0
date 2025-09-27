@@ -39,6 +39,10 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
 
   const [empleadoAEliminar, setEmpleadoAEliminar] = useState<number | null>(null);
   const [mostrarAviso, setMostrarAviso] = useState(false);
+  const hayEmpleadoSinEditar = config?.empleadosData?.some(
+  (emp: Empleado) => !emp.nombre?.trim()
+);
+
 
   // 🔑 Detectar usuario y cargar config
   useEffect(() => {
@@ -109,119 +113,132 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   return (
     <>
       <ModalBase
-        abierto={abierto}
-        onClose={onCerrar}
-        titulo="Configuración de empleados"
-        maxWidth="max-w-4xl"
-      >
-        {estado === "cargando" && <p>Cargando...</p>}
-        {estado === "sin-acceso" && (
-          <p className="text-red-400">🚫 No tienes acceso</p>
-        )}
-        {estado === "listo" && (
-          <div className="flex flex-col gap-6">
-            {config.empleadosData.map((empleado: Empleado, index: number) => (
-              <div
-                key={index}
-                className="relative border border-gray-700 rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center bg-neutral-800"
-              >
-                {/* Botón eliminar */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmpleadoAEliminar(index);
-                    setMostrarAviso(true);
-                  }}
-                  className="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full 
-                             bg-red-600 text-white text-sm font-bold 
-                             hover:bg-red-700 active:bg-red-800"
-                  title="Eliminar empleado"
-                >
-                  X
-                </button>
-
-                {/* Foto perfil */}
-                <div className="relative">
-                  <input
-                    id={`fotoPerfil-${index}`}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) =>
-                      handleFotoPerfil(index, e.target.files?.[0] || null)
-                    }
-                  />
-                  <label
-                    htmlFor={`fotoPerfil-${index}`}
-                    className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
-                  >
-                    {empleado.fotoPerfil ? (
-                      <img
-                        src={empleado.fotoPerfil}
-                        alt=""
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      <span className="text-xl text-gray-400">+</span>
-                    )}
-                  </label>
-                </div>
-
-                {/* Datos */}
-                <div className="flex-1 flex flex-col gap-3">
-                  <input
-                    type="text"
-                    placeholder="Nombre del empleado"
-                    value={empleado.nombre}
-                    onChange={(e) =>
-                      handleChangeEmpleado(index, "nombre", e.target.value)
-                    }
-                    className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white focus:ring-2 focus:ring-green-600"
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setEmpleadoSeleccionado(index)}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700 transition"
-                    >
-                      Configurar horario
-                    </button>
-                    <button
-  type="button"
-  onClick={() => setEmpleadoServicios(index)} // 👈 guarda el índice del empleado
-  className="px-4 py-2 bg-purple-600 text-white rounded-md shadow hover:bg-purple-700 transition"
+  abierto={abierto}
+  onClose={onCerrar}
+  titulo="Configuración de empleados"
+  maxWidth="max-w-4xl"
 >
-  Configurar servicios
-</button>
+  {estado === "cargando" && <p>Cargando...</p>}
+  {estado === "sin-acceso" && (
+    <p className="text-red-400">🚫 No tienes acceso</p>
+  )}
+  {estado === "listo" && (
+    <div className="flex flex-col h-[70vh]">
+      {/* 🔹 Contenido scrollable */}
+      <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex flex-col gap-6">
+          {config.empleadosData.map((empleado: Empleado, index: number) => (
+            <div
+              key={index}
+              className="relative border border-gray-700 rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center bg-neutral-800"
+            >
+              {/* Botón eliminar */}
+              <button
+                type="button"
+                onClick={() => {
+                  setEmpleadoAEliminar(index);
+                  setMostrarAviso(true);
+                }}
+                className="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full 
+                           bg-red-600 text-white text-sm font-bold 
+                           hover:bg-red-700 active:bg-red-800"
+                title="Eliminar empleado"
+              >
+                X
+              </button>
 
-                  </div>
+              {/* Foto perfil */}
+              <div className="relative">
+                <input
+                  id={`fotoPerfil-${index}`}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) =>
+                    handleFotoPerfil(index, e.target.files?.[0] || null)
+                  }
+                />
+                <label
+                  htmlFor={`fotoPerfil-${index}`}
+                  className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
+                >
+                  {empleado.fotoPerfil ? (
+                    <img
+                      src={empleado.fotoPerfil}
+                      alt=""
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <span className="text-xl text-gray-400">+</span>
+                  )}
+                </label>
+              </div>
+
+              {/* Datos */}
+              <div className="flex-1 flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Nombre del empleado"
+                  value={empleado.nombre}
+                  onChange={(e) =>
+                    handleChangeEmpleado(index, "nombre", e.target.value)
+                  }
+                  className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white focus:ring-2 focus:ring-green-600"
+                />
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEmpleadoSeleccionado(index)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700 transition"
+                  >
+                    Configurar horario
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEmpleadoServicios(index)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md shadow hover:bg-purple-700 transition"
+                  >
+                    Configurar servicios
+                  </button>
                 </div>
               </div>
-            ))}
-
-            {/* Botón guardar / añadir */}
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() =>
-                  setConfig((prev: any) => ({
-                    ...prev,
-                    empleadosData: [...prev.empleadosData, crearEmpleadoVacio()],
-                  }))
-                }
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow hover:bg-blue-700 transition"
-              >
-                ➕ Añadir empleado
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl shadow hover:opacity-90 transition"
-              >
-                Guardar cambios
-              </button>
             </div>
-          </div>
-        )}
-      </ModalBase>
+          ))}
+        </div>
+      </div>
+
+
+      {/* 🔹 Botones fijos abajo */}
+<div className="flex flex-col sm:flex-row justify-between sm:justify-end mt-4 pt-4 border-t border-gray-700 bg-neutral-900 gap-3">
+  <button
+  onClick={() =>
+    setConfig((prev: any) => ({
+      ...prev,
+      empleadosData: [crearEmpleadoVacio(), ...prev.empleadosData],
+    }))
+  }
+  disabled={hayEmpleadoSinEditar} // 👈 deshabilitado si hay uno en edición
+  className={`px-6 py-3 rounded-xl shadow transition ${
+    hayEmpleadoSinEditar
+      ? "bg-gray-500 cursor-not-allowed opacity-60"
+      : "bg-blue-600 hover:bg-blue-700 text-white"
+  }`}
+>
+  ➕ Añadir empleado
+</button>
+
+  <button
+    onClick={handleSubmit}
+    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl shadow hover:opacity-90 transition sm:order-2"
+  >
+    Guardar cambios
+  </button>
+</div>
+
+    </div>
+  )}
+</ModalBase>
+
 
       {/* Modal horario */}
       {empleadoSeleccionado !== null && (

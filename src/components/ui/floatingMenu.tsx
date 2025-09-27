@@ -12,20 +12,18 @@ const Button = () => {
           type="checkbox"
         />
         <label htmlFor="menu-open" className="menu-open-button">
-          <span className="lines line-1" />
-          <span className="lines line-2" />
-          <span className="lines line-3" />
+          <i className="fa fa-bars" /> {/* ✅ Botón principal azul */}
         </label>
 
-        {/* ✅ Solo dejamos estos 3 */}
-        <a className="menu-item purple" href="#">
-          <i className="fa fa-microphone" />
+        {/* ✅ Botones desplegables con íconos */}
+        <a className="menu-item location" href="#">
+          <i className="fa fa-map-marker-alt" /> {/* 📍 Ubicación */}
         </a>
-        <a className="menu-item lightblue" href="#">
-          <i className="fa fa-diamond" />
+        <a className="menu-item calendar" href="#">
+          <i className="fa fa-calendar" /> {/* 📅 Agenda */}
         </a>
-        <a className="menu-item orange" href="#">
-          <i className="fa fa-star" />
+        <a className="menu-item whatsapp" href="#">
+          <i className="fa fa-whatsapp" /> {/* 💬 WhatsApp */}
         </a>
       </nav>
     </StyledWrapper>
@@ -33,86 +31,80 @@ const Button = () => {
 };
 
 const StyledWrapper = styled.div`
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+
+  /* 🔹 Ocultar en escritorio, mostrar solo en pantallas hasta 768px */
+  @media (min-width: 769px) {
+    display: none;
+  }
+
   .menu-item,
   .menu-open-button {
-    background: #eeeeee;
     border-radius: 100%;
-    width: 80px;
-    height: 80px;
-    margin-left: -40px;
+    width: 60px;
+    height: 60px;
+    margin-left: -20px;
+bottom: 50px;
     position: absolute;
-    color: #ffffff;
-    text-align: center;
-    line-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
     transition: transform ease-out 200ms;
+    box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.25);
   }
 
   .menu-open {
     display: none;
   }
 
-  .lines {
-    width: 25px;
-    height: 3px;
-    background: #596778;
-    display: block;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    margin-left: -12.5px;
-    margin-top: -1.5px;
-  }
-  .line-1 {
-    transform: translate3d(0, -8px, 0);
-  }
-  .line-2 {
-    transform: translate3d(0, 0, 0);
-  }
-  .line-3 {
-    transform: translate3d(0, 8px, 0);
-  }
-
   .menu {
     margin: auto;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    position: relative;
     width: 80px;
     height: 80px;
     text-align: center;
     font-size: 26px;
   }
 
-  /* 👉 Mantener posiciones exactas */
-  .menu-open:checked ~ .menu-item.purple {
-    transform: translate3d(0, -105px, 0); /* Arriba */
+  /* ✅ Tus coordenadas NO se tocan */
+  .menu-open:checked ~ .menu-item.location {
+    transform: translate3d(0, -90px, 0); /* Arriba */
   }
-  .menu-open:checked ~ .menu-item.lightblue {
-    transform: translate3d(-95px, 32px, 0); /* Izquierda */
+  .menu-open:checked ~ .menu-item.calendar {
+    transform: translate3d(-75px, 32px, 0); /* Izquierda */
   }
-  .menu-open:checked ~ .menu-item.orange {
-    transform: translate3d(-95px, -72px, 0); /* Derecha */
+  .menu-open:checked ~ .menu-item.whatsapp {
+    transform: translate3d(-70px, -52px, 0); /* Derecha */
   }
 
+  /* ✅ Botón central azul */
   .menu-open-button {
+    background: #007bff;
+    color: #fff;
     z-index: 2;
-    transition: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    transform: scale(1.1);
     cursor: pointer;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.14);
+    transition: 0.3s;
+  }
+  .menu-open-button:hover {
+    background: #0056b3;
   }
 
-  /* Colores */
-  .purple {
-    background-color: #b908ff;
+  /* ✅ Colores e íconos en blanco */
+  .location {
+    background-color: #17a2b8; /* celeste */
+    color: white;
   }
-  .lightblue {
-    background-color: #62c2e4;
+  .calendar {
+    background-color: #6f42c1; /* violeta agenda */
+    color: white;
   }
-  .orange {
-    background-color: #fc913a;
+  .whatsapp {
+    background-color: #25d366; /* verde WhatsApp */
+    color: white;
   }
 `;
 
