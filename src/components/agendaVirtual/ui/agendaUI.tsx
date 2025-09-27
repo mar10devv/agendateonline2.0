@@ -122,6 +122,8 @@ export default function AgendaVirtualUI({
   const [nuevoNombreNegocio, setNuevoNombreNegocio] = useState(negocio.nombre);
   const [nombreNegocio, setNombreNegocio] = useState(negocio.nombre);
 const [servicios, setServicios] = useState<Servicio[]>(negocio.servicios || []);
+const [empleadosState, setEmpleadosState] = useState<Empleado[]>(empleados || []);
+
 
 const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -292,6 +294,17 @@ useEffect(() => {
     unsubscribeServicios = unsub;
   });
 
+  // 👉 Escuchar empleados
+  let unsubscribeEmpleados: () => void;
+
+  import("../backend/agenda-backend").then(({ escucharEmpleados }) => {
+    escucharEmpleados(negocio.slug, (emps) => {
+      setEmpleadosState(emps); // 👈 refresca empleados
+    }).then((unsub) => {
+      unsubscribeEmpleados = unsub;
+    });
+  });
+
   // 👉 Escuchar ubicación del negocio en tiempo real
   const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
   const unsubscribeNegocio = onSnapshot(q, (snap) => {
@@ -303,11 +316,14 @@ useEffect(() => {
     }
   });
 
+  // 🔹 Limpieza de listeners
   return () => {
     if (unsubscribeServicios) unsubscribeServicios();
+    if (unsubscribeEmpleados) unsubscribeEmpleados();
     unsubscribeNegocio();
   };
-}, [negocio.slug]);
+}, [negocio.slug, modalAbierto]); // 👈 importante incluir modalAbierto
+
 
 
   return (
@@ -432,8 +448,8 @@ useEffect(() => {
 
 
 <div className="flex gap-6 flex-wrap mt-2 justify-center">
-    {empleados && empleados.length > 0 ? (
-      empleados.map((e, idx) => (
+    {empleadosState && empleadosState.length > 0 ? (
+  empleadosState.map((e, idx) => (
         <button
           key={idx}
           onClick={() => setEmpleadoSeleccionado(e)}

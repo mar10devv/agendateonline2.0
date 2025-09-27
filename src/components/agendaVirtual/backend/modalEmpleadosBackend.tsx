@@ -61,14 +61,15 @@ export function crearEmpleadoVacio(): Empleado {
   return {
     nombre: "",
     fotoPerfil: "",
-    trabajos: Array(6).fill(""),
+    trabajos: [],  // 👈 empezamos vacío de verdad
     calendario: {
-      inicio: "08:00",
-      fin: "17:00",
+      inicio: "",
+      fin: "",
       diasLibres: [],
     },
   };
 }
+
 
 // 📌 Actualizar datos de un empleado dentro de config
 export function actualizarEmpleado(

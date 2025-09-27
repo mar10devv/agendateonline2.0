@@ -237,39 +237,45 @@ export async function escucharEmpleados(
     return () => {};
   }
 
-const negocioId = negocioDocs.docs[0].id;
-const empleadosRef = collection(db, "Negocios", negocioId, "Empleados");
+  const negocioId = negocioDocs.docs[0].id;
+  const negocioRef = doc(db, "Negocios", negocioId);
 
-const unsubscribe = onSnapshot(empleadosRef, (snapshot) => {
-  if (snapshot.empty) {
-    // ⚡ Si no hay subcolección, devuelvo un único empleado con los datos del negocio
-    const negocioData = negocioDocs.docs[0].data();
-    callback([
-      {
-        id: negocioId,
-        nombre: negocioData.nombre || "Empleado",
-        foto: negocioData.fotoPerfil || "",   // 👈 normalizado
-        especialidad: negocioData.plantilla || "",
-        calendario: negocioData.configuracionAgenda || {},
-      },
-    ]);
-  } else {
-    const empleados = snapshot.docs.map((doc) => {
-      const data = doc.data() as any;
-      return {
-        id: doc.id,
-        nombre: data.nombre || "Empleado",
-        foto: data.fotoPerfil || "",   // 👈 normalizado
-        especialidad: data.especialidad || "",
-        calendario: data.calendario || {},
-      } as Empleado;
-    });
-    callback(empleados);
-  }
-});
+  // 🔹 Escuchar TODO el documento (así también vemos cuando se actualiza empleadosData)
+  const unsubscribe = onSnapshot(negocioRef, (snap) => {
+    if (!snap.exists()) {
+      callback([]);
+      return;
+    }
 
-return unsubscribe;
- }
+    const data = snap.data();
+
+    // ⚡ Si tiene array empleadosData -> usarlo
+    if (Array.isArray(data.empleadosData) && data.empleadosData.length > 0) {
+      const empleados = data.empleadosData.map((e: any, idx: number) => ({
+        id: e.id || idx.toString(),
+        nombre: e.nombre || "Empleado",
+        foto: e.foto || e.fotoPerfil || "",
+        especialidad: e.especialidad || "",
+        calendario: e.calendario || {},
+      }));
+      callback(empleados);
+    } else {
+      // ⚡ Si no tiene array empleadosData -> usar fallback con datos básicos
+      callback([
+        {
+          id: negocioId,
+          nombre: data.nombre || "Empleado",
+          foto: data.foto || data.fotoPerfil || "",
+          especialidad: data.plantilla || "",
+          calendario: data.configuracionAgenda || {},
+        },
+      ]);
+    }
+  });
+
+  return unsubscribe;
+}
+
 
 // 📆 Obtener turnos por fecha
 export async function getTurnos(slug: string, fecha: string): Promise<Turno[]> {

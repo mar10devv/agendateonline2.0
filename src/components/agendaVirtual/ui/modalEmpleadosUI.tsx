@@ -4,7 +4,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import ModalServicios from "../modalServicios";
-
 import ModalBase from "../../ui/modalGenerico";
 import ModalAviso from "../../ui/modalAviso";
 import ModalHorariosEmpleados from "./modalEmpleadosHorarios";
@@ -17,7 +16,10 @@ import {
   actualizarEmpleado,
   eliminarEmpleado,
 } from "../backend/modalEmpleadosBackend";
-import type { Empleado } from "../backend/modalEmpleadosBackend"; // ✅ import type
+import type { Empleado } from "../backend/modalEmpleadosBackend";
+
+// ⚠️ Ícono de alerta
+import AlertIcon from "../../../assets/alert.svg?url";
 
 type Props = {
   abierto: boolean;
@@ -67,7 +69,7 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
               empleadosData:
                 negocioConfig.empleadosData?.length
                   ? negocioConfig.empleadosData
-                  : [crearEmpleadoVacio()], // ✅ safe-check
+                  : [crearEmpleadoVacio()],
             });
             setEstado("listo");
           }
@@ -97,18 +99,17 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
   const handleSubmit = async () => {
     if (!user) return;
 
-    setEstado("guardando"); // ⏳ Arrancamos guardando
+    setEstado("guardando");
     try {
-      await guardarEmpleados(user.uid, config); // ✅ Guardamos en Firebase
-      setEstado("exito"); // 🎉 Mostramos "Guardado con éxito"
+      await guardarEmpleados(user.uid, config);
+      setEstado("exito");
 
-      // Después de 2s volvemos a "listo" para permitir otro guardado
       setTimeout(() => {
         setEstado("listo");
       }, 2000);
     } catch (error) {
       console.error("Error guardando empleados:", error);
-      setEstado("listo"); // 🔄 volvemos a listo si falla
+      setEstado("listo");
     }
   };
 
@@ -131,83 +132,133 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
             {/* 🔹 Contenido scrollable */}
             <div className="flex-1 overflow-y-auto pr-2">
               <div className="flex flex-col gap-6">
-                {config.empleadosData.map((empleado: Empleado, index: number) => (
-                  <div
-                    key={index}
-                    className="relative border border-gray-700 rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center bg-neutral-800"
-                  >
-                    {/* Botón eliminar */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmpleadoAEliminar(index);
-                        setMostrarAviso(true);
-                      }}
-                      className="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full 
+                {config.empleadosData.map((empleado: Empleado, index: number) => {
+                  // ⚡ Validaciones
+                  const faltaHorario =
+                    !empleado.calendario ||
+                    !empleado.calendario.inicio ||
+                    !empleado.calendario.fin;
+
+                  const faltaServicios =
+                    !Array.isArray(empleado.trabajos) ||
+                    empleado.trabajos.length === 0 ||
+                    empleado.trabajos.every((t) => !t.trim());
+
+                  return (
+                    <div
+                      key={index}
+                      className="relative border border-gray-700 rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center bg-neutral-800"
+                    >
+                      {/* Botón eliminar */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmpleadoAEliminar(index);
+                          setMostrarAviso(true);
+                        }}
+                        className="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full 
                            bg-red-600 text-white text-sm font-bold 
                            hover:bg-red-700 active:bg-red-800"
-                      title="Eliminar empleado"
-                    >
-                      X
-                    </button>
-
-                    {/* Foto perfil */}
-                    <div className="relative">
-                      <input
-                        id={`fotoPerfil-${index}`}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleFotoPerfil(index, e.target.files?.[0] || null)
-                        }
-                      />
-                      <label
-                        htmlFor={`fotoPerfil-${index}`}
-                        className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
+                        title="Eliminar empleado"
                       >
-                        {empleado.fotoPerfil ? (
-                          <img
-                            src={empleado.fotoPerfil}
-                            alt=""
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <span className="text-xl text-gray-400">+</span>
-                        )}
-                      </label>
-                    </div>
+                        X
+                      </button>
 
-                    {/* Datos */}
-                    <div className="flex-1 flex flex-col gap-3">
-                      <input
-                        type="text"
-                        placeholder="Nombre del empleado"
-                        value={empleado.nombre}
-                        onChange={(e) =>
-                          handleChangeEmpleado(index, "nombre", e.target.value)
-                        }
-                        className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white focus:ring-2 focus:ring-green-600"
-                      />
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setEmpleadoSeleccionado(index)}
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700 transition"
+                      {/* Foto perfil */}
+                      <div className="relative">
+                        <input
+                          id={`fotoPerfil-${index}`}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleFotoPerfil(index, e.target.files?.[0] || null)
+                          }
+                        />
+                        <label
+                          htmlFor={`fotoPerfil-${index}`}
+                          className="w-24 h-24 rounded-full bg-neutral-700 flex items-center justify-center cursor-pointer overflow-hidden shadow-sm hover:border-green-500 transition"
                         >
-                          Configurar horario
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEmpleadoServicios(index)}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-md shadow hover:bg-purple-700 transition"
-                        >
-                          Configurar servicios
-                        </button>
+                          {empleado.fotoPerfil ? (
+                            <img
+                              src={empleado.fotoPerfil}
+                              alt=""
+                              className="object-cover w-full h-full"
+                            />
+                          ) : (
+                            <span className="text-xl text-gray-400">+</span>
+                          )}
+                        </label>
+                      </div>
+
+                      {/* Datos */}
+                      <div className="flex-1 flex flex-col gap-3">
+                        <input
+                          type="text"
+                          placeholder="Nombre del empleado"
+                          value={empleado.nombre}
+                          onChange={(e) =>
+                            handleChangeEmpleado(index, "nombre", e.target.value)
+                          }
+                          className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white focus:ring-2 focus:ring-green-600"
+                        />
+                        <div className="flex gap-3">
+                          {/* Botón horario */}
+                          <div className="relative flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => setEmpleadoSeleccionado(index)}
+                              className={`px-4 py-2 rounded-md shadow transition ${
+                                faltaHorario
+                                  ? "bg-yellow-500 text-black animate-pulse"
+                                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+                              }`}
+                            >
+                              Configurar horario
+                            </button>
+                            {faltaHorario && (
+                              <img
+                                src={AlertIcon}
+                                alt="Falta configurar horario"
+                                className="absolute -right-3 -top-3 w-6 h-6 animate-pulse"
+                                style={{
+                                  filter:
+                                    "invert(67%) sepia(90%) saturate(500%) hue-rotate(350deg) brightness(95%)",
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Botón servicios */}
+                          <div className="relative flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => setEmpleadoServicios(index)}
+                              className={`px-4 py-2 rounded-md shadow transition ${
+                                faltaServicios
+                                  ? "bg-yellow-500 text-black animate-pulse"
+                                  : "bg-purple-600 text-white hover:bg-purple-700"
+                              }`}
+                            >
+                              Configurar servicios
+                            </button>
+                            {faltaServicios && (
+                              <img
+                                src={AlertIcon}
+                                alt="Falta configurar servicios"
+                                className="absolute -right-3 -top-3 w-6 h-6 animate-pulse"
+                                style={{
+                                  filter:
+                                    "invert(67%) sepia(90%) saturate(500%) hue-rotate(350deg) brightness(95%)",
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -220,7 +271,7 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
                     empleadosData: [crearEmpleadoVacio(), ...prev.empleadosData],
                   }))
                 }
-                disabled={hayEmpleadoSinEditar} // 👈 deshabilitado si hay uno en edición
+                disabled={hayEmpleadoSinEditar}
                 className={`px-6 py-3 rounded-xl shadow transition ${
                   hayEmpleadoSinEditar
                     ? "bg-gray-500 cursor-not-allowed opacity-60"
@@ -230,7 +281,7 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
                 ➕ Añadir empleado
               </button>
 
-              {/* Botón Guardar con labels dinámicos */}
+              {/* Botón Guardar */}
               <button
                 onClick={handleSubmit}
                 disabled={esGuardando}
@@ -260,9 +311,10 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
           onClose={() => setEmpleadoSeleccionado(null)}
           horario={
             config.empleadosData[empleadoSeleccionado]?.calendario || {
-              inicio: "08:00",
-              fin: "17:00",
+              inicio: "",
+              fin: "",
               diasLibres: [],
+              diaYMedio: null,
             }
           }
           onGuardar={(nuevoHorario) => {
@@ -300,7 +352,7 @@ export default function ModalEmpleadosUI({ abierto, onCerrar }: Props) {
         <ModalServicios
           abierto={empleadoServicios !== null}
           onCerrar={() => setEmpleadoServicios(null)}
-          negocioId={user?.uid} // 👈 ID del negocio dueño de los servicios
+          negocioId={user?.uid}
           trabajosEmpleado={config.empleadosData[empleadoServicios].trabajos || []}
           onGuardar={(trabajosActualizados) => {
             const nuevo = [...config.empleadosData];
