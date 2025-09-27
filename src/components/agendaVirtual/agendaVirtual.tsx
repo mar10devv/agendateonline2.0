@@ -9,13 +9,14 @@ import {
   type Empleado,
   type Negocio,
 } from "./backend/agenda-backend";
-import AgendaVirtualUI from "./ui/agendaUI"; // 👈 Importa tu UI
+import AgendaVirtualUI from "./ui/agendaUI";
+import LoaderAgenda from "../ui/loaderAgenda"; // 👈 tu loader
 
 type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente";
 
 export default function AgendaVirtual() {
-  const slug = window.location.pathname.split("/")[2]; // Ajustalo si tenés otra forma
+  const slug = window.location.pathname.split("/")[2];
   const [estado, setEstado] = useState<Estado>("cargando");
   const [modo, setModo] = useState<Modo>("cliente");
   const [negocio, setNegocio] = useState<Negocio | null>(null);
@@ -42,30 +43,38 @@ export default function AgendaVirtual() {
     });
   }, [slug, fechaSeleccionada]);
 
+  // 👇 Pantalla de carga
   if (estado === "cargando") {
     return (
-      <div className="text-white text-center p-10 animate-pulse">
-        Cargando agenda...
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white gap-6">
+        {/* Loader con animación */}
+        <LoaderAgenda />
+
+        {/* Texto debajo del logo */}
+        <p className="text-lg font-medium animate-pulse">
+          Cargando agenda...
+        </p>
       </div>
     );
   }
 
-if (estado === "no-sesion") {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-black text-white">
-      <div className="text-center space-y-4">
-        <p className="text-lg font-medium">Debes iniciar sesión para ver la agenda</p>
-        <button
-          onClick={loginConGoogle}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl transition"
-        >
-          Iniciar sesión con Google
-        </button>
+  if (estado === "no-sesion") {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black text-white">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-medium">
+            Debes iniciar sesión para ver la agenda
+          </p>
+          <button
+            onClick={loginConGoogle}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl transition"
+          >
+            Iniciar sesión con Google
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   if (!negocio) {
     return (
