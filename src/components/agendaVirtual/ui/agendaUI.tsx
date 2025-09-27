@@ -113,7 +113,7 @@ export default function AgendaVirtualUI({
   const [empleadoSeleccionado, setEmpleadoSeleccionado] =
     useState<Empleado | null>(null);
   const [subiendo, setSubiendo] = useState(false);
-  const [logo, setLogo] = useState(negocio.perfilLogo || "");
+
 
   // 👇 Estados para servicios
   const [modalServiciosAbierto, setModalServiciosAbierto] = useState(false);
@@ -123,9 +123,6 @@ export default function AgendaVirtualUI({
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [nuevoNombreNegocio, setNuevoNombreNegocio] = useState(negocio.nombre);
   const [nombreNegocio, setNombreNegocio] = useState(negocio.nombre);
-const [servicios, setServicios] = useState<Servicio[]>(negocio.servicios || []);
-const [empleadosState, setEmpleadosState] = useState<Empleado[]>(empleados || []);
-
 
 const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -151,6 +148,26 @@ const handleMouseDown = (e: React.MouseEvent) => {
   document.addEventListener("mouseup", handleMouseUp);
 };
 
+ // 👇 Hook para logo
+  const [logo, setLogo] = useAgendaCache<string>(
+    negocio.slug,
+    "logo",
+    negocio.perfilLogo || ""
+  );
+
+  // 👇 Hook para empleados
+  const [empleadosState, setEmpleadosState] = useAgendaCache(
+    negocio.slug,
+    "empleados",
+    empleados || []
+  );
+
+  // 👇 Hook para servicios
+  const [servicios, setServicios] = useAgendaCache(
+    negocio.slug,
+    "servicios",
+    negocio.servicios || []
+  );
 
 
 
