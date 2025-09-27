@@ -402,65 +402,170 @@ useEffect(() => {
           </a>
         </div>
 
-        {/* Descripción */}
+        {/* Descripción editable */}
         <div className="mt-6 w-full px-2">
-          <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
-            {negocio.descripcion || "Este negocio aún no tiene descripción."}
-          </p>
+          {modo === "dueño" ? (
+            <div className="flex flex-col items-stretch gap-2 w-full">
+              <textarea
+                maxLength={200}
+                rows={4}
+                style={{
+                  minHeight: "4rem",
+                  overflow: editandoDescripcion ? "auto" : "hidden",
+                }}
+                placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
+                className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
+                  editandoDescripcion
+                    ? "bg-neutral-700 rounded p-2"
+                    : "bg-transparent"
+                }`}
+                value={nuevaDescripcion}
+                onFocus={() => setEditandoDescripcion(true)}
+                onBlur={() => {
+                  if (nuevaDescripcion.trim() === (negocio.descripcion || "")) {
+                    setEditandoDescripcion(false);
+                  }
+                }}
+                onInput={(e) => {
+                  const el = e.target as HTMLTextAreaElement;
+                  el.style.height = "auto";
+                  el.style.height = el.scrollHeight + "px";
+                  setNuevaDescripcion(el.value);
+                }}
+              />
+              {editandoDescripcion && (
+                <button
+                  onClick={handleGuardarDescripcion}
+                  disabled={
+                    nuevaDescripcion.trim() === (negocio.descripcion || "")
+                  }
+                  className={`px-4 py-2 rounded font-medium transition ${
+                    nuevaDescripcion.trim() === (negocio.descripcion || "")
+                      ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
+                >
+                  Guardar
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
+              {negocio.descripcion || "Este negocio aún no tiene descripción."}
+            </p>
+          )}
         </div>
       </div>
       {/* 🔹 Fin Perfil */}
 
       {/* 🔹 Ubicación */}
-      <div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
-        {!ubicacion && modo === "dueño" && (
+<div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+  {/* Botón inicial si no hay ubicación */}
+  {modo === "dueño" && !ubicacion && (
+    <button
+      onClick={handleGuardarUbicacion}
+      disabled={estadoUbicacion === "cargando"}
+      className={`px-4 py-2 rounded-md flex items-center gap-2 transition ${
+        estadoUbicacion === "cargando"
+          ? "bg-gray-600 text-white"
+          : estadoUbicacion === "exito"
+          ? "bg-green-600 text-white"
+          : "bg-indigo-600 hover:bg-indigo-700 text-white"
+      }`}
+    >
+      {estadoUbicacion === "cargando" && (
+        <>
+          <LoaderSpinner size={20} color="white" />
+          Buscando nueva ubicación...
+        </>
+      )}
+      {estadoUbicacion === "exito" && "✅ Se cargó la nueva ubicación"}
+      {estadoUbicacion === "idle" && "Usar mi ubicación actual"}
+    </button>
+  )}
+
+  {/* Mapa y botón actualizar */}
+  {ubicacion && (
+    <div className="w-full flex flex-col gap-4">
+      <div className="h-64 rounded-md overflow-hidden border">
+        <MapContainer
+          key={`${ubicacion.lat}-${ubicacion.lng}`}
+          center={[ubicacion.lat, ubicacion.lng]}
+          zoom={16}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          <Marker
+            position={[ubicacion.lat, ubicacion.lng]}
+            icon={customIcon}
+            draggable={modo === "dueño"}
+            eventHandlers={
+              modo === "dueño"
+                ? {
+                    dragend: async (e) => {
+                      const newPos = e.target.getLatLng();
+                      const direccion = await obtenerDireccion(
+                        newPos.lat,
+                        newPos.lng
+                      );
+                      const nuevaUbicacion = {
+                        lat: newPos.lat,
+                        lng: newPos.lng,
+                        direccion,
+                      };
+                      await guardarUbicacionNegocio(
+                        negocio.slug,
+                        nuevaUbicacion
+                      );
+                      setUbicacion(nuevaUbicacion);
+                    },
+                  }
+                : {}
+            }
+          >
+            {modo === "dueño" && (
+              <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+            )}
+          </Marker>
+        </MapContainer>
+      </div>
+
+      {modo === "dueño" && (
+        <div className="flex justify-end w-full">
           <button
             onClick={handleGuardarUbicacion}
             disabled={estadoUbicacion === "cargando"}
-            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white"
+            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition ${
+              estadoUbicacion === "cargando"
+                ? "bg-gray-600 text-white"
+                : estadoUbicacion === "exito"
+                ? "bg-green-600 text-white"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
           >
-            📍 Usar mi ubicación actual
-          </button>
-        )}
-
-        {ubicacion && (
-          <div className="w-full flex flex-col gap-4">
-            <div className="h-64 rounded-md overflow-hidden border">
-              <MapContainer
-                key={`${ubicacion.lat}-${ubicacion.lng}`}
-                center={[ubicacion.lat, ubicacion.lng]}
-                zoom={16}
-                style={{ width: "100%", height: "100%" }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                <Marker
-                  position={[ubicacion.lat, ubicacion.lng]}
-                  icon={customIcon}
-                >
-                  {modo === "dueño" && (
-                    <Popup>Mueve el pin si la ubicación no es correcta</Popup>
-                  )}
-                </Marker>
-              </MapContainer>
-            </div>
-
-            {modo === "dueño" && (
-              <button
-                onClick={handleGuardarUbicacion}
-                disabled={estadoUbicacion === "cargando"}
-                className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                📍 Actualizar ubicación
-              </button>
+            {estadoUbicacion === "cargando" && (
+              <>
+                <LoaderSpinner size={14} color="white" />
+                Buscando...
+              </>
             )}
-          </div>
-        )}
+            {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
+            {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+          </button>
+        </div>
+      )}
+    </div>
+  )}
+</div>
+</div>
+{/* 🔹 Fin Ubicación */}
 
-         </div>
-      </div>
+
+
+    
           {/* Columna izquierda -> servicios y empleados */}
           <div className="order-2 md:order-1 md:col-span-2 space-y-8">
             
