@@ -35,6 +35,8 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import LoaderSpinner from "../../ui/loaderSpinner"; 
+import ModalCalendario from "../ui/modalCalendario";
+
 
 // ✅ Icono personalizado para Leaflet
 const customIcon = new L.Icon({
@@ -117,7 +119,7 @@ export default function AgendaVirtualUI({
 
   // 👇 Estados para servicios
   const [modalServiciosAbierto, setModalServiciosAbierto] = useState(false);
-
+const [modalCalendarioAbierto, setModalCalendarioAbierto] = useState(false);
 
   // 👇 Estados para editar nombre/slug
   const [editandoNombre, setEditandoNombre] = useState(false);
@@ -546,14 +548,37 @@ useEffect(() => {
   </div>
 </div>
             {/* Calendario */}
-<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
+<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center relative">
+  {/* ⚙️ Tuerca de configuración */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalCalendarioAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar calendario"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+  )}
+
   <div className="max-w-sm w-full flex flex-col items-center">
     <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
     <div className="flex justify-center">
       <CalendarioUI />
     </div>
   </div>
-  </div>
+</div>
+
+{/* Modal Calendario */}
+{modo === "dueño" && (
+  <ModalCalendario
+    abierto={modalCalendarioAbierto}
+    onCerrar={() => setModalCalendarioAbierto(false)}
+    negocioId={negocio.id}
+  />
+)}
 </div>
             {/* Columna derecha */}
 <div className="flex flex-col gap-6 order-1 md:pr-6">
