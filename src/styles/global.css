@@ -1,4 +1,9 @@
 @import "animate.css/animate.min.css";
+@import "swiper/css";
+@import "swiper/css/navigation";
+@import "swiper/css/pagination";
+
+
 
 /* ================= Animaciones de entrada ================= */
 
@@ -126,4 +131,31 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome, Safari y Opera */
+}
+
+/* ===== Scrollbar carrousel ===== */
+
+/* Ocultar flechas */
+.custom-swiper .swiper-button-next,
+.custom-swiper .swiper-button-prev {
+  display: none !important;
+}
+
+/* Forzar a que los puntitos estén visibles y centrados */
+.custom-swiper .swiper-pagination {
+  position: relative !important;  /* 👈 en flujo normal */
+  margin-top: 12px;              /* 👈 espacio hacia abajo */
+  bottom: 0 !important;          /* 👈 reseteo del absolute */
+  text-align: center !important;
+}
+
+/* Colores de los puntitos */
+.custom-swiper .swiper-pagination-bullet {
+  background: white !important;
+  opacity: 0.4;
+}
+
+.custom-swiper .swiper-pagination-bullet-active {
+  background: white !important;
+  opacity: 1;
 }

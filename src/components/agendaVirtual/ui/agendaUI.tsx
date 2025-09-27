@@ -16,7 +16,8 @@ import {
 
 import { db } from "../../../lib/firebase";
 import FloatingMenu from "../../ui/floatingMenu";
-
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 
 import {
   subirLogoNegocio,
@@ -354,56 +355,50 @@ useEffect(() => {
 <div className="relative md:-mt-16 px-4 pb-10">
 <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[60%_40%] gap-6 items-stretch">
 
-
-    
-
-
-
-    
-          {/* Columna izquierda -> servicios y empleados */}
+      {/* Columna izquierda -> servicios y empleados */}
             <div className="flex flex-col gap-6 order-2 md:order-1">
 
-            
-{/* Servicios */}
+            {/* Servicios */}
 <div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg">
-        <h2 className="text-lg font-semibold mb-4">Servicios</h2>
+  <h2 className="text-lg font-semibold mb-4">Servicios</h2>
 
   {servicios && servicios.length > 0 ? (
-    <div
-      ref={scrollRef}
-      onMouseDown={handleMouseDown}
-      className="flex gap-4 overflow-x-auto flex-nowrap scrollbar-hide cursor-grab active:cursor-grabbing"
+    <Swiper
+      modules={[Pagination, Autoplay]}   // 👈 quitamos Navigation
+      spaceBetween={16}
+      slidesPerView={1.2}
+      pagination={{ clickable: true }}
+      autoplay={{ delay: 2000 }} // ⚡ más rápido
+      loop={true}
+      className="!w-full !h-auto custom-swiper"
+      breakpoints={{
+        640: { slidesPerView: 2 },
+        768: { slidesPerView: 3 },
+        1024: { slidesPerView: 4 },
+      }}
     >
-      {/* Rectángulo de agregar servicio siempre primero */}
-      {modo === "dueño" && (
-        <button
-          onClick={() => setModalServiciosAbierto(true)} // 👈 abre el modal
-          className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
-        >
-          <span className="text-3xl text-gray-400">+</span>
-        </button>
-      )}
-
       {/* Servicios cargados */}
       {servicios.map((s, idx) => (
-        <div
-          key={s.id || idx}
-          className="flex-shrink-0 flex flex-col justify-center items-center w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center"
-        >
-          <p className="font-medium text-white text-sm leading-tight break-words truncate w-full">
-            {s.servicio}
-          </p>
-          <span className="text-sm text-gray-400">${s.precio}</span>
-          <span className="text-xs text-gray-500">{s.duracion} min</span>
-        </div>
+        <SwiperSlide key={s.id || idx}>
+          <div className="flex flex-col justify-center items-center 
+                          w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
+            <p className="font-medium text-white text-sm truncate w-full">
+              {s.servicio}
+            </p>
+            <span className="text-sm text-gray-400">${s.precio}</span>
+            <span className="text-xs text-gray-500">{s.duracion} min</span>
+          </div>
+        </SwiperSlide>
       ))}
-    </div>
+    </Swiper>
   ) : (
     <div className="w-full flex justify-start mt-2">
       {modo === "dueño" ? (
         <button
           onClick={() => setModalServiciosAbierto(true)}
-          className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+          className="w-32 h-24 flex items-center justify-center 
+                     border-2 border-dashed border-gray-500 rounded-xl 
+                     hover:border-white transition"
         >
           <span className="text-3xl text-gray-400">+</span>
         </button>
@@ -413,18 +408,18 @@ useEffect(() => {
     </div>
   )}
 
-{/* Modal para agregar servicios */}
-{modo === "dueño" && (
-  <ModalAgregarServicios
-    abierto={modalServiciosAbierto}
-    onCerrar={() => setModalServiciosAbierto(false)}
-    negocioId={negocio.id}   // ✅ ahora es el ID real
-  />
-)}
+  {/* Modal para agregar servicios */}
+  {modo === "dueño" && (
+    <ModalAgregarServicios
+      abierto={modalServiciosAbierto}
+      onCerrar={() => setModalServiciosAbierto(false)}
+      negocioId={negocio.id}
+    />
+  )}
 </div>
 
 
-{/* Empleados */}
+            {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
         <h2 className="text-lg font-semibold mb-4">Empleados</h2>
 {modo === "dueño" && (
@@ -483,10 +478,9 @@ useEffect(() => {
       <CalendarioUI />
     </div>
   </div>
+  </div>
 </div>
-
-          </div>
-              {/* Columna derecha */}
+            {/* Columna derecha */}
 <div className="flex flex-col gap-6 order-1 md:pr-6">
       
       {/* Columna derecha -> Perfil */}
