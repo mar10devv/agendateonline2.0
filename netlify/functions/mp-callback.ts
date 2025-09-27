@@ -14,6 +14,7 @@ const db = admin.firestore();
 
 // 🔹 Configuración Mercado Pago
 const CLIENT_ID = process.env.MP_CLIENT_ID || "";
+
 const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
 const BASE_URL = process.env.SITE_URL || "";
 

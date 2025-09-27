@@ -17,7 +17,8 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const [mercadoPagoConectado, setMercadoPagoConectado] = useState(false);
 
   // 👇 CLIENT_ID desde .env
-  const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID || "";
+const CLIENT_ID = "7842411370137167";
+
 
   // 🔹 Cargar configuración inicial desde Firestore
   useEffect(() => {
