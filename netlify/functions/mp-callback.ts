@@ -2,7 +2,7 @@
 import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
-import { getStore } from "@netlify/blobs"; // 👈 usamos Netlify Blobs
+import { getStore } from "@netlify/blobs";
 
 // 🔹 Inicializar Firebase Admin (para Firestore)
 if (!admin.apps.length) {
@@ -13,8 +13,9 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // 🔹 Configuración Mercado Pago
-const CLIENT_ID = process.env.MP_CLIENT_ID || "";
-const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
+const CLIENT_ID = process.env.PUBLIC_MP_CLIENT_ID || "";  // 👈 ahora sí correcto
+const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || ""; // 👈 tu Access Token
+const BASE_URL = process.env.SITE_URL || "";              // 👈 dominio de Netlify
 
 export const handler: Handler = async (event) => {
   try {
@@ -30,7 +31,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // 🔹 Intercambio por access token
+    // 🔹 Intercambio del code por access_token
     const tokenResp = await fetch("https://api.mercadopago.com/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -39,7 +40,7 @@ export const handler: Handler = async (event) => {
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
         code,
-        redirect_uri: `${process.env.URL}/.netlify/functions/mp-callback?negocioId=${negocioId}`,
+        redirect_uri: `${BASE_URL}/.netlify/functions/mp-callback?negocioId=${negocioId}`,
       }),
     });
 
@@ -56,14 +57,17 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: bodyHtml };
     }
 
-    // 🔐 Guardar tokens en Netlify Blobs (privado)
-    const store = getStore({ name: "mp_tokens" }); // bucket privado
-    await store.set(`negocio:${negocioId}`, JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      userId: data.user_id,
-      liveMode: data.live_mode,
-    }));
+    // 🔐 Guardar tokens en Netlify Blobs como JSON string
+    const store = getStore({ name: "mp_tokens" });
+    await store.set(
+      `negocio:${negocioId}`,
+      JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        userId: data.user_id,
+        liveMode: data.live_mode,
+      })
+    );
 
     // 🔹 Guardar solo info pública en Firestore
     await db.collection("Negocios").doc(negocioId).update({
@@ -73,7 +77,7 @@ export const handler: Handler = async (event) => {
       },
     });
 
-    // ✅ Devolver HTML de éxito
+    // ✅ Devolver HTML de éxito (cierra popup y avisa al opener)
     const html = `
       <!doctype html>
       <html>
@@ -83,9 +87,10 @@ export const handler: Handler = async (event) => {
           (function() {
             try {
               if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({ type: 'MP_CONNECTED', negocioId: ${JSON.stringify(
-                  negocioId
-                )} }, window.location.origin);
+                window.opener.postMessage(
+                  { type: 'MP_CONNECTED', negocioId: ${JSON.stringify(negocioId)} },
+                  window.location.origin
+                );
                 document.body.innerText = "✅ Cuenta conectada correctamente. Esta ventana se cerrará.";
                 setTimeout(() => { window.close(); }, 800);
               } else {
