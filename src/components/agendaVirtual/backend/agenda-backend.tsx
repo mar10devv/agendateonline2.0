@@ -128,55 +128,69 @@ export async function detectarUsuario(
   ) => void
 ) {
   const auth = getAuth();
+
   onAuthStateChanged(auth, async (user) => {
-    if (!user) return callback("no-sesion", "cliente", null, null);
+    try {
+      // 1️⃣ Buscar negocio por slug
+      const negocioDocs = await getDocs(
+        query(collection(db, "Negocios"), where("slug", "==", slug))
+      );
 
-    const negocioDocs = await getDocs(
-      query(collection(db, "Negocios"), where("slug", "==", slug))
-    );
-    if (negocioDocs.empty) {
-      return callback("no-sesion", "cliente", user, null);
+      if (negocioDocs.empty) {
+        // 🚫 Slug inválido → no hay negocio
+        callback("listo", "cliente", user, null);
+        return;
+      }
+
+      // 2️⃣ Si existe negocio → armar objeto
+      const negocioSnap = negocioDocs.docs[0];
+      const negocioId = negocioSnap.id;
+      const negocioData = negocioSnap.data();
+
+      const preciosRef = collection(db, "Negocios", negocioId, "Precios");
+      const preciosSnap = await getDocs(preciosRef);
+      const servicios = preciosSnap.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
+      );
+
+      const negocio: Negocio = {
+        id: negocioId,
+        nombre: negocioData.nombre || "",
+        direccion: negocioData.direccion || "",
+        slug: negocioData.slug || "",
+        perfilLogo: negocioData.perfilLogo,
+        bannerUrl: negocioData.bannerUrl,
+        plantilla: negocioData.plantilla,
+        tipoPremium: negocioData.tipoPremium || "gratis",
+        empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
+          id: e.id || "",
+          nombre: e.nombre || "",
+          foto: e.foto || e.fotoPerfil || "",
+          especialidad: e.especialidad || "",
+          calendario: e.calendario || {},
+        })),
+        servicios,
+        fotoPerfil: negocioData.fotoPerfil || "",
+        configuracionAgenda: negocioData.configuracionAgenda || {},
+        descripcion: negocioData.descripcion || "",
+        ubicacion: negocioData.ubicacion || null,
+      };
+
+      // 3️⃣ Decidir estado según usuario
+      if (!user) {
+        callback("no-sesion", "cliente", null, negocio);
+        return;
+      }
+
+      const modo = user.uid === negocioId ? "dueño" : "cliente";
+      callback("listo", modo, user, negocio);
+    } catch (err) {
+      console.error("❌ Error en detectarUsuario:", err);
+      callback("listo", "cliente", null, null);
     }
-
-    const negocioSnap = negocioDocs.docs[0];
-    const negocioId = negocioSnap.id;
-    const negocioData = negocioSnap.data();
-
-    // 🔹 Obtener servicios desde la subcolección Precios
-    const preciosRef = collection(db, "Negocios", negocioId, "Precios");
-    const preciosSnap = await getDocs(preciosRef);
-    const servicios = preciosSnap.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
-    );
-
-const negocio: Negocio = {
-  id: negocioId,   // 👈 agregado aquí
-  nombre: negocioData.nombre || "",
-  direccion: negocioData.direccion || "",
-  slug: negocioData.slug || "",
-  perfilLogo: negocioData.perfilLogo,
-  bannerUrl: negocioData.bannerUrl,
-  plantilla: negocioData.plantilla,
-  tipoPremium: negocioData.tipoPremium || "gratis",
-  empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
-    id: e.id || "",
-    nombre: e.nombre || "",
-    foto: e.foto || e.fotoPerfil || "",
-    especialidad: e.especialidad || "",
-    calendario: e.calendario || {},
-  })),
-  servicios,
-  fotoPerfil: negocioData.fotoPerfil || "",
-  configuracionAgenda: negocioData.configuracionAgenda || {},
-  descripcion: negocioData.descripcion || "",
-  ubicacion: negocioData.ubicacion || null,
-};
-
-
-    const modo = user.uid === negocioId ? "dueño" : "cliente";
-    callback("listo", modo, user, negocio);
   });
 }
+
 
 // 👥 Obtener empleados (una sola vez)
 export async function getEmpleados(slug: string): Promise<Empleado[]> {
