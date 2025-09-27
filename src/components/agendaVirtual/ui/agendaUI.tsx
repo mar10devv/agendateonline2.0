@@ -332,134 +332,263 @@ useEffect(() => {
 
       {/* Contenido */}
 <div className="relative md:-mt-16 px-4 pb-10">
-  <div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-    
-    {/* Columna derecha */}
-    <div className="order-1 mt-8 md:order-2 flex flex-col gap-6">
-      
-      {/* 🔹 Perfil + redes + descripción */}
-      <div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
-        {/* ⚙️ Tuerca */}
-        {modo === "dueño" && (
-          <button
-            onClick={() => alert("Abrir configuración del negocio")}
-            className="absolute top-4 right-4"
-          >
-            <img
-              src={ConfigIcon}
-              alt="Configurar negocio"
-              className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-            />
-          </button>
-        )}
+<div className="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[60%_40%] gap-6 items-stretch">
 
-        {/* Logo */}
-        <div className="mt-8 relative w-24 h-24">
-          {logo ? (
+
+    
+
+
+
+    
+          {/* Columna izquierda -> servicios y empleados */}
+            <div className="flex flex-col gap-6 order-2 md:order-1">
+
+            
+{/* Servicios */}
+<div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg">
+        <h2 className="text-lg font-semibold mb-4">Servicios</h2>
+
+  {servicios && servicios.length > 0 ? (
+    <div
+      ref={scrollRef}
+      onMouseDown={handleMouseDown}
+      className="flex gap-4 overflow-x-auto flex-nowrap scrollbar-hide cursor-grab active:cursor-grabbing"
+    >
+      {/* Rectángulo de agregar servicio siempre primero */}
+      {modo === "dueño" && (
+        <button
+          onClick={() => setModalServiciosAbierto(true)} // 👈 abre el modal
+          className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+        >
+          <span className="text-3xl text-gray-400">+</span>
+        </button>
+      )}
+
+      {/* Servicios cargados */}
+      {servicios.map((s, idx) => (
+        <div
+          key={s.id || idx}
+          className="flex-shrink-0 flex flex-col justify-center items-center w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center"
+        >
+          <p className="font-medium text-white text-sm leading-tight break-words truncate w-full">
+            {s.servicio}
+          </p>
+          <span className="text-sm text-gray-400">${s.precio}</span>
+          <span className="text-xs text-gray-500">{s.duracion} min</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="w-full flex justify-start mt-2">
+      {modo === "dueño" ? (
+        <button
+          onClick={() => setModalServiciosAbierto(true)}
+          className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
+        >
+          <span className="text-3xl text-gray-400">+</span>
+        </button>
+      ) : (
+        <p className="text-gray-400 text-sm">No hay servicios cargados.</p>
+      )}
+    </div>
+  )}
+
+{/* Modal para agregar servicios */}
+{modo === "dueño" && (
+  <ModalAgregarServicios
+    abierto={modalServiciosAbierto}
+    onCerrar={() => setModalServiciosAbierto(false)}
+    negocioId={negocio.id}   // ✅ ahora es el ID real
+  />
+)}
+</div>
+
+
+{/* Empleados */}
+<div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
+        <h2 className="text-lg font-semibold mb-4">Empleados</h2>
+{modo === "dueño" && (
+  <>
+    <button
+      onClick={() => setModalAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar empleados"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+
+    {/* Modal empleados */}
+    <ModalEmpleadosUI
+      abierto={modalAbierto}
+      onCerrar={() => setModalAbierto(false)}
+    />
+  </>
+)}
+
+
+  <div className="flex ml-20 gap-6 flex-wrap mt-2">
+    {empleados && empleados.length > 0 ? (
+      empleados.map((e, idx) => (
+        <button
+          key={idx}
+          onClick={() => setEmpleadoSeleccionado(e)}
+          className="relative w-24 h-24 rounded-full bg-neutral-900 hover:bg-neutral-700 transition flex items-center justify-center"
+        >
+          {e.foto ? (
             <img
-              src={logo}
-              alt="Logo negocio"
+              src={e.foto}
+              alt={e.nombre || "Empleado"}
               className="w-24 h-24 rounded-full object-cover border-4 border-white"
             />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
-              {nombreNegocio.charAt(0)}
+            <div className="w-24 h-24 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-white border-4 border-black text-xl">
+              {e.nombre ? e.nombre.charAt(0) : "?"}
             </div>
           )}
-
-          {modo === "dueño" && (
-            <>
-              <label
-                htmlFor="upload-logo"
-                className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
-              >
-                +
-              </label>
-              <input
-                id="upload-logo"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </>
-          )}
-        </div>
-
-        {/* Nombre */}
-        <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>
-
-        {/* Redes */}
-        <div className="mt-6 flex items-center justify-center gap-4">
-          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-pink-600 transition">
-            <Instagram className="w-4 h-4 text-white" />
-          </a>
-          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-blue-600 transition">
-            <Facebook className="w-4 h-4 text-white" />
-          </a>
-          <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-green-600 transition">
-            <Phone className="w-4 h-4 text-white" />
-          </a>
-        </div>
-
-        {/* Descripción editable */}
-        <div className="mt-6 w-full px-2">
-          {modo === "dueño" ? (
-            <div className="flex flex-col items-stretch gap-2 w-full">
-              <textarea
-                maxLength={200}
-                rows={4}
-                style={{
-                  minHeight: "4rem",
-                  overflow: editandoDescripcion ? "auto" : "hidden",
-                }}
-                placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
-                className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
-                  editandoDescripcion
-                    ? "bg-neutral-700 rounded p-2"
-                    : "bg-transparent"
-                }`}
-                value={nuevaDescripcion}
-                onFocus={() => setEditandoDescripcion(true)}
-                onBlur={() => {
-                  if (nuevaDescripcion.trim() === (negocio.descripcion || "")) {
-                    setEditandoDescripcion(false);
-                  }
-                }}
-                onInput={(e) => {
-                  const el = e.target as HTMLTextAreaElement;
-                  el.style.height = "auto";
-                  el.style.height = el.scrollHeight + "px";
-                  setNuevaDescripcion(el.value);
-                }}
-              />
-              {editandoDescripcion && (
-                <button
-                  onClick={handleGuardarDescripcion}
-                  disabled={
-                    nuevaDescripcion.trim() === (negocio.descripcion || "")
-                  }
-                  className={`px-4 py-2 rounded font-medium transition ${
-                    nuevaDescripcion.trim() === (negocio.descripcion || "")
-                      ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                  }`}
-                >
-                  Guardar
-                </button>
-              )}
+        </button>
+      ))
+    ) : (
+      <p className="text-gray-400 text-sm">No hay empleados cargados.</p>
+    )}
+  </div>
+</div>
+            {/* Calendario */}
+                  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
+        <div className="w-full max-w-sm">
+          <h2 className="text-lg font-semibold mb-4 ml-2">Mi Agenda</h2>
+                <CalendarioUI />
+              </div>
             </div>
-          ) : (
-            <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
-              {negocio.descripcion || "Este negocio aún no tiene descripción."}
-            </p>
-          )}
-        </div>
+          </div>
+              {/* Columna derecha */}
+    <div className="flex flex-col gap-6 order-1">
+      
+      {/* Columna derecha -> Perfil */}
+<div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+  {/* ⚙️ Tuerca */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => alert("Abrir configuración del negocio")}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar negocio"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+  )}
+
+  {/* Logo */}
+  <div className="mt-8 relative w-24 h-24">
+    {logo ? (
+      <img
+        src={logo}
+        alt="Logo negocio"
+        className="w-24 h-24 rounded-full object-cover border-4 border-white"
+      />
+    ) : (
+      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+        {nombreNegocio.charAt(0)}
       </div>
-      {/* 🔹 Fin Perfil */}
+    )}
 
-      {/* 🔹 Ubicación */}
-<div className="bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
+    {modo === "dueño" && (
+      <>
+        <label
+          htmlFor="upload-logo"
+          className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
+        >
+          +
+        </label>
+        <input
+          id="upload-logo"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </>
+    )}
+  </div>
+
+  {/* Nombre */}
+  <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>
+
+  {/* Redes */}
+  <div className="mt-6 flex items-center justify-center gap-4">
+    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-pink-600 transition">
+      <Instagram className="w-4 h-4 text-white" />
+    </a>
+    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-blue-600 transition">
+      <Facebook className="w-4 h-4 text-white" />
+    </a>
+    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-green-600 transition">
+      <Phone className="w-4 h-4 text-white" />
+    </a>
+  </div>
+
+  {/* Descripción editable */}
+  <div className="mt-6 w-full px-2">
+    {modo === "dueño" ? (
+      <div className="flex flex-col items-stretch gap-2 w-full">
+        <textarea
+          maxLength={200}
+          rows={4}
+          style={{
+            minHeight: "4rem",
+            overflow: editandoDescripcion ? "auto" : "hidden",
+          }}
+          placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
+          className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
+            editandoDescripcion
+              ? "bg-neutral-700 rounded p-2"
+              : "bg-transparent"
+          }`}
+          value={nuevaDescripcion}
+          onFocus={() => setEditandoDescripcion(true)}
+          onBlur={() => {
+            if (nuevaDescripcion.trim() === (negocio.descripcion || "")) {
+              setEditandoDescripcion(false);
+            }
+          }}
+          onInput={(e) => {
+            const el = e.target as HTMLTextAreaElement;
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+            setNuevaDescripcion(el.value);
+          }}
+        />
+        {editandoDescripcion && (
+          <button
+            onClick={handleGuardarDescripcion}
+            disabled={
+              nuevaDescripcion.trim() === (negocio.descripcion || "")
+            }
+            className={`px-4 py-2 rounded font-medium transition ${
+              nuevaDescripcion.trim() === (negocio.descripcion || "")
+                ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
+          >
+            Guardar
+          </button>
+        )}
+      </div>
+    ) : (
+      <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
+        {negocio.descripcion || "Este negocio aún no tiene descripción."}
+      </p>
+    )}
+  </div>
+</div>
+{/* 🔹 Fin Perfil */}
+
+{/* Columna derecha -> Mapa */}
+<div className="order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative">
   {/* Botón inicial si no hay ubicación */}
   {modo === "dueño" && !ubicacion && (
     <button
@@ -561,133 +690,9 @@ useEffect(() => {
   )}
 </div>
 </div>
-{/* 🔹 Fin Ubicación */}
+{/* 🔹 Fin Mapa */}
 
 
-
-    
-          {/* Columna izquierda -> servicios y empleados */}
-          <div className="order-2 md:order-1 md:col-span-2 space-y-8">
-            
-{/* Servicios */}
-<div className="bg-neutral-800 rounded-2xl p-6 shadow-lg">
-  <h2 className="text-lg font-semibold mb-4">Servicios</h2>
-
-  {servicios && servicios.length > 0 ? (
-    <div
-      ref={scrollRef}
-      onMouseDown={handleMouseDown}
-      className="flex gap-4 overflow-x-auto flex-nowrap scrollbar-hide cursor-grab active:cursor-grabbing"
-    >
-      {/* Rectángulo de agregar servicio siempre primero */}
-      {modo === "dueño" && (
-        <button
-          onClick={() => setModalServiciosAbierto(true)} // 👈 abre el modal
-          className="w-32 h-24 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
-        >
-          <span className="text-3xl text-gray-400">+</span>
-        </button>
-      )}
-
-      {/* Servicios cargados */}
-      {servicios.map((s, idx) => (
-        <div
-          key={s.id || idx}
-          className="flex-shrink-0 flex flex-col justify-center items-center w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center"
-        >
-          <p className="font-medium text-white text-sm leading-tight break-words truncate w-full">
-            {s.servicio}
-          </p>
-          <span className="text-sm text-gray-400">${s.precio}</span>
-          <span className="text-xs text-gray-500">{s.duracion} min</span>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="w-full flex justify-start mt-2">
-      {modo === "dueño" ? (
-        <button
-          onClick={() => setModalServiciosAbierto(true)}
-          className="w-32 h-24 flex items-center justify-center border-2 border-dashed border-gray-500 rounded-xl hover:border-white transition"
-        >
-          <span className="text-3xl text-gray-400">+</span>
-        </button>
-      ) : (
-        <p className="text-gray-400 text-sm">No hay servicios cargados.</p>
-      )}
-    </div>
-  )}
-
-{/* Modal para agregar servicios */}
-{modo === "dueño" && (
-  <ModalAgregarServicios
-    abierto={modalServiciosAbierto}
-    onCerrar={() => setModalServiciosAbierto(false)}
-    negocioId={negocio.id}   // ✅ ahora es el ID real
-  />
-)}
-</div>
-
-
-{/* Empleados */}
-<div className="bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
-  <h2 className="text-lg font-semibold mb-4">Empleados</h2>
-{modo === "dueño" && (
-  <>
-    <button
-      onClick={() => setModalAbierto(true)}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar empleados"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-
-    {/* Modal empleados */}
-    <ModalEmpleadosUI
-      abierto={modalAbierto}
-      onCerrar={() => setModalAbierto(false)}
-    />
-  </>
-)}
-
-
-  <div className="flex ml-20 gap-6 flex-wrap mt-2">
-    {empleados && empleados.length > 0 ? (
-      empleados.map((e, idx) => (
-        <button
-          key={idx}
-          onClick={() => setEmpleadoSeleccionado(e)}
-          className="relative w-24 h-24 rounded-full bg-neutral-900 hover:bg-neutral-700 transition flex items-center justify-center"
-        >
-          {e.foto ? (
-            <img
-              src={e.foto}
-              alt={e.nombre || "Empleado"}
-              className="w-24 h-24 rounded-full object-cover border-4 border-white"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-white border-4 border-black text-xl">
-              {e.nombre ? e.nombre.charAt(0) : "?"}
-            </div>
-          )}
-        </button>
-      ))
-    ) : (
-      <p className="text-gray-400 text-sm">No hay empleados cargados.</p>
-    )}
-  </div>
-</div>
-            {/* Calendario */}
-            <div className="bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center">
-              <div className="w-full max-w-sm">
-                <h2 className="text-lg font-semibold mb-4 ml-2">Mi Agenda</h2>
-                <CalendarioUI />
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
