@@ -13,9 +13,9 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // 🔹 Configuración Mercado Pago
-const CLIENT_ID = process.env.PUBLIC_MP_CLIENT_ID || "";  // 👈 ahora sí correcto
-const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || ""; // 👈 tu Access Token
-const BASE_URL = process.env.SITE_URL || "";              // 👈 dominio de Netlify
+const CLIENT_ID = process.env.PUBLIC_MP_CLIENT_ID || "";
+const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
+const BASE_URL = process.env.SITE_URL || ""; // dominio principal de Netlify
 
 export const handler: Handler = async (event) => {
   try {
@@ -27,7 +27,28 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 400,
         headers: { "Content-Type": "text/html" },
-        body: `<html><body>Faltan parámetros (code o negocioId)</body></html>`,
+        body: `<html><body>❌ Faltan parámetros (code o negocioId)</body></html>`,
+      };
+    }
+
+    // 🔒 Validar negocio en Firestore
+    const negocioRef = db.collection("Negocios").doc(negocioId);
+    const negocioSnap = await negocioRef.get();
+
+    if (!negocioSnap.exists) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "text/html" },
+        body: `<html><body>❌ Negocio no encontrado</body></html>`,
+      };
+    }
+
+    const negocioData = negocioSnap.data();
+    if (!negocioData?.duenoUid) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "text/html" },
+        body: `<html><body>❌ Negocio inválido (sin dueño asignado)</body></html>`,
       };
     }
 
@@ -49,7 +70,7 @@ export const handler: Handler = async (event) => {
     if (!data.access_token) {
       const bodyHtml = `
         <html><body>
-          <h3>Error conectando con Mercado Pago</h3>
+          <h3>❌ Error conectando con Mercado Pago</h3>
           <pre>${JSON.stringify(data, null, 2)}</pre>
           <p>Cerrá la ventana y volvé a intentar.</p>
         </body></html>
@@ -57,7 +78,7 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: bodyHtml };
     }
 
-    // 🔐 Guardar tokens en Netlify Blobs como JSON string
+    // 🔐 Guardar tokens sensibles en Netlify Blobs
     const store = getStore({ name: "mp_tokens" });
     await store.set(
       `negocio:${negocioId}`,
@@ -66,18 +87,20 @@ export const handler: Handler = async (event) => {
         refresh_token: data.refresh_token,
         userId: data.user_id,
         liveMode: data.live_mode,
+        updatedAt: Date.now(),
       })
     );
 
     // 🔹 Guardar solo info pública en Firestore
-    await db.collection("Negocios").doc(negocioId).update({
+    await negocioRef.update({
       "configuracionAgenda.mercadoPago": {
         conectado: true,
         userId: data.user_id,
+        actualizado: admin.firestore.FieldValue.serverTimestamp(),
       },
     });
 
-    // ✅ Devolver HTML de éxito (cierra popup y avisa al opener)
+    // ✅ Devolver HTML de éxito (notifica al opener y cierra ventana)
     const html = `
       <!doctype html>
       <html>
@@ -91,10 +114,10 @@ export const handler: Handler = async (event) => {
                   { type: 'MP_CONNECTED', negocioId: ${JSON.stringify(negocioId)} },
                   window.location.origin
                 );
-                document.body.innerText = "✅ Cuenta conectada correctamente. Esta ventana se cerrará.";
+                document.body.innerText = "✅ Cuenta de Mercado Pago conectada correctamente. Esta ventana se cerrará.";
                 setTimeout(() => { window.close(); }, 800);
               } else {
-                document.body.innerHTML = "<p>Cuenta conectada. Podés cerrar esta ventana.</p>";
+                document.body.innerHTML = "<p>✅ Cuenta conectada. Podés cerrar esta ventana.</p>";
               }
             } catch (err) {
               document.body.innerText = 'Error al procesar la respuesta: ' + err;
@@ -107,7 +130,7 @@ export const handler: Handler = async (event) => {
 
     return { statusCode: 200, headers: { "Content-Type": "text/html" }, body: html };
   } catch (err: any) {
-    const html = `<html><body><h3>Error interno</h3><pre>${String(err)}</pre></body></html>`;
+    const html = `<html><body><h3>❌ Error interno</h3><pre>${String(err)}</pre></body></html>`;
     return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: html };
   }
 };
