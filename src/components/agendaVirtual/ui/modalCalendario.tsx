@@ -15,10 +15,10 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const [porcentajeSenia, setPorcentajeSenia] = useState<number>(20);
   const [guardando, setGuardando] = useState(false);
   const [mercadoPagoConectado, setMercadoPagoConectado] = useState(false);
+  const [loadingPago, setLoadingPago] = useState(false);
 
   // 👇 CLIENT_ID desde .env
-const CLIENT_ID = "7842411370137167";
-
+  const CLIENT_ID = "7842411370137167";
 
   // 🔹 Cargar configuración inicial desde Firestore
   useEffect(() => {
@@ -65,7 +65,7 @@ const CLIENT_ID = "7842411370137167";
     }
   };
 
-  // 🔹 Conectar con Mercado Pago
+  // 🔹 Conectar con Mercado Pago (OAuth)
   const handleConectarMercadoPago = () => {
     if (!CLIENT_ID) {
       alert("⚠️ Falta configurar PUBLIC_MP_CLIENT_ID en tu .env");
@@ -92,6 +92,30 @@ const CLIENT_ID = "7842411370137167";
     };
 
     window.addEventListener("message", listener);
+  };
+
+  // 🔹 Pago de prueba directo
+  const handlePagoPrueba = async () => {
+    try {
+      setLoadingPago(true);
+      const resp = await fetch("/.netlify/functions/create-preference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ servicio: "Prueba MP", precio: 10 }),
+      });
+      const data = await resp.json();
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        alert("No se pudo iniciar el pago");
+        console.error("Respuesta MP:", data);
+      }
+    } catch (err) {
+      console.error("Error iniciando pago:", err);
+      alert("Error al iniciar el pago");
+    } finally {
+      setLoadingPago(false);
+    }
   };
 
   if (!abierto) return null;
@@ -152,6 +176,18 @@ const CLIENT_ID = "7842411370137167";
             </div>
           </div>
         )}
+
+        {/* 🔹 Botón de pago de prueba */}
+        <div className="flex flex-col gap-2">
+          <label className="font-medium">Probar pago en producción</label>
+          <button
+            onClick={handlePagoPrueba}
+            disabled={loadingPago}
+            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            {loadingPago ? "Redirigiendo..." : "💳 Pagar $10 de prueba"}
+          </button>
+        </div>
 
         {/* Botones */}
         <div className="flex justify-end gap-3 mt-4">

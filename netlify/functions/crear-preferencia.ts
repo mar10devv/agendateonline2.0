@@ -1,72 +1,42 @@
-import { Handler } from "@netlify/functions";
+// netlify/functions/create-preference.ts
+import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 
-const handler: Handler = async (event) => {
+export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== "POST") {
-      return {
-        statusCode: 405,
-        body: JSON.stringify({ error: "Método no permitido" }),
-      };
-    }
-
+    // Opcional: si querés enviar datos desde el frontend
     const body = JSON.parse(event.body || "{}");
-    const { servicio, precio, senia } = body;
 
-    if (!servicio || !precio || !senia) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Faltan datos: servicio, precio o seña" }),
-      };
-    }
-
-    // 🔑 Usamos el Access Token guardado en Netlify
-    const accessToken = process.env.MP_ACCESS_TOKEN;
-    if (!accessToken) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Falta configurar MP_ACCESS_TOKEN" }),
-      };
-    }
-
-    // 🔹 Crear preferencia en Mercado Pago
-    const mpRes = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        "Authorization": `Bearer ${process.env.MP_ACCESS_TOKEN}`,
       },
       body: JSON.stringify({
         items: [
           {
-            title: `Seña de ${servicio}`,
+            title: body.servicio || "Pago de prueba",
             quantity: 1,
-            unit_price: senia,
-            currency_id: "UYU", // 👈 cambia a "ARS" si es Argentina
+            currency_id: "UYU", // 👈 UYU para Uruguay, ARS para Argentina
+            unit_price: body.precio || 10,
           },
         ],
         back_urls: {
-          success: "https://agendateonline.com/success",
-          failure: "https://agendateonline.com/failure",
-          pending: "https://agendateonline.com/pending",
+          success: `${process.env.SITE_URL}/pago-exitoso`,
+          failure: `${process.env.SITE_URL}/pago-fallido`,
+          pending: `${process.env.SITE_URL}/pago-pendiente`,
         },
         auto_return: "approved",
       }),
     });
 
-    const data = await mpRes.json();
+    const data: any = await response.json(); // 👈 casteamos a any para evitar error TS
 
-    if (data.init_point) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ init_point: data.init_point }),
-      };
-    } else {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "No se pudo generar preferencia", detalle: data }),
-      };
-    }
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ init_point: data.init_point }), // 👈 solo devolvemos lo necesario
+    };
   } catch (err: any) {
     return {
       statusCode: 500,
@@ -74,5 +44,3 @@ const handler: Handler = async (event) => {
     };
   }
 };
-
-export { handler };
