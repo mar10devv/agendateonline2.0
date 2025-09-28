@@ -2,7 +2,6 @@
 import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
-import { getStore } from "@netlify/blobs";
 
 // 🔹 Inicializar Firebase Admin (para Firestore)
 if (!admin.apps.length) {
@@ -14,7 +13,6 @@ const db = admin.firestore();
 
 // 🔹 Configuración Mercado Pago
 const CLIENT_ID = process.env.MP_CLIENT_ID || "";
-
 const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
 const BASE_URL = process.env.SITE_URL || "";
 
@@ -44,15 +42,6 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const negocioData = negocioSnap.data();
-    if (!negocioData?.duenoUid) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "text/html" },
-        body: `<html><body>❌ Negocio inválido (sin dueño asignado)</body></html>`,
-      };
-    }
-
     // 🔹 Intercambio del code por access_token
     const tokenResp = await fetch("https://api.mercadopago.com/oauth/token", {
       method: "POST",
@@ -79,24 +68,14 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: bodyHtml };
     }
 
-    // 🔐 Guardar tokens sensibles en Netlify Blobs
-    const store = getStore({ name: "mp_tokens" });
-    await store.set(
-      `negocio:${negocioId}`,
-      JSON.stringify({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        userId: data.user_id,
-        liveMode: data.live_mode,
-        updatedAt: Date.now(),
-      })
-    );
-
-    // 🔹 Guardar solo info pública en Firestore
+    // 🔹 Guardar tokens en Firestore (para que create-preference.ts pueda usarlos)
     await negocioRef.update({
       "configuracionAgenda.mercadoPago": {
         conectado: true,
         userId: data.user_id,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        liveMode: data.live_mode,
         actualizado: admin.firestore.FieldValue.serverTimestamp(),
       },
     });

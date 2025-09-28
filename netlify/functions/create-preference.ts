@@ -1,40 +1,68 @@
 // netlify/functions/create-preference.ts
 import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
+import * as admin from "firebase-admin";
+
+// 🔹 Inicializar Firebase Admin (si no está inicializado)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
+const db = admin.firestore();
 
 export const handler: Handler = async (event) => {
   try {
-    // Datos que podés enviar desde el frontend (servicio, turnoId, negocioId, emailCliente, precio, etc.)
+    // Datos que vienen del frontend
     const body = JSON.parse(event.body || "{}");
+    const { servicioId, servicio, descripcion, precio, emailCliente, negocioId, turnoId } = body;
 
+    if (!negocioId) {
+      return { statusCode: 400, body: "❌ Falta negocioId" };
+    }
+
+    // 🔎 Buscar el token del negocio en Firestore
+    const negocioRef = db.collection("Negocios").doc(negocioId);
+    const negocioSnap = await negocioRef.get();
+    const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
+
+    // Si el negocio tiene su propio token, lo usamos. Si no, usamos el global.
+    const accessToken =
+      negocioData?.configuracionAgenda?.mercadoPago?.accessToken ||
+      process.env.MP_ACCESS_TOKEN;
+
+    if (!accessToken) {
+      return { statusCode: 400, body: "❌ No hay Access Token configurado" };
+    }
+
+    // 🔹 Crear preferencia
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         items: [
           {
-            id: body.servicioId || "servicio_generico",   // 👈 código interno del servicio
-            title: body.servicio || "Pago de prueba",
-            description: body.descripcion || "Reserva de turno en AgéndateOnline",
-            category_id: "services", // 👈 categoría general
+            id: servicioId || "servicio_generico",
+            title: servicio || "Pago de prueba",
+            description: descripcion || "Reserva de turno en AgéndateOnline",
+            category_id: "services",
             quantity: 1,
             currency_id: "UYU", // UYU para Uruguay, ARS para Argentina
-            unit_price: body.precio || 100, // precio dinámico (o fijo 100 si no llega nada)
+            unit_price: precio || 100,
           },
         ],
         payer: {
-          email: body.emailCliente || "invitado@agendateonline.com", // opcional pero recomendado
+          email: emailCliente || "invitado@agendateonline.com",
         },
-        // 👇 ahora mandamos ambas cosas
         metadata: {
-          negocioId: body.negocioId,
-          turnoId: body.turnoId,
+          negocioId,
+          turnoId,
         },
-        external_reference: `${body.negocioId || "negocio"}_${body.turnoId || Date.now()}`, // 👈 referencia única
-        notification_url: `${process.env.SITE_URL}/.netlify/functions/mp-webhook`, // 👈 tu webhook en Netlify
+        external_reference: `${negocioId}_${turnoId || Date.now()}`,
+        notification_url: `${process.env.SITE_URL}/.netlify/functions/mp-webhook`,
         back_urls: {
           success: `${process.env.SITE_URL}/pago-exitoso`,
           failure: `${process.env.SITE_URL}/pago-fallido`,
