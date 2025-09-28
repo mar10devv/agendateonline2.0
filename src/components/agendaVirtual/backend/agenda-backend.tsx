@@ -163,12 +163,14 @@ export async function detectarUsuario(
         plantilla: negocioData.plantilla,
         tipoPremium: negocioData.tipoPremium || "gratis",
         empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
-          id: e.id || "",
-          nombre: e.nombre || "",
-          foto: e.foto || e.fotoPerfil || "",
-          especialidad: e.especialidad || "",
-          calendario: e.calendario || {},
-        })),
+  id: e.id || "",
+  nombre: e.nombre || "",
+  foto: e.fotoPerfil || e.foto || "",   // 👈 siempre prioriza fotoPerfil
+  especialidad: e.especialidad || "",
+  calendario: e.calendario || {},
+  trabajos: e.trabajos || [],
+})),
+
         servicios,
         fotoPerfil: negocioData.fotoPerfil || "",
         configuracionAgenda: negocioData.configuracionAgenda || {},
@@ -203,13 +205,15 @@ export async function getEmpleados(slug: string): Promise<Empleado[]> {
 
 // ⚡ Si existe array empleadosData, lo uso
 if (Array.isArray(negocioData.empleadosData) && negocioData.empleadosData.length > 0) {
-  return negocioData.empleadosData.map((e: any) => ({
-    id: e.id || "",
-    nombre: e.nombre || "",
-    foto: e.fotoPerfil || "",   // 👈 normalizado
-    especialidad: e.especialidad || "",
-    calendario: e.calendario || {},
-  }));
+return negocioData.empleadosData.map((e: any) => ({
+  id: e.id || "",
+  nombre: e.nombre || "",
+  foto: e.fotoPerfil || e.foto || "",   // 👈
+  especialidad: e.especialidad || "",
+  calendario: e.calendario || {},
+  trabajos: e.trabajos || [],
+}));
+
 }
 
 
@@ -265,13 +269,16 @@ export async function escucharEmpleados(
 
     // ⚡ Si tiene array empleadosData -> usarlo
     if (Array.isArray(data.empleadosData) && data.empleadosData.length > 0) {
-      const empleados = data.empleadosData.map((e: any, idx: number) => ({
-        id: e.id || idx.toString(),
-        nombre: e.nombre || "Empleado",
-        foto: e.foto || e.fotoPerfil || "",
-        especialidad: e.especialidad || "",
-        calendario: e.calendario || {},
-      }));
+const empleados = data.empleadosData.map((e: any, idx: number) => ({
+  id: e.id || idx.toString(),
+  nombre: e.nombre || "Empleado",
+  foto: e.fotoPerfil || e.foto || "",   // 👈
+  especialidad: e.especialidad || "",
+  calendario: e.calendario || {},
+  trabajos: e.trabajos || [],
+}));
+
+
       callback(empleados);
     } else {
       // ⚡ Si no tiene array empleadosData -> usar fallback con datos básicos

@@ -13,7 +13,7 @@ import {
   getDocs,
   onSnapshot,
 } from "firebase/firestore";
-
+import ModalAgendarse from "./modalAgendarse";
 import { db } from "../../../lib/firebase";
 import FloatingMenu from "../../ui/floatingMenu";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -84,6 +84,7 @@ type Negocio = {
   bannerUrl?: string;
   servicios?: Servicio[];
   descripcion?: string;
+  empleadosData?: any[];
   ubicacion?: {
     lat: number;
     lng: number;
@@ -120,6 +121,8 @@ export default function AgendaVirtualUI({
   // 👇 Estados para servicios
   const [modalServiciosAbierto, setModalServiciosAbierto] = useState(false);
 const [modalCalendarioAbierto, setModalCalendarioAbierto] = useState(false);
+const [modalAgendarseAbierto, setModalAgendarseAbierto] = useState(false);
+
 
   // 👇 Estados para editar nombre/slug
   const [editandoNombre, setEditandoNombre] = useState(false);
@@ -318,9 +321,8 @@ useEffect(() => {
     unsubscribeServicios = unsub;
   });
 
-  // 👉 Escuchar empleados
+  // 👉 Escuchar empleados (si seguís usando backend)
   let unsubscribeEmpleados: () => void;
-
   import("../backend/agenda-backend").then(({ escucharEmpleados }) => {
     escucharEmpleados(negocio.slug, (emps) => {
       setEmpleadosState(emps); // 👈 refresca empleados
@@ -329,11 +331,20 @@ useEffect(() => {
     });
   });
 
-  // 👉 Escuchar ubicación del negocio en tiempo real
+  // 👉 Escuchar negocio (ubicación + empleadosData)
   const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
-  const unsubscribeNegocio = onSnapshot(q, (snap) => {
+  const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     if (!snap.empty) {
       const data = snap.docs[0].data() as Negocio;
+
+      console.log("Negocio cargado:", data);
+
+      // ✅ Guardamos empleadosData en estado
+      if (data.empleadosData) {
+        setEmpleadosState(data.empleadosData);
+      }
+
+      // ✅ Guardamos ubicación en estado
       if (data.ubicacion) {
         setUbicacion(data.ubicacion);
       }
@@ -346,8 +357,7 @@ useEffect(() => {
     if (unsubscribeEmpleados) unsubscribeEmpleados();
     unsubscribeNegocio();
   };
-}, [negocio.slug, modalAbierto]); // 👈 importante incluir modalAbierto
-
+}, [negocio.slug, modalAbierto]);
 
 
   return (
@@ -548,9 +558,9 @@ useEffect(() => {
     )}
   </div>
 </div>
-            {/* Calendario */}
-<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex justify-center relative">
-  {/* ⚙️ Tuerca de configuración */}
+            {/* Calendario + Botón Agendarse */}
+<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-center relative">
+  {/* ⚙️ Tuerca de configuración (solo dueño) */}
   {modo === "dueño" && (
     <button
       onClick={() => setModalCalendarioAbierto(true)}
@@ -569,17 +579,26 @@ useEffect(() => {
     <div className="flex justify-center">
       <CalendarioUI />
     </div>
+
+    {/* 🔹 Botón Agendarse (solo clientes) */}
+    {modo === "cliente" && (
+      <button
+        onClick={() => setModalAgendarseAbierto(true)}
+        className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
+      >
+        📅 Agendarse
+      </button>
+    )}
   </div>
 </div>
 
-{/* Modal Calendario */}
-{modo === "dueño" && (
-  <ModalCalendario
-    abierto={modalCalendarioAbierto}
-    onCerrar={() => setModalCalendarioAbierto(false)}
-    negocioId={negocio.id}
-  />
-)}
+{/* Modal Agendarse */}
+<ModalAgendarse
+  abierto={modalAgendarseAbierto}
+  onClose={() => setModalAgendarseAbierto(false)}
+  negocio={{ ...negocio, empleadosData: empleadosState }} // 👈 ahora viaja actualizado
+/>
+
 </div>
             {/* Columna derecha */}
 <div className="flex flex-col gap-6 md:order-2 md:pr-6">
@@ -637,7 +656,6 @@ useEffect(() => {
     </>
   )}
 </div>
-
 
   {/* Nombre */}
   <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>
@@ -710,7 +728,6 @@ useEffect(() => {
   </div>
 </div>
 {/* 🔹 Fin Perfil */}
-
 
 {/* Columna derecha -> Mapa */}
 <div className="hidden md:flex order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex-col items-center text-center shadow-lg relative">
