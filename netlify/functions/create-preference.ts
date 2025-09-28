@@ -19,7 +19,8 @@ export const handler: Handler = async (event) => {
             title: body.servicio || "Pago de prueba",
             quantity: 1,
             currency_id: "UYU", // 👈 UYU para Uruguay, ARS para Argentina
-            unit_price: body.precio || 100, // 👈 subimos a 100
+            unit_price: 100, // 👈 siempre $100
+ // 👈 subimos a 100
           },
         ],
         back_urls: {
