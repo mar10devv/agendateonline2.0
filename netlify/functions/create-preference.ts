@@ -19,7 +19,7 @@ export const handler: Handler = async (event) => {
             title: body.servicio || "Pago de prueba",
             quantity: 1,
             currency_id: "UYU", // 👈 UYU para Uruguay, ARS para Argentina
-            unit_price: body.precio || 10,
+            unit_price: body.precio || 100, // 👈 subimos a 100
           },
         ],
         back_urls: {
@@ -31,7 +31,9 @@ export const handler: Handler = async (event) => {
       }),
     });
 
-    const data: any = await response.json(); // 👈 casteamos a any para evitar error TS
+    console.log("📡 Status Mercado Pago:", response.status, response.statusText);
+
+    const data: any = await response.json();
     console.log("📦 Respuesta de Mercado Pago:", JSON.stringify(data, null, 2));
 
     if (!data.init_point) {
@@ -46,7 +48,7 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ init_point: data.init_point }), // 👈 solo devolvemos lo necesario
+      body: JSON.stringify({ init_point: data.init_point }),
     };
   } catch (err: any) {
     console.error("❌ Error en create-preference:", err);
