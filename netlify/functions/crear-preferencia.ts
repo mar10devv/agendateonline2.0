@@ -32,12 +32,24 @@ export const handler: Handler = async (event) => {
     });
 
     const data: any = await response.json(); // 👈 casteamos a any para evitar error TS
+    console.log("📦 Respuesta de Mercado Pago:", JSON.stringify(data, null, 2));
+
+    if (!data.init_point) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "No se recibió init_point",
+          mpResponse: data,
+        }),
+      };
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({ init_point: data.init_point }), // 👈 solo devolvemos lo necesario
     };
   } catch (err: any) {
+    console.error("❌ Error en create-preference:", err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: err.message }),
