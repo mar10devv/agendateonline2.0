@@ -20,7 +20,8 @@ export const handler: Handler = async (event) => {
   try {
     const params = new URLSearchParams(event.rawQuery || "");
     const code = params.get("code");
-    const negocioId = params.get("negocioId");
+const negocioId = params.get("state");
+
 
     if (!code || !negocioId) {
       return {
