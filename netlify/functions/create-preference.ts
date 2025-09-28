@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 
 export const handler: Handler = async (event) => {
   try {
-    // Opcional: si querés enviar datos desde el frontend
+    // Datos que podés enviar desde el frontend (servicio, turnoId, negocioId, emailCliente, precio, etc.)
     const body = JSON.parse(event.body || "{}");
 
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
@@ -16,13 +16,25 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         items: [
           {
+            id: body.servicioId || "servicio_generico",   // 👈 código interno del servicio
             title: body.servicio || "Pago de prueba",
+            description: body.descripcion || "Reserva de turno en AgéndateOnline",
+            category_id: "services", // 👈 categoría general
             quantity: 1,
-            currency_id: "UYU", // 👈 UYU para Uruguay, ARS para Argentina
-            unit_price: 100, // 👈 siempre $100
- // 👈 subimos a 100
+            currency_id: "UYU", // UYU para Uruguay, ARS para Argentina
+            unit_price: body.precio || 100, // precio dinámico (o fijo 100 si no llega nada)
           },
         ],
+        payer: {
+          email: body.emailCliente || "invitado@agendateonline.com", // opcional pero recomendado
+        },
+        // 👇 ahora mandamos ambas cosas
+        metadata: {
+          negocioId: body.negocioId,
+          turnoId: body.turnoId,
+        },
+        external_reference: `${body.negocioId || "negocio"}_${body.turnoId || Date.now()}`, // 👈 referencia única
+        notification_url: `${process.env.SITE_URL}/.netlify/functions/mp-webhook`, // 👈 tu webhook en Netlify
         back_urls: {
           success: `${process.env.SITE_URL}/pago-exitoso`,
           failure: `${process.env.SITE_URL}/pago-fallido`,
