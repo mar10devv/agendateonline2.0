@@ -29,6 +29,9 @@ import {
 } from "../backend/agenda-backend";
 import CalendarioUI from "../ui/calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
+import CalendarioNegocio from "../calendario/calendarioNegocio";
+import ModalCalendarioCliente from "../calendario/modalCalendarioCliente";
+
 
 // 🌍 Leaflet
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -577,7 +580,12 @@ useEffect(() => {
   <div className="max-w-sm w-full flex flex-col items-center">
     <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
     <div className="flex justify-center">
-      <CalendarioUI />
+      <CalendarioUI
+  empleado={{ nombre: "Demo", calendario: {} }}
+  servicio={{ id: "demo", servicio: "Consulta", precio: 0, duracion: 30 }}
+  onSelectTurno={(t) => console.log("Turno elegido:", t)}
+/>
+
     </div>
 
     {/* 🔹 Botón Agendarse (solo clientes) */}

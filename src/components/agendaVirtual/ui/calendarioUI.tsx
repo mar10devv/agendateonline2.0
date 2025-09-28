@@ -12,7 +12,15 @@ const esMismoDia = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-export default function CalendarioUI() {
+export default function CalendarioUI({
+  empleado,
+  servicio,
+  onSelectTurno,
+}: {
+  empleado: any;
+  servicio: any;
+  onSelectTurno: (t: { hora: string; fecha: Date }) => void;
+}) {
   const hoy = new Date();
   const [mesVisible, setMesVisible] = useState(new Date(hoy));
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
@@ -71,15 +79,39 @@ export default function CalendarioUI() {
     if (puedeIrSiguiente) setMesVisible(new Date(year, month + 1, 1));
   };
 
-  // ⚡ Simulación de horarios de un empleado (8:00 a 16:00, cada 1hr)
+  // ⚡ Generar turnos dinámicos según empleado + servicio
   const generarTurnos = (fecha: Date) => {
     const turnosTemp: Turno[] = [];
-    for (let h = 8; h < 16; h++) {
-      turnosTemp.push({
-        hora: `${h.toString().padStart(2, "0")}:00`,
-        disponible: true,
-      });
+
+    if (!empleado?.calendario) {
+      setTurnos([]);
+      return;
     }
+
+    const [hInicio, mInicio] = empleado.calendario.inicio
+      ? empleado.calendario.inicio.split(":").map(Number)
+      : [8, 0];
+    const [hFin, mFin] = empleado.calendario.fin
+      ? empleado.calendario.fin.split(":").map(Number)
+      : [16, 0];
+
+    let mins = hInicio * 60 + mInicio;
+    const finMins = hFin * 60 + mFin;
+
+    // ⏱️ Duración: por servicio o calculada por clientesPorJornada
+    let duracion = servicio?.duracion || 30;
+    if (empleado.calendario.clientesPorJornada) {
+      const totalMins = finMins - mins;
+      duracion = Math.floor(totalMins / empleado.calendario.clientesPorJornada);
+    }
+
+    while (mins + duracion <= finMins) {
+      const hh = String(Math.floor(mins / 60)).padStart(2, "0");
+      const mm = String(mins % 60).padStart(2, "0");
+      turnosTemp.push({ hora: `${hh}:${mm}`, disponible: true });
+      mins += duracion;
+    }
+
     setTurnos(turnosTemp);
   };
 
@@ -95,7 +127,7 @@ export default function CalendarioUI() {
         calendarioRef.current &&
         !calendarioRef.current.contains(event.target as Node)
       ) {
-        setDiaSeleccionado(null); // cerrar turnos
+        setDiaSeleccionado(null);
       }
     };
 
@@ -188,6 +220,7 @@ export default function CalendarioUI() {
               <button
                 key={i}
                 disabled={!t.disponible}
+                onClick={() => onSelectTurno({ hora: t.hora, fecha: diaSeleccionado })}
                 className={`px-3 py-2 rounded-md text-sm transition ${
                   t.disponible
                     ? "bg-white text-black hover:bg-gray-200"
