@@ -73,7 +73,8 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
     }
 
     // redirect_uri con negocioId embebido
-    const redirectUri = `${window.location.origin}/.netlify/functions/mp-callback?negocioId=${negocioId}`;
+const redirectUri = `${window.location.origin}/.netlify/functions/mp-callback`;
+
 
  // URL de autorización oficial de Mercado Pago con "state" para pasar negocioId
 const authUrl = `https://auth.mercadopago.com/authorization?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${negocioId}`;
