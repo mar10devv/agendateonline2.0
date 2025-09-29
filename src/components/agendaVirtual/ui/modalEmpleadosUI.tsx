@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
-import ModalServicios from "../modalServicios";
+import ModalServicios from "../modalAsignarServiciosEmpleados";
 import ModalBase from "../../ui/modalGenerico";
 import ModalAviso from "../../ui/modalAviso";
 import ModalHorariosEmpleados from "./modalEmpleadosHorarios";

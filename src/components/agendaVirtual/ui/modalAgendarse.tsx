@@ -1,7 +1,8 @@
 // src/components/agendaVirtual/ui/modalAgendarse.tsx
 import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc } from "firebase/firestore";
+
 import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
 type Empleado = {
@@ -171,6 +172,7 @@ function PasoEmpleados({
   onBack: () => void;
 }) {
   const [filtrados, setFiltrados] = useState<Empleado[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!servicio || !Array.isArray(negocio.empleadosData)) return;
@@ -181,28 +183,48 @@ function PasoEmpleados({
         emp.trabajos.some((t: string) => String(t).trim() === String(servicio.id).trim())
     );
 
-    console.log("📌 Servicio seleccionado:", servicio.id);
-    negocio.empleadosData.forEach((emp, idx) => {
-      console.log(`Empleado ${idx}:`, emp.nombre, " -> trabajos:", emp.trabajos);
-    });
-    console.log("📌 Empleados disponibles:", disponibles);
-
     setFiltrados(disponibles);
   }, [servicio, negocio]);
+
+  const validarEmpleado = (e: Empleado) => {
+    // ❌ Validar días libres
+    if (!e.calendario?.diasLibres || e.calendario.diasLibres.length === 0) {
+      setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
+      return;
+    }
+
+    // ❌ Validar horario cargado (ejemplo: debe existir y durar 8h mín.)
+    const tieneHorario = (e.calendario?.inicio && e.calendario?.fin);
+
+if (!tieneHorario) {
+  setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
+  return;
+}
+
+    // Si todo bien, limpiamos error y pasamos al siguiente paso
+    setError(null);
+    onSelect(e);
+  };
 
   return (
     <div className="space-y-4">
       <p className="mb-2">
-    Servicio {servicio.servicio}
-    <br />
-    Selecciona un empleado
-  </p>
+        Servicio <b>{servicio.servicio}</b>
+        <br />
+        Selecciona un empleado
+      </p>
+
+      {error && (
+        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">
+          {error}
+        </p>
+      )}
 
       {filtrados.length > 0 ? (
         filtrados.map((e, idx) => (
           <button
             key={idx}
-            onClick={() => onSelect(e)}
+            onClick={() => validarEmpleado(e)}
             className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
           >
             {e.fotoPerfil || (e as any).foto ? (
@@ -285,13 +307,36 @@ function PasoConfirmacion({
   onConfirm,
   onBack,
 }: any) {
+  const guardarTurno = async () => {
+    try {
+      const ref = collection(db, "Negocios", negocio.id, "Turnos");
+      await addDoc(ref, {
+        servicioId: servicio.id,
+        servicioNombre: servicio.servicio,
+        duracion: servicio.duracion,
+        empleadoId: empleado.id || null,
+        empleadoNombre: empleado.nombre,
+        fecha: turno.fecha.toISOString().split("T")[0],
+        hora: turno.hora,
+        estado: "pendiente", // 👈 lo podemos actualizar después
+        creadoEn: new Date(),
+      });
+      onConfirm(); // 👉 avanzar al paso 5 solo si se guardó
+    } catch (err) {
+      console.error("❌ Error guardando turno:", err);
+      alert("Hubo un error al guardar el turno. Intenta de nuevo.");
+    }
+  };
+
   return (
     <div>
       <p>Confirma tu turno:</p>
       <ul className="mb-4 text-sm">
         <li>Servicio: {servicio?.servicio}</li>
         <li>Empleado: {empleado?.nombre}</li>
-        <li>Hora: {turno?.hora}</li>
+        <li>
+          Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
+        </li>
       </ul>
       <div className="flex justify-end gap-4">
         <button
@@ -301,7 +346,7 @@ function PasoConfirmacion({
           Volver
         </button>
         <button
-          onClick={onConfirm}
+          onClick={guardarTurno}
           className="px-4 py-2 rounded bg-green-600 text-white"
         >
           Confirmar
