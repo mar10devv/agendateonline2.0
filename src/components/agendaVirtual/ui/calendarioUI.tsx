@@ -6,6 +6,15 @@ type Turno = {
   disponible: boolean;
 };
 
+type Props = {
+  empleado: any;
+  servicio: any;
+  negocioId: string;
+  onSelectTurno: (t: { hora: string; fecha: Date }) => void;
+  generarTurnos?: (fecha: Date) => Turno[];
+  onAbrirModalCliente?: () => void; // 👈 agregado
+};
+
 // 🔎 Helper para comparar fechas sin hora
 const esMismoDia = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
@@ -15,17 +24,15 @@ const esMismoDia = (a: Date, b: Date) =>
 export default function CalendarioUI({
   empleado,
   servicio,
+  negocioId,
   onSelectTurno,
-}: {
-  empleado: any;
-  servicio: any;
-  onSelectTurno: (t: { hora: string; fecha: Date }) => void;
-}) {
+  generarTurnos,
+  onAbrirModalCliente,
+}: Props) {
   const hoy = new Date();
   const [mesVisible, setMesVisible] = useState(new Date(hoy));
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
   const [turnos, setTurnos] = useState<Turno[]>([]);
-
   const calendarioRef = useRef<HTMLDivElement>(null);
 
   const year = mesVisible.getFullYear();
@@ -47,14 +54,10 @@ export default function CalendarioUI({
 
   // Generar días visibles dentro del rango permitido
   const dias: (Date | null)[] = [];
-  for (let i = 0; i < inicioSemana; i++) {
-    dias.push(null);
-  }
+  for (let i = 0; i < inicioSemana; i++) dias.push(null);
   for (let d = 1; d <= diasEnMes; d++) {
     const fecha = new Date(year, month, d);
-    if (fecha >= fechaMinima && fecha <= fechaMaxima) {
-      dias.push(fecha);
-    }
+    if (fecha >= fechaMinima && fecha <= fechaMaxima) dias.push(fecha);
   }
 
   const nombreMes = mesVisible.toLocaleDateString("es-ES", {
@@ -62,7 +65,6 @@ export default function CalendarioUI({
     year: "numeric",
   });
 
-  // 🔎 Validar si hay días válidos en el mes anterior/siguiente
   const hayDiasEnMes = (y: number, m: number) => {
     const primero = new Date(y, m, 1);
     const ultimo = new Date(y, m + 1, 0);
@@ -79,14 +81,10 @@ export default function CalendarioUI({
     if (puedeIrSiguiente) setMesVisible(new Date(year, month + 1, 1));
   };
 
-  // ⚡ Generar turnos dinámicos según empleado + servicio
-  const generarTurnos = (fecha: Date) => {
+  // ⚡ Generar turnos internos
+  const generarTurnosInterno = (fecha: Date) => {
     const turnosTemp: Turno[] = [];
-
-    if (!empleado?.calendario) {
-      setTurnos([]);
-      return;
-    }
+    if (!empleado?.calendario) return [];
 
     const [hInicio, mInicio] = empleado.calendario.inicio
       ? empleado.calendario.inicio.split(":").map(Number)
@@ -98,7 +96,6 @@ export default function CalendarioUI({
     let mins = hInicio * 60 + mInicio;
     const finMins = hFin * 60 + mFin;
 
-    // ⏱️ Duración: por servicio o calculada por clientesPorJornada
     let duracion = servicio?.duracion || 30;
     if (empleado.calendario.clientesPorJornada) {
       const totalMins = finMins - mins;
@@ -112,12 +109,15 @@ export default function CalendarioUI({
       mins += duracion;
     }
 
-    setTurnos(turnosTemp);
+    return turnosTemp;
   };
 
   const seleccionarDia = (fecha: Date) => {
     setDiaSeleccionado(fecha);
-    generarTurnos(fecha);
+    const nuevosTurnos = generarTurnos
+      ? generarTurnos(fecha)
+      : generarTurnosInterno(fecha);
+    setTurnos(nuevosTurnos);
   };
 
   // 👀 Detectar click/touch fuera del calendario
@@ -130,10 +130,8 @@ export default function CalendarioUI({
         setDiaSeleccionado(null);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside);
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
@@ -220,7 +218,9 @@ export default function CalendarioUI({
               <button
                 key={i}
                 disabled={!t.disponible}
-                onClick={() => onSelectTurno({ hora: t.hora, fecha: diaSeleccionado })}
+                onClick={() =>
+                  onSelectTurno({ hora: t.hora, fecha: diaSeleccionado })
+                }
                 className={`px-3 py-2 rounded-md text-sm transition ${
                   t.disponible
                     ? "bg-white text-black hover:bg-gray-200"
@@ -231,6 +231,18 @@ export default function CalendarioUI({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Botón abrir modal cliente */}
+      {onAbrirModalCliente && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={onAbrirModalCliente}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 transition"
+          >
+            Abrir modal cliente
+          </button>
         </div>
       )}
     </div>

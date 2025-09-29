@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
-
+import CalendarioUI from "../ui/calendarioUI";
 type Empleado = {
   nombre: string;
   fotoPerfil?: string;
@@ -73,17 +73,19 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
         />
       )}
 
-      {paso === 3 && empleado && (
-        <PasoTurnos
-          empleado={empleado}
-          negocio={negocio}
-          onSelect={(t: any) => {
-            setTurno(t);
-            siguiente();
-          }}
-          onBack={volver}
-        />
-      )}
+      {paso === 3 && empleado && servicio && (
+  <PasoTurnos
+    empleado={empleado}
+    servicio={servicio}   // 👈 ahora lo recibe bien
+    negocio={negocio}
+    onSelect={(t: any) => {
+      setTurno(t);
+      siguiente();
+    }}
+    onBack={volver}
+  />
+)}
+
 
       {paso === 4 && servicio && empleado && (
         <PasoConfirmacion
@@ -233,13 +235,43 @@ function PasoEmpleados({
 }
 
 // 🔹 Paso 3 – Turnos
-function PasoTurnos({ empleado, onSelect, onBack }: any) {
+function PasoTurnos({
+  negocio,
+  empleado,
+  servicio,
+  onSelect,
+  onBack,
+}: {
+  negocio: { id: string };
+  empleado: any;
+  servicio: any;
+  onSelect: (t: { hora: string; fecha: Date }) => void;
+  onBack: () => void;
+}) {
   return (
     <div>
-      <p className="mb-4">Horarios disponibles para {empleado?.nombre}</p>
-      <button onClick={onBack} className="text-sm text-gray-400">
-        ← Volver
-      </button>
+      <p className="mb-4 text-center">
+        Selecciona un turno para <b>{empleado?.nombre}</b>
+      </p>
+
+      {/* Calendario con slots */}
+      <div className="flex justify-center mb-6">
+        <CalendarioUI
+          empleado={empleado}
+          servicio={servicio}
+          negocioId={negocio.id}
+          onSelectTurno={onSelect} // 👈 pasa el turno elegido al padre
+        />
+      </div>
+
+      <div className="text-center">
+        <button
+          onClick={onBack}
+          className="text-sm text-gray-400 hover:text-gray-200 transition"
+        >
+          ← Volver
+        </button>
+      </div>
     </div>
   );
 }

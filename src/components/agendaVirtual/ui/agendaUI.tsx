@@ -184,6 +184,8 @@ const [nuevaDescripcion, setNuevaDescripcion] = useState(negocio.descripcion || 
 const [editandoDescripcion, setEditandoDescripcion] = useState(false);
 const [modalAbierto, setModalAbierto] = useState(false);
 const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false);
+// 👇 Estado único para ModalCalendarioCliente
+const [modalClienteAbierto, setModalClienteAbierto] = useState(false);
 
 
 const handleGuardarUbicacion = () => {
@@ -579,14 +581,17 @@ useEffect(() => {
 
   <div className="max-w-sm w-full flex flex-col items-center">
     <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
-    <div className="flex justify-center">
-      <CalendarioUI
-  empleado={{ nombre: "Demo", calendario: {} }}
-  servicio={{ id: "demo", servicio: "Consulta", precio: 0, duracion: 30 }}
-  onSelectTurno={(t) => console.log("Turno elegido:", t)}
+<div className="flex justify-center">
+  
+  <CalendarioUI
+    empleado={empleadoSeleccionado || { nombre: "Demo", calendario: { inicio: "08:00", fin: "16:00", clientesPorJornada: 8 } }}
+    servicio={servicios.length > 0 ? servicios[0] : { id: "demo", servicio: "Consulta Demo", precio: 0, duracion: 60 }}
+    negocioId={negocio.id}
+    onSelectTurno={(t) => console.log("Turno elegido:", t)}
+     onAbrirModalCliente={() => setModalAgendarseAbierto(true)} 
 />
+</div>
 
-    </div>
 
     {/* 🔹 Botón Agendarse (solo clientes) */}
     {modo === "cliente" && (
@@ -601,11 +606,13 @@ useEffect(() => {
 </div>
 
 {/* Modal Agendarse */}
-<ModalAgendarse
-  abierto={modalAgendarseAbierto}
-  onClose={() => setModalAgendarseAbierto(false)}
-  negocio={{ ...negocio, empleadosData: empleadosState }} // 👈 ahora viaja actualizado
-/>
+{modalAgendarseAbierto && (
+  <ModalAgendarse
+    abierto={modalAgendarseAbierto}
+    onClose={() => setModalAgendarseAbierto(false)}
+    negocio={negocio}
+  />
+)}
 
 </div>
             {/* Columna derecha */}
