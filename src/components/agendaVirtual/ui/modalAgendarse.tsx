@@ -2,9 +2,9 @@
 import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
 import { collection, getDocs, addDoc } from "firebase/firestore";
-
 import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
+
 type Empleado = {
   nombre: string;
   fotoPerfil?: string;
@@ -45,6 +45,8 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 
   if (!abierto) return null;
 
+  console.log(`[DEBUG] Paso actual: ${paso}`);
+
   return (
     <ModalBase
       abierto={abierto}
@@ -56,6 +58,7 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
         <PasoServicios
           negocio={negocio}
           onSelect={(s: Servicio) => {
+            console.log("[PASO 1] Servicio seleccionado:", s);
             setServicio(s);
             siguiente();
           }}
@@ -67,6 +70,7 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
           servicio={servicio}
           negocio={negocio}
           onSelect={(e: Empleado) => {
+            console.log("[PASO 2] Empleado seleccionado:", e);
             setEmpleado(e);
             siguiente();
           }}
@@ -75,18 +79,18 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
       )}
 
       {paso === 3 && empleado && servicio && (
-  <PasoTurnos
-    empleado={empleado}
-    servicio={servicio}   // 👈 ahora lo recibe bien
-    negocio={negocio}
-    onSelect={(t: any) => {
-      setTurno(t);
-      siguiente();
-    }}
-    onBack={volver}
-  />
-)}
-
+        <PasoTurnos
+          empleado={empleado}
+          servicio={servicio}
+          negocio={negocio}
+          onSelect={(t: any) => {
+            console.log("[PASO 3] Turno seleccionado:", t);
+            setTurno(t);
+            siguiente();
+          }}
+          onBack={volver}
+        />
+      )}
 
       {paso === 4 && servicio && empleado && (
         <PasoConfirmacion
@@ -94,12 +98,27 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
           empleado={empleado}
           turno={turno}
           negocio={negocio}
-          onConfirm={siguiente}
+          onConfirm={() => {
+            console.log("[PASO 4] Confirmación enviada", {
+              servicio,
+              empleado,
+              turno,
+            });
+            siguiente();
+          }}
           onBack={volver}
         />
       )}
 
-      {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
+      {paso === 5 && (
+        <PasoFinal
+          negocio={negocio}
+          onClose={() => {
+            console.log("[PASO 5] Proceso finalizado");
+            onClose();
+          }}
+        />
+      )}
     </ModalBase>
   );
 }
@@ -109,7 +128,13 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
    ============================================================ */
 
 // 🔹 Paso 1 – Servicios
-function PasoServicios({ negocio, onSelect }: { negocio: any; onSelect: (s: Servicio) => void }) {
+function PasoServicios({
+  negocio,
+  onSelect,
+}: {
+  negocio: any;
+  onSelect: (s: Servicio) => void;
+}) {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -125,6 +150,7 @@ function PasoServicios({ negocio, onSelect }: { negocio: any; onSelect: (s: Serv
               ...doc.data(),
             } as Servicio)
         );
+        console.log("[PASO 1] Servicios cargados:", lista);
         setServicios(lista);
       } catch (err) {
         console.error("Error cargando servicios:", err);
@@ -180,28 +206,27 @@ function PasoEmpleados({
     const disponibles = negocio.empleadosData.filter(
       (emp: Empleado) =>
         Array.isArray(emp.trabajos) &&
-        emp.trabajos.some((t: string) => String(t).trim() === String(servicio.id).trim())
+        emp.trabajos.some(
+          (t: string) => String(t).trim() === String(servicio.id).trim()
+        )
     );
 
+    console.log("[PASO 2] Empleados filtrados:", disponibles);
     setFiltrados(disponibles);
   }, [servicio, negocio]);
 
   const validarEmpleado = (e: Empleado) => {
-    // ❌ Validar días libres
     if (!e.calendario?.diasLibres || e.calendario.diasLibres.length === 0) {
       setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
       return;
     }
 
-    // ❌ Validar horario cargado (ejemplo: debe existir y durar 8h mín.)
-    const tieneHorario = (e.calendario?.inicio && e.calendario?.fin);
+    const tieneHorario = e.calendario?.inicio && e.calendario?.fin;
+    if (!tieneHorario) {
+      setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
+      return;
+    }
 
-if (!tieneHorario) {
-  setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
-  return;
-}
-
-    // Si todo bien, limpiamos error y pasamos al siguiente paso
     setError(null);
     onSelect(e);
   };
@@ -270,19 +295,23 @@ function PasoTurnos({
   onSelect: (t: { hora: string; fecha: Date }) => void;
   onBack: () => void;
 }) {
+  console.log("[PASO 3] Render calendario para empleado:", empleado?.nombre);
+
   return (
     <div>
       <p className="mb-4 text-center">
         Selecciona un turno para <b>{empleado?.nombre}</b>
       </p>
 
-      {/* Calendario con slots */}
       <div className="flex justify-center mb-6">
         <CalendarioUI
           empleado={empleado}
           servicio={servicio}
           negocioId={negocio.id}
-          onSelectTurno={onSelect} // 👈 pasa el turno elegido al padre
+          onSelectTurno={(t) => {
+            console.log("[PASO 3] Turno elegido:", t);
+            onSelect(t);
+          }}
         />
       </div>
 
@@ -309,8 +338,14 @@ function PasoConfirmacion({
 }: any) {
   const guardarTurno = async () => {
     try {
+      console.log("[PASO 4] Guardando turno en Firestore", {
+        servicio,
+        empleado,
+        turno,
+      });
+
       const ref = collection(db, "Negocios", negocio.id, "Turnos");
-      await addDoc(ref, {
+      const docRef = await addDoc(ref, {
         servicioId: servicio.id,
         servicioNombre: servicio.servicio,
         duracion: servicio.duracion,
@@ -318,10 +353,12 @@ function PasoConfirmacion({
         empleadoNombre: empleado.nombre,
         fecha: turno.fecha.toISOString().split("T")[0],
         hora: turno.hora,
-        estado: "pendiente", // 👈 lo podemos actualizar después
+        estado: "pendiente",
         creadoEn: new Date(),
       });
-      onConfirm(); // 👉 avanzar al paso 5 solo si se guardó
+
+      console.log("[PASO 4] Turno guardado con id:", docRef.id);
+      onConfirm();
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
       alert("Hubo un error al guardar el turno. Intenta de nuevo.");
@@ -358,6 +395,8 @@ function PasoConfirmacion({
 
 // 🔹 Paso 5 – Final
 function PasoFinal({ negocio, onClose }: any) {
+  console.log("[PASO 5] Mostrando pantalla final");
+
   return (
     <div className="text-center">
       <h2 className="text-xl font-semibold mb-4">

@@ -29,8 +29,6 @@ import {
 } from "../backend/agenda-backend";
 import CalendarioUI from "../ui/calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
-import CalendarioNegocio from "../calendario/calendarioNegocio";
-import ModalCalendarioCliente from "../calendario/modalCalendarioCliente";
 
 
 // 🌍 Leaflet

@@ -1,7 +1,14 @@
 // src/components/agendaVirtual/ui/CalendarioUI.tsx
 import { useState, useEffect, useRef } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import type { DocumentData, QuerySnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  type DocumentData,
+  type QuerySnapshot,
+  Timestamp,
+} from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
 type Turno = {
@@ -10,9 +17,9 @@ type Turno = {
 };
 
 type TurnoGuardado = {
-  hora: string;
-  duracion: number;
-  fecha: Date; // siempre Date
+  hora: string;        // "HH:mm"
+  duracion: number|string; // minutos o "H:MM"
+  fecha: Date;         // siempre Date aquí
 };
 
 type Props = {
@@ -24,13 +31,12 @@ type Props = {
   onAbrirModalCliente?: () => void;
 };
 
-// 🔎 Helper para comparar fechas sin hora
+/* -------------------- Helpers de fecha/hora -------------------- */
 const esMismoDia = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-// 🔎 Helper para saber si un turno ya pasó
 const esTurnoPasado = (fecha: Date, hora: string) => {
   const [h, m] = hora.split(":").map(Number);
   const turno = new Date(fecha);
@@ -38,28 +44,77 @@ const esTurnoPasado = (fecha: Date, hora: string) => {
   return turno < new Date();
 };
 
-// 🔎 Verifica si un slot se superpone con un turno reservado
-function seSuperpone(
-  horaSlot: string,
-  duracionServicio: number,
-  turnos: TurnoGuardado[],
-  fecha: Date
-) {
-  const [h, m] = horaSlot.split(":").map(Number);
-  const inicioSlot = h * 60 + m;
-  const finSlot = inicioSlot + duracionServicio;
-
-  return turnos.some((t) => {
-    if (!esMismoDia(fecha, t.fecha)) return false;
-
-    const [th, tm] = t.hora.split(":").map(Number);
-    const inicioTurno = th * 60 + tm;
-    const finTurno = inicioTurno + (t.duracion || 0);
-
-    return inicioSlot < finTurno && finSlot > inicioTurno;
-  });
+function toMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
 }
 
+function parseDuracionMin(d: any): number {
+  if (typeof d === "number") return d;
+  if (typeof d === "string") {
+    if (d.includes(":")) {
+      const [h, m] = d.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+    const n = Number(d);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 30; // fallback por seguridad
+}
+
+function solapan(aStart: number, aEnd: number, bStart: number, bEnd: number) {
+  // intervalos medio-abiertos [start, end)
+  return aStart < bEnd && aEnd > bStart;
+}
+
+function toDateSafe(f: any): Date {
+  if (!f) return new Date(NaN);
+  if (f instanceof Date) return f;
+  if (f instanceof Timestamp) return f.toDate();
+  if (typeof f?.toDate === "function") return f.toDate();
+  if (typeof f === "string") {
+    // admite "YYYY-MM-DD"
+    const [y, m, d] = f.split("-").map(Number);
+    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+      return new Date(y, (m || 1) - 1, d || 1);
+    }
+    // intento genérico
+    const t = new Date(f);
+    return t;
+  }
+  return new Date(f);
+}
+
+/* --------- Disponibilidad: verifica hueco exacto del slot --------- */
+function estaLibreSlot(
+  inicioSlot: number,
+  duracionServicio: number,
+  turnos: TurnoGuardado[],
+  fecha: Date,
+  inicioJornada: number,
+  finJornada: number
+): boolean {
+  const sStart = inicioSlot;
+  const sEnd = sStart + duracionServicio;
+
+  if (sStart < inicioJornada) return false;
+  if (sEnd > finJornada) return false;
+
+  const reservas = turnos
+    .filter((t) => t.fecha && esMismoDia(fecha, t.fecha))
+    .map((t) => {
+      const i = toMin(t.hora);
+      const d = parseDuracionMin(t.duracion);
+      return { inicio: i, fin: i + d };
+    });
+
+  for (const r of reservas) {
+    if (solapan(sStart, sEnd, r.inicio, r.fin)) return false;
+  }
+  return true;
+}
+
+/* =========================== Componente =========================== */
 export default function CalendarioUI({
   empleado,
   servicio,
@@ -115,33 +170,40 @@ export default function CalendarioUI({
     if (puedeIrSiguiente) setMesVisible(new Date(year, month + 1, 1));
   };
 
-  // ⚡ Generar turnos internos
+  /* -------- Generador de slots de 30' con disponibilidad correcta -------- */
   const generarTurnosInterno = (fecha: Date) => {
     const turnosTemp: Turno[] = [];
     if (!empleado?.calendario) return [];
 
-    const [hInicio, mInicio] = empleado.calendario.inicio
-      ? empleado.calendario.inicio.split(":").map(Number)
-      : [8, 0];
-    const [hFin, mFin] = empleado.calendario.fin
-      ? empleado.calendario.fin.split(":").map(Number)
-      : [16, 0];
+    const [hInicio, mInicio] = (empleado.calendario.inicio || "08:00")
+      .split(":")
+      .map(Number);
+    const [hFin, mFin] = (empleado.calendario.fin || "22:00")
+      .split(":")
+      .map(Number);
 
-    let mins = hInicio * 60 + mInicio;
-    const finMins = hFin * 60 + mFin;
-    const duracion = Number(servicio?.duracion) || 30;
+    const inicioJ = hInicio * 60 + mInicio;
+    const finJ = hFin * 60 + mFin;
 
-    while (mins + duracion <= finMins) {
+    const paso = 30;
+    const duracionServicio = parseDuracionMin(servicio?.duracion);
+
+    for (let mins = inicioJ; mins + paso <= finJ; mins += paso) {
       const hh = String(Math.floor(mins / 60)).padStart(2, "0");
       const mm = String(mins % 60).padStart(2, "0");
       const horaSlot = `${hh}:${mm}`;
 
-      const ocupado = seSuperpone(horaSlot, duracion, turnosOcupados, fecha);
-      turnosTemp.push({ hora: horaSlot, disponible: !ocupado });
+      const disponible = estaLibreSlot(
+        mins,
+        duracionServicio,
+        turnosOcupados,
+        fecha,
+        inicioJ,
+        finJ
+      );
 
-      mins += duracion;
+      turnosTemp.push({ hora: horaSlot, disponible });
     }
-
     return turnosTemp;
   };
 
@@ -153,30 +215,21 @@ export default function CalendarioUI({
     setTurnos(nuevosTurnos);
   };
 
-  // 👀 Escuchar turnos ocupados en tiempo real
+  /* ------------- Escucha de turnos ocupados (con parseo seguro) ------------- */
   useEffect(() => {
-    if (!empleado || !empleado.nombre) return;
+    if (!empleado || !empleado.nombre || !negocioId) return;
 
     const ref = collection(db, "Negocios", negocioId, "Turnos");
     const q = query(ref, where("empleadoNombre", "==", empleado.nombre));
 
     const unsub = onSnapshot(q, (snap: QuerySnapshot<DocumentData>) => {
-      const lista: TurnoGuardado[] = snap.docs.map((doc) => {
-        const data = doc.data() as any;
-
-        // ⚡ convertir "2025-09-29" → Date(2025, 8, 29)
-        let fecha: Date;
-        if (typeof data.fecha === "string") {
-          const [y, m, d] = data.fecha.split("-").map(Number);
-          fecha = new Date(y, m - 1, d);
-        } else {
-          fecha = new Date(data.fecha);
-        }
-
+      const lista: TurnoGuardado[] = snap.docs.map((d) => {
+        const data = d.data() as any;
         return {
-          ...data,
-          fecha,
-        } as TurnoGuardado;
+          hora: data.hora,
+          duracion: data.duracion,
+          fecha: toDateSafe(data.fecha), // ✅ ahora siempre Date válido
+        };
       });
       setTurnosOcupados(lista);
     });
@@ -184,6 +237,14 @@ export default function CalendarioUI({
     return () => unsub();
   }, [empleado, negocioId]);
 
+  /* ---- Recalcular slots cuando cambian reservas/duración/calendario/día ---- */
+  useEffect(() => {
+    if (!diaSeleccionado) return;
+    setTurnos(generarTurnos ? generarTurnos(diaSeleccionado) : generarTurnosInterno(diaSeleccionado));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnosOcupados, servicio?.duracion, empleado?.calendario, diaSeleccionado]);
+
+  /* --------------------------------- UI --------------------------------- */
   return (
     <div
       ref={calendarioRef}
