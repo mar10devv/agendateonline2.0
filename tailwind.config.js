@@ -9,6 +9,7 @@ module.exports = {
     "font-raleway",
     "font-playfair",
     "font-bebas",
+    "font-euphoria", // 👈 agregado
   ],
   theme: {
     extend: {
@@ -24,11 +25,12 @@ module.exports = {
         slide: "slide 12s infinite ease-in-out",
       },
       fontFamily: {
-        montserrat: ['Montserrat', 'sans-serif'],
-        poppins: ['Poppins', 'sans-serif'],
-        raleway: ['Raleway', 'sans-serif'],
-        playfair: ['Playfair Display', 'serif'],
-        bebas: ['Bebas Neue', 'sans-serif'],
+        montserrat: ["Montserrat", "sans-serif"],
+        poppins: ["Poppins", "sans-serif"],
+        raleway: ["Raleway", "sans-serif"],
+        playfair: ["Playfair Display", "serif"],
+        bebas: ["Bebas Neue", "sans-serif"],
+        euphoria: ["Euphoria Script", "cursive"], // 👈 agregado
       },
     },
   },

@@ -1,9 +1,17 @@
 // src/components/agendaVirtual/ui/modalAgendarse.tsx
 import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
-import { collection, getDocs, addDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  Timestamp,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 type Empleado = {
   nombre: string;
@@ -16,7 +24,7 @@ type Servicio = {
   id: string;
   servicio: string;
   precio: number;
-  duracion: number;
+  duracion: number; // minutos
 };
 
 type Props = {
@@ -34,18 +42,196 @@ type Props = {
   };
 };
 
+// ✅ Tipo consistente para el bloqueo
+type Bloqueo = { activo: boolean; inicio: Date | null; fin: Date | null };
+
+/* -------------------- HELPERS -------------------- */
+function toDateSafe(f: any): Date {
+  if (!f) return new Date(NaN);
+  if (f instanceof Date) return f;
+  if (f instanceof Timestamp) return f.toDate();
+  if (typeof f?.toDate === "function") return f.toDate();
+  if (typeof f === "string") return new Date(f);
+  return new Date(f);
+}
+function parseDuracionMin(d: any): number {
+  if (typeof d === "number") return d;
+  if (typeof d === "string") {
+    if (d.includes(":")) {
+      const [h, m] = d.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+    const n = Number(d);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 30;
+}
+function combinarFechaHora(fecha: Date, hhmm: string): Date {
+  const [h, m] = String(hhmm ?? "00:00").split(":").map((n) => Number(n || 0));
+  const d = new Date(fecha);
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d;
+}
+function calcularInicioFinDesdeDoc(t: any): { inicio: Date; fin: Date } | null {
+  // prioridad: inicioTs/finTs
+  const inicioTs = t.inicioTs ? toDateSafe(t.inicioTs) : null;
+  const finTs = t.finTs ? toDateSafe(t.finTs) : null;
+  if (inicioTs && finTs && !isNaN(+inicioTs) && !isNaN(+finTs)) {
+    return { inicio: inicioTs, fin: finTs };
+  }
+  // fallback legacy: fecha+hora+duracion
+  const f = toDateSafe(t.fecha);
+  if (isNaN(+f)) return null;
+  const inicio = combinarFechaHora(f, t.hora || "00:00");
+  const dur = parseDuracionMin(t.duracion);
+  const fin = new Date(inicio.getTime() + dur * 60000);
+  return { inicio, fin };
+}
+
+/* -------------------- VERIFICACIÓN DE TURNO ACTIVO --------------------
+   Regla: bloquea si existe un turno con fin > ahora.
+   1) Usuarios/{uid}/Turnos  (primario)
+   2) Negocios/{negocioId}/Turnos (compat)
+----------------------------------------------------------------------- */
+async function verificarTurnoActivoPorUsuarioYNegocio(
+  negocioId: string,
+  u: { uid?: string | null; email?: string | null } | null
+): Promise<Bloqueo> {
+  if (!u?.uid || !negocioId) return { activo: false, inicio: null, fin: null };
+
+  const ahora = new Date();
+  let inicioSel: Date | null = null;
+  let finSel: Date | null = null;
+
+  const pick = (inicio: Date, fin: Date) => {
+    if (fin <= ahora) return;
+    if (!inicioSel || inicio < inicioSel) {
+      inicioSel = inicio;
+      finSel = fin;
+    }
+  };
+
+  // --- 1) Usuarios/{uid}/Turnos: intento con where("finTs", ">", now) ---
+  try {
+    const refUser = collection(db, "Usuarios", u.uid, "Turnos");
+
+    // Preferimos filtrar en servidor por finTs (si existe)
+    // A) con negocioId (puede requerir índice). Si falla, B) sin negocioId.
+    let snaps: any[] = [];
+    try {
+      const q1 = query(refUser, where("negocioId", "==", negocioId), where("finTs", ">", ahora));
+      snaps.push(await getDocs(q1));
+    } catch {
+      const q2 = query(refUser, where("finTs", ">", ahora));
+      snaps.push(await getDocs(q2));
+    }
+
+    for (const s of snaps) {
+      s.forEach((doc: any) => {
+        const t = doc.data();
+        const par = calcularInicioFinDesdeDoc(t);
+        if (!par) return;
+        if (t.negocioId && t.negocioId !== negocioId) return; // si viene marcado por otro negocio
+        pick(par.inicio, par.fin);
+      });
+    }
+    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+
+    // Fallback: leer todo y calcular (por si no hay finTs)
+    const allSnap = await getDocs(refUser);
+    allSnap.forEach((doc) => {
+      const t = doc.data();
+      if (t.negocioId && t.negocioId !== negocioId) return;
+      const par = calcularInicioFinDesdeDoc(t);
+      if (!par) return;
+      pick(par.inicio, par.fin);
+    });
+    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+  } catch {
+    // seguimos con negocio
+  }
+
+  // --- 2) Negocios/{negocioId}/Turnos: intento con where("finTs", ">", now) ---
+  try {
+    const refNeg = collection(db, "Negocios", negocioId, "Turnos");
+    let negSnaps: any[] = [];
+    try {
+      if (u.uid) negSnaps.push(await getDocs(query(refNeg, where("clienteUid", "==", u.uid), where("finTs", ">", ahora))));
+    } catch {
+      if (u.uid) negSnaps.push(await getDocs(query(refNeg, where("clienteUid", "==", u.uid))));
+    }
+    try {
+      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email), where("finTs", ">", ahora))));
+    } catch {
+      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
+    }
+
+    for (const s of negSnaps) {
+      s.forEach((doc: any) => {
+        const t = doc.data();
+        const par = calcularInicioFinDesdeDoc(t);
+        if (!par) return;
+        pick(par.inicio, par.fin);
+      });
+    }
+    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+  } catch {
+    // nada
+  }
+
+  return { activo: false, inicio: null, fin: null };
+}
+
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [paso, setPaso] = useState(1);
   const [servicio, setServicio] = useState<Servicio | null>(null);
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [turno, setTurno] = useState<any>(null);
 
+  // Usuario actual (para reusar en confirmación)
+  const [usuario, setUsuario] = useState<{ uid?: string | null; email?: string | null } | null>(null);
+
+  // Bloqueo por turno ya reservado
+  const [cargandoCheck, setCargandoCheck] = useState(false);
+  const [bloqueo, setBloqueo] = useState<Bloqueo>({
+    activo: false,
+    inicio: null,
+    fin: null,
+  });
+
   const siguiente = () => setPaso((p) => p + 1);
   const volver = () => setPaso((p) => p - 1);
 
-  if (!abierto) return null;
+  // Al abrir modal, obtener usuario y chequear bloqueo (usuario → negocio)
+  useEffect(() => {
+    if (!abierto || !negocio?.id) return;
 
-  console.log(`[DEBUG] Paso actual: ${paso}`);
+    setCargandoCheck(true);
+    const auth = getAuth();
+
+    const off = onAuthStateChanged(auth, async (u) => {
+      const info = u ? { uid: u.uid, email: u.email } : null;
+      setUsuario(info);
+
+      if (!u) {
+        setBloqueo({ activo: false, inicio: null, fin: null });
+        setCargandoCheck(false);
+        return;
+      }
+      try {
+        const r = await verificarTurnoActivoPorUsuarioYNegocio(negocio.id, info);
+        setBloqueo(r);
+      } catch {
+        setBloqueo({ activo: false, inicio: null, fin: null });
+      } finally {
+        setCargandoCheck(false);
+      }
+    });
+
+    return () => off();
+  }, [abierto, negocio?.id]);
+
+  if (!abierto) return null;
 
   return (
     <ModalBase
@@ -54,70 +240,108 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
       titulo="Agendar turno"
       maxWidth="max-w-lg"
     >
-      {paso === 1 && (
-        <PasoServicios
-          negocio={negocio}
-          onSelect={(s: Servicio) => {
-            console.log("[PASO 1] Servicio seleccionado:", s);
-            setServicio(s);
-            siguiente();
-          }}
-        />
+      {/* Aviso / bloqueo */}
+      {cargandoCheck && (
+        <div className="p-4 text-sm text-gray-300">Verificando turnos ya reservados...</div>
       )}
 
-      {paso === 2 && servicio && (
-        <PasoEmpleados
-          servicio={servicio}
-          negocio={negocio}
-          onSelect={(e: Empleado) => {
-            console.log("[PASO 2] Empleado seleccionado:", e);
-            setEmpleado(e);
-            siguiente();
-          }}
-          onBack={volver}
-        />
+      {!cargandoCheck && bloqueo.activo && (
+        <div className="p-4 space-y-3">
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+            <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
+            <div className="text-amber-200 text-sm">
+              Día:{" "}
+              <b>
+                {bloqueo.inicio?.toLocaleDateString("es-ES", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </b>{" "}
+              a las{" "}
+              <b>
+                {bloqueo.inicio?.toLocaleTimeString("es-ES", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </b>
+              . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
       )}
 
-      {paso === 3 && empleado && servicio && (
-        <PasoTurnos
-          empleado={empleado}
-          servicio={servicio}
-          negocio={negocio}
-          onSelect={(t: any) => {
-            console.log("[PASO 3] Turno seleccionado:", t);
-            setTurno(t);
-            siguiente();
-          }}
-          onBack={volver}
-        />
-      )}
+      {/* Flujo original SOLO si no hay bloqueo */}
+      {!cargandoCheck && !bloqueo.activo && (
+        <>
+          {paso === 1 && (
+            <PasoServicios
+              negocio={negocio}
+              onSelect={(s: Servicio) => {
+                setServicio(s);
+                siguiente();
+              }}
+            />
+          )}
 
-      {paso === 4 && servicio && empleado && (
-        <PasoConfirmacion
-          servicio={servicio}
-          empleado={empleado}
-          turno={turno}
-          negocio={negocio}
-          onConfirm={() => {
-            console.log("[PASO 4] Confirmación enviada", {
-              servicio,
-              empleado,
-              turno,
-            });
-            siguiente();
-          }}
-          onBack={volver}
-        />
-      )}
+          {paso === 2 && servicio && (
+            <PasoEmpleados
+              servicio={servicio}
+              negocio={negocio}
+              onSelect={(e: Empleado) => {
+                setEmpleado(e);
+                siguiente();
+              }}
+              onBack={volver}
+            />
+          )}
 
-      {paso === 5 && (
-        <PasoFinal
-          negocio={negocio}
-          onClose={() => {
-            console.log("[PASO 5] Proceso finalizado");
-            onClose();
-          }}
-        />
+          {paso === 3 && empleado && servicio && (
+            <PasoTurnos
+              empleado={empleado}
+              servicio={servicio}
+              negocio={negocio}
+              onSelect={(t: any) => {
+                setTurno(t);
+                siguiente();
+              }}
+              onBack={volver}
+            />
+          )}
+
+          {paso === 4 && servicio && empleado && (
+            <PasoConfirmacion
+              servicio={servicio}
+              empleado={empleado}
+              turno={turno}
+              negocio={negocio}
+              usuario={usuario}
+              onConfirm={() => {
+                siguiente();
+              }}
+              onBack={volver}
+            />
+          )}
+
+          {paso === 5 && (
+            <PasoFinal
+              negocio={negocio}
+              onClose={() => {
+                onClose();
+              }}
+            />
+          )}
+        </>
       )}
     </ModalBase>
   );
@@ -150,7 +374,6 @@ function PasoServicios({
               ...doc.data(),
             } as Servicio)
         );
-        console.log("[PASO 1] Servicios cargados:", lista);
         setServicios(lista);
       } catch (err) {
         console.error("Error cargando servicios:", err);
@@ -211,7 +434,6 @@ function PasoEmpleados({
         )
     );
 
-    console.log("[PASO 2] Empleados filtrados:", disponibles);
     setFiltrados(disponibles);
   }, [servicio, negocio]);
 
@@ -295,8 +517,6 @@ function PasoTurnos({
   onSelect: (t: { hora: string; fecha: Date }) => void;
   onBack: () => void;
 }) {
-  console.log("[PASO 3] Render calendario para empleado:", empleado?.nombre);
-
   return (
     <div>
       <p className="mb-4 text-center">
@@ -309,7 +529,6 @@ function PasoTurnos({
           servicio={servicio}
           negocioId={negocio.id}
           onSelectTurno={(t) => {
-            console.log("[PASO 3] Turno elegido:", t);
             onSelect(t);
           }}
         />
@@ -333,31 +552,80 @@ function PasoConfirmacion({
   empleado,
   turno,
   negocio,
+  usuario,
   onConfirm,
   onBack,
 }: any) {
   const guardarTurno = async () => {
     try {
-      console.log("[PASO 4] Guardando turno en Firestore", {
-        servicio,
-        empleado,
-        turno,
-      });
+      const auth = getAuth();
+      const u = auth.currentUser;
+      const uInfo = {
+        uid: u?.uid ?? usuario?.uid ?? null,
+        email: u?.email ?? usuario?.email ?? null,
+      };
 
-      const ref = collection(db, "Negocios", negocio.id, "Turnos");
-      const docRef = await addDoc(ref, {
+      // 🔁 Re-verificación ANTES de guardar
+      const bloqueo = await verificarTurnoActivoPorUsuarioYNegocio(
+        negocio.id,
+        uInfo
+      );
+      if (bloqueo.activo) {
+        alert(
+          `Ya tienes un turno reservado el ${bloqueo.inicio?.toLocaleDateString(
+            "es-ES"
+          )} a las ${bloqueo.inicio?.toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}.`
+        );
+        return;
+      }
+
+      // Calculamos inicio/fin y guardamos esos campos (inicioTs/finTs)
+      const fechaStr = turno.fecha.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      const inicio = combinarFechaHora(turno.fecha, turno.hora);
+      const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
+
+      // 1) Guardar en negocio
+      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+      const docRef = await addDoc(refNeg, {
+        negocioId: negocio.id,
+        negocioNombre: negocio.nombre,
         servicioId: servicio.id,
         servicioNombre: servicio.servicio,
         duracion: servicio.duracion,
         empleadoId: empleado.id || null,
         empleadoNombre: empleado.nombre,
-        fecha: turno.fecha.toISOString().split("T")[0],
+        fecha: fechaStr,
         hora: turno.hora,
-        estado: "pendiente",
+        inicioTs: inicio, // Date -> Firestore Timestamp
+        finTs: fin,
+        clienteUid: uInfo.uid,
+        clienteEmail: uInfo.email,
         creadoEn: new Date(),
       });
 
-      console.log("[PASO 4] Turno guardado con id:", docRef.id);
+      // 2) Guardar COPIA en Usuarios/{uid}/Turnos
+      if (uInfo.uid) {
+        const refUserTurns = collection(db, "Usuarios", uInfo.uid, "Turnos");
+        await addDoc(refUserTurns, {
+          negocioId: negocio.id,
+          negocioNombre: negocio.nombre,
+          turnoIdNegocio: docRef.id,
+          servicioId: servicio.id,
+          servicioNombre: servicio.servicio,
+          duracion: servicio.duracion,
+          empleadoId: empleado.id || null,
+          empleadoNombre: empleado.nombre,
+          fecha: fechaStr,
+          hora: turno.hora,
+          inicioTs: inicio,
+          finTs: fin,
+          creadoEn: new Date(),
+        });
+      }
+
       onConfirm();
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
@@ -395,8 +663,6 @@ function PasoConfirmacion({
 
 // 🔹 Paso 5 – Final
 function PasoFinal({ negocio, onClose }: any) {
-  console.log("[PASO 5] Mostrando pantalla final");
-
   return (
     <div className="text-center">
       <h2 className="text-xl font-semibold mb-4">

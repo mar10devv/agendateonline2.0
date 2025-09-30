@@ -1,8 +1,11 @@
+/* ================= Fonts ================= */
+@import url('https://fonts.googleapis.com/css2?family=Euphoria+Script&display=swap');
+
+/* ================= Librerías externas ================= */
 @import "animate.css/animate.min.css";
 @import "swiper/css";
 @import "swiper/css/navigation";
 @import "swiper/css/pagination";
-
 
 
 /* ================= Animaciones de entrada ================= */
@@ -28,6 +31,7 @@
 }
 .animate-fadeInModal { animation: fadeInModal 0.3s ease-out forwards; }
 
+
 /* ================= Animaciones de salida ================= */
 
 /* 👉 Fade + scale para cierre de modal */
@@ -36,6 +40,7 @@
   to   { opacity: 0; transform: scale(0.9) translateY(15px); }
 }
 .animate-fadeOutModal { animation: fadeOutModal 0.5s ease-in forwards; }
+
 
 /* ================= Animaciones de carga ================= */
 
@@ -66,6 +71,7 @@
     box-shadow: 0 0 0 0 rgba(178, 212, 252, 0.7);
   }
 }
+
 
 /* ================= Animaciones de UI ================= */
 
@@ -98,7 +104,7 @@
 .animate-contentFade { animation: contentFade 0.3s ease-in-out; }
 
 
-/* Hamburguesa animada */
+/* ================= Hamburguesa animada ================= */
 .hamburger .line {
   fill: none;
   stroke: white;
@@ -122,7 +128,9 @@
   stroke-dashoffset: -32.42;
 }
 
+
 /* ================= Scrollbar hide ================= */
+
 /* ===== Scrollbar invisible ===== */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE y Edge */
