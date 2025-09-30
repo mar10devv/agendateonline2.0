@@ -1,5 +1,16 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": [".astro/types.d.ts", "src", "src/types/svg.d.ts"],
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "include": [
+    ".astro/types.d.ts",
+    "src",
+    "src/types/svg.d.ts",
+    "netlify/functions"
+  ],
   "exclude": ["dist"]
 }
