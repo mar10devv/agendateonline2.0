@@ -29,7 +29,7 @@ type TurnoNegocio = {
   id: string;
   servicioId?: string;
   servicioNombre?: string;
-  duracion?: number;
+  duracion?: number | string;
   empleadoId?: string | null;
   empleadoNombre: string;
   fecha?: string;
@@ -43,7 +43,7 @@ type TurnoNegocio = {
   creadoEn?: any;
 };
 
-type Servicio = { id: string; servicio: string; precio: number; duracion: number };
+type Servicio = { id: string; servicio: string; precio: number; duracion: number | string };
 
 /* =============== Helpers fecha/hora =============== */
 const esMismoDia = (a: Date, b: Date) =>
@@ -104,7 +104,7 @@ const solapan = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
 export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   const hoy = new Date();
 
-  // 🔄 Mismo rango que CalendarioUI (−10 / +30)
+  // Rango visible (−10 / +30)
   const fechaMinima = useMemo(() => {
     const d = new Date(hoy);
     d.setDate(hoy.getDate() - 10);
@@ -120,7 +120,11 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     negocio.empleadosData?.[0] || null
   );
   const [mesVisible, setMesVisible] = useState<Date>(new Date(hoy));
-  const [diaSel, setDiaSel] = useState<Date>(new Date(hoy));
+
+  // ⛔️ NO abrir horarios automáticamente
+  const [diaSel, setDiaSel] = useState<Date | null>(null);
+
+  // Guardamos TODOS los turnos del empleado (sin filtrar por día en la suscripción)
   const [turnos, setTurnos] = useState<TurnoNegocio[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
 
@@ -139,7 +143,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     error?: string | null;
   }>({ visible: false, hora: null, paso: 1 });
 
-  /* ---------- Calendario del mes (igual a CalendarioUI) ---------- */
+  /* ---------- Calendario del mes ---------- */
   const year = mesVisible.getFullYear();
   const month = mesVisible.getMonth();
   const primerDia = new Date(year, month, 1);
@@ -166,7 +170,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   const irMesAnterior = () => puedeIrAnterior && setMesVisible(new Date(year, month - 1, 1));
   const irMesSiguiente = () => puedeIrSiguiente && setMesVisible(new Date(year, month + 1, 1));
 
-  /* ---------- Cargar servicios del negocio (para asignación manual) ---------- */
+  /* ---------- Cargar servicios del negocio ---------- */
   useEffect(() => {
     if (!negocio?.id) return;
     (async () => {
@@ -181,9 +185,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     })();
   }, [negocio?.id]);
 
-  /* ---------- Escucha de turnos del día/empleado ---------- */
+  /* ---------- Escucha de turnos del EMPLEADO (no depende del día) ---------- */
   useEffect(() => {
-    if (!negocio?.id || !empleadoSel?.nombre || !diaSel) return;
+    if (!negocio?.id || !empleadoSel?.nombre) return;
 
     const ref = collection(db, "Negocios", negocio.id, "Turnos");
     const qBase = query(ref, where("empleadoNombre", "==", empleadoSel.nombre));
@@ -194,7 +198,6 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
         const data = d.data() as any;
         const par = calcularInicioFinDesdeDoc(data);
         if (!par) return;
-        if (!esMismoDia(par.inicio, diaSel)) return;
         lista.push({
           id: d.id,
           ...data,
@@ -207,26 +210,56 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     });
 
     return () => off();
-  }, [negocio?.id, empleadoSel?.nombre, diaSel]);
+  }, [negocio?.id, empleadoSel?.nombre]);
 
-  /* ---------- Slots 30' y ocupación (6 columnas, sin textos extra) ---------- */
-  const slots = useMemo(() => {
-    const cal = empleadoSel?.calendario || {};
-    const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
-    const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
-    const inicioJ = (hi || 0) * 60 + (mi || 0);
-    const finJ = (hf || 0) * 60 + (mf || 0);
-    const paso = 30;
+  /* ---------- Reset al cambiar empleado/negocio ---------- */
+  useEffect(() => {
+    setDiaSel(null);
+  }, [empleadoSel?.nombre, negocio?.id]);
 
-    const out: { hora: string; ocupado: boolean; turno?: TurnoNegocio }[] = [];
-    for (let m = inicioJ; m <= finJ; m += paso) {
-      const hhmm = minToHHMM(m);
-      const ini = combinarFechaHora(diaSel, hhmm);
-      const t = turnos.find((tt) => Math.abs(+toDateSafe(tt.inicioTs) - +ini) < 60 * 1000);
-      out.push({ hora: hhmm, ocupado: Boolean(t), turno: t });
-    }
-    return out;
-  }, [empleadoSel?.calendario, turnos, diaSel]);
+  /* ---------- Slots 30' y ocupación (filtramos por día aquí) ---------- */
+const slots = useMemo(() => {
+  if (!diaSel) return [] as { hora: string; ocupado: boolean; turno?: TurnoNegocio }[];
+
+  const cal = empleadoSel?.calendario || {};
+  const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
+  const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
+  const inicioJ = (hi || 0) * 60 + (mi || 0);
+  const finJ = (hf || 0) * 60 + (mf || 0);
+  const paso = 30;
+
+  // Turnos del día (con inicio y fin seguros)
+  const turnosDelDia = turnos
+    .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
+    .map((t) => {
+      const ini = toDateSafe(t.inicioTs as any);
+      const fin = t.finTs ? toDateSafe(t.finTs as any)
+                          : new Date(+ini + parseDuracionMin(t.duracion) * 60000);
+      return { ...t, _ini: ini, _fin: fin };
+    });
+
+  const out: { hora: string; ocupado: boolean; turno?: TurnoNegocio }[] = [];
+
+  // usamos m < finJ para que el slot completo quede dentro de la jornada
+  for (let m = inicioJ; m < finJ; m += paso) {
+    const hhmm = minToHHMM(m);
+    const slotStart = combinarFechaHora(diaSel, hhmm);
+    const slotEnd = new Date(+slotStart + paso * 60000);
+
+    // ⛔️ Ocupado si CUALQUIER turno se solapa con [slotStart, slotEnd)
+    const covering = turnosDelDia.find(
+      (t) => t._ini < slotEnd && t._fin > slotStart
+    );
+
+    out.push({
+      hora: hhmm,
+      ocupado: Boolean(covering),
+      turno: covering as any,
+    });
+  }
+
+  return out;
+}, [empleadoSel?.calendario, turnos, diaSel]);
 
   /* ---------- Datos extra del cliente (para detalle) ---------- */
   useEffect(() => {
@@ -248,27 +281,37 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   /* ---------- Validación de hueco (sin solape) ---------- */
   const puedeAsignarEn = (inicio: Date, durMin: number) => {
     const fin = new Date(inicio.getTime() + durMin * 60000);
-    const reservas = turnos.map((t) => {
-      const par = calcularInicioFinDesdeDoc(t);
-      return par ? { i: +par.inicio, f: +par.fin } : null;
-    }).filter(Boolean) as { i: number; f: number }[];
+    const reservas = turnos
+      .map((t) => {
+        const par = calcularInicioFinDesdeDoc(t);
+        return par ? { i: +par.inicio, f: +par.fin } : null;
+      })
+      .filter(Boolean) as { i: number; f: number }[];
 
     const sI = +inicio, sF = +fin;
     for (const r of reservas) {
       if (solapan(sI, sF, r.i, r.f)) return false;
     }
-    // también respetar jornada del empleado
+
+    // respetar jornada del empleado
     const cal = empleadoSel?.calendario || {};
     const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
     const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
     const jI = (hi || 0) * 60 + (mi || 0);
     const jF = (hf || 0) * 60 + (mf || 0);
-    const slotMin = toMin(minToHHMM(inicio.getHours() * 60 + inicio.getMinutes()));
+    const slotMin = inicio.getHours() * 60 + inicio.getMinutes();
     return slotMin >= jI && slotMin + durMin <= jF;
   };
 
   /* ------------------------------- UI ------------------------------- */
   const nombreMes = mesVisible.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+
+  // Reservas “quién se agendó” del día seleccionado
+  const reservasDelDia = diaSel
+    ? turnos
+        .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
+        .sort((a, b) => +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any))
+    : [];
 
   return (
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">
@@ -328,7 +371,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     ${
                       esMismoDia(d, hoy)
                         ? "bg-white text-black font-bold"
-                        : esMismoDia(d, diaSel)
+                        : diaSel && esMismoDia(d, diaSel)
                         ? "bg-indigo-600 text-white font-bold"
                         : "hover:bg-neutral-700"
                     }`}
@@ -342,36 +385,62 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
           </div>
         </div>
 
-        {/* Slots del día (6 columnas, sin textos) */}
+        {/* Panel derecho */}
         <div className="bg-neutral-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3 sticky top-0 bg-neutral-800 z-10">
-            <div className="text-sm text-gray-300">
-              {empleadoSel?.nombre} • {diaSel.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}
-            </div>
-            <div className="text-xs text-gray-400">{turnos.length} turno{turnos.length === 1 ? "" : "s"}</div>
-          </div>
+          {!diaSel ? (
+            <div className="text-sm text-gray-400">Selecciona un día del calendario para ver los turnos.</div>
+          ) : (
+            <>
+              {/* Encabezado + contador */}
+              <div className="flex items-center justify-between mb-3 sticky top-0 bg-neutral-800 z-10">
+                <div className="text-sm text-gray-300">
+                  {empleadoSel?.nombre} • {diaSel.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {reservasDelDia.length} turno{reservasDelDia.length === 1 ? "" : "s"}
+                </div>
+              </div>
 
-          <div className="max-h-[420px] overflow-auto pr-1">
-            <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-              {slots.map((s, i) => {
-                const ocupado = s.ocupado;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      if (ocupado) setDetalles(s.turno!);
-                      else setManualOpen({ visible: true, hora: s.hora, paso: 1 });
-                    }}
-                    className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none
-                      ${ocupado ? "bg-red-600/95 hover:bg-red-600 text-white" : "bg-emerald-600/90 hover:bg-emerald-600 text-white"}`}
-                    title={ocupado ? "Turno ocupado" : "Asignar manualmente"}
-                  >
-                    {s.hora}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              {/* Quién se agendó */}
+              {reservasDelDia.length > 0 && (
+                <ul className="mb-3 space-y-1 text-xs">
+                  {reservasDelDia.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1">
+                      <span className="font-semibold">
+                        {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="truncate">
+                        {t.clienteNombre ?? "Reservado"} {t.servicioNombre ? `• ${t.servicioNombre}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Slots del día (6 columnas) */}
+              <div className="max-h-[420px] overflow-auto pr-1">
+                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                  {slots.map((s, i) => {
+                    const ocupado = s.ocupado;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (ocupado) setDetalles(s.turno!);
+                          else setManualOpen({ visible: true, hora: s.hora, paso: 1 });
+                        }}
+                        className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none
+                          ${ocupado ? "bg-red-600/95 hover:bg-red-600 text-white" : "bg-emerald-600/90 hover:bg-emerald-600 text-white"}`}
+                        title={ocupado ? "Turno ocupado" : "Asignar manualmente"}
+                      >
+                        {s.hora}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -410,7 +479,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
       )}
 
       {/* Modal asignación manual (verde) */}
-      {manualOpen.visible && (
+      {manualOpen.visible && diaSel && (
         <div className="fixed inset-0 z-[10000]">
           <div className="absolute inset-0 bg-black/60" onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} />
           <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
@@ -516,7 +585,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
                         try {
                           const hora = manualOpen.hora!;
-                          const inicio = combinarFechaHora(diaSel, hora);
+                          const inicio = combinarFechaHora(diaSel!, hora);
                           const dur = parseDuracionMin(manualOpen.servicio.duracion);
 
                           if (!puedeAsignarEn(inicio, dur)) {
