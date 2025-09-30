@@ -581,12 +581,17 @@ useEffect(() => {
       <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden">
         <h2 className="text-lg font-semibold mb-4">Ubicación</h2>
         {ubicacion ? (
-          <div className="w-full h-64 rounded-md overflow-hidden border">
+          <a
+            href={`https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full h-64 rounded-md overflow-hidden border"
+          >
             <MapContainer
               key={`${ubicacion.lat}-${ubicacion.lng}`}
               center={[ubicacion.lat, ubicacion.lng]}
               zoom={16}
-              className="w-full h-full"
+              className="w-full h-full pointer-events-none" // 👈 Desactiva interacción para que el click vaya al <a>
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -594,7 +599,7 @@ useEffect(() => {
               />
               <Marker position={[ubicacion.lat, ubicacion.lng]} icon={customIcon} />
             </MapContainer>
-          </div>
+          </a>
         ) : (
           <p className="text-gray-400 text-sm">Ubicación no disponible.</p>
         )}
@@ -621,6 +626,7 @@ useEffect(() => {
     negocio={negocio}
   />
 )}
+
 
 
 
