@@ -8,6 +8,25 @@ import FormRegisterEmpresa2 from "../ui/form-registerEmpresa2";
 
 const tiposDeNegocio = ["Barbería", "Casa de Tattoo", "Estilista", "Dentista", "Spa"];
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const CATEGORIAS = [
+  { id: "belleza-estetica", label: "Belleza & Estética (salón)", subs: ["Peluquería unisex","Coloración","Peinados","Alisados","Maquillaje social","Novias"] },
+  { id: "barberia", label: "Barbería", subs: ["Corte","Barba","Afeitado clásico","Perfilado","Color hombre","Diseño de líneas"] },
+  { id: "unas-pestanas", label: "Uñas & Pestañas", subs: ["Manicura","Semipermanente","Uñas esculpidas","Pedicura","Lifting de pestañas","Extensiones"] },
+  { id: "tattoo-piercing", label: "Tatuajes & Piercings", subs: ["Black & grey","Color","Realismo","Microtattoo","Cover up","Piercing"] },
+  { id: "masajes-spa", label: "Masajes & Spa", subs: ["Descontracturante","Relajante","Deportivo","Piedras calientes","Drenaje linfático","Reflexología"] },
+  { id: "quiropraxia-fisio", label: "Quiropraxia & Fisioterapia", subs: ["Ajuste quiropráctico","Evaluación postural","Kinesiología","Rehabilitación","Punción seca","Estiramientos"] },
+  { id: "medicina", label: "Medicina (Doctores)", subs: ["Medicina general","Pediatría","Dermatología","Ginecología","Oftalmología","Traumatología"] },
+  { id: "medicina-estetica", label: "Medicina Estética (Botox & +)", subs: ["Botox","Rellenos","PRP","Peelings","Hilos tensores","Depilación láser"] },
+  { id: "odontologia", label: "Odontología", subs: ["Consulta","Limpieza","Blanqueamiento","Ortodoncia","Implantes","Urgencias"] },
+  { id: "abogados", label: "Legal / Abogados", subs: ["Civil","Penal","Laboral","Familia","Corporativo","Notarial"] },
+  { id: "mascotas", label: "Mascotas", subs: ["Veterinaria","Vacunación","Cirugías","Peluquería canina","Adiestramiento","Guardería"] },
+  { id: "fitness-clases", label: "Fitness & Clases", subs: ["Personal trainer","Yoga","Pilates","CrossFit","Danza","Evaluación física"] },
+  { id: "automotor", label: "Automotor", subs: ["Taller mecánico","Electricidad","Alineación y balanceo","Gomería","Detailing","ITV"] },
+  { id: "hogar-tecnicos", label: "Hogar & Técnicos", subs: ["Plomería","Electricidad","Aire acondicionado","Cerrajería","Carpintería","Limpieza"] },
+  { id: "foto-video", label: "Foto/Video & Estudio", subs: ["Retratos","Eventos","Producto","Books","Alquiler de estudio","Edición"] },
+  { id: "educacion-consultoria", label: "Educación & Consultoría", subs: ["Clases particulares","Exámenes","Coaching","Marketing","Contabilidad","Asesoría legal exprés"] },
+];
+
 
 type LoaderProps = {
   mensaje?: string;
@@ -87,13 +106,13 @@ useEffect(() => {
   const [telefono, setTelefono] = useState("");
   const [tipoNegocio, setTipoNegocio] = useState("");
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
+  const [subSeccion, setSubSeccion] = useState("");
 
   // Validaciones
   const nombreValido = nombre.trim().length > 2;
   const emailValido = /\S+@\S+\.\S+/.test(email);
   const telefonoValido = /^\d{8,15}$/.test(telefono);
-  const tipoValido = tipoNegocio !== "";
-  const formularioValido = nombreValido && emailValido && telefonoValido && tipoValido;
+const formularioValido = nombreValido && emailValido && telefonoValido;
 
   const handleNext = () => {
     if (!formularioValido) {
@@ -104,19 +123,19 @@ useEffect(() => {
   };
 
   // Paso 2
-  const [mostrarDias, setMostrarDias] = useState(false);
-  const [diasLibres, setDiasLibres] = useState<string[]>([]);
-  const [modoTurnos, setModoTurnos] = useState<"jornada" | "personalizado">("jornada");
-  const [subModoJornada, setSubModoJornada] = useState<"minutos" | "horas" | null>(null);
+const [mostrarDias, setMostrarDias] = useState(false);
+const [diasLibres, setDiasLibres] = useState<string[]>([]);
+const [modoTurnos, setModoTurnos] = useState<"jornada" | "personalizado">("jornada");
+const [subModoJornada, setSubModoJornada] = useState<"minutos" | "horas" | null>(null);
 const [clientesPorDia, setClientesPorDia] = useState<number | null>(4);
 const [horasSeparacion, setHorasSeparacion] = useState<number | null>(1);
 
 
-  const toggleDia = (dia: string) => {
-    setDiasLibres((prev) =>
-      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
-    );
-  };
+const toggleDia = (dia: string) => {
+  setDiasLibres((prev) =>
+    prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
+  );
+};
 
 const handleFinalizar = () => {
   if (!modoTurnos) {
@@ -129,15 +148,14 @@ const handleFinalizar = () => {
       alert("⚠️ Debes indicar si trabajas por minutos o por horas.");
       return;
     }
-
-    if ((horasSeparacion ?? 0) <= 0) {   // 👈 usa fallback en null
+    if ((horasSeparacion ?? 0) <= 0) {
       alert("⚠️ Debes configurar el tiempo de separación entre clientes.");
       return;
     }
   }
 
   if (modoTurnos === "personalizado") {
-    if ((clientesPorDia ?? 0) <= 0) {   // 👈 usa fallback en null
+    if ((clientesPorDia ?? 0) <= 0) {
       alert("⚠️ Debes indicar cuántos clientes atiendes por día.");
       return;
     }
@@ -148,7 +166,7 @@ const handleFinalizar = () => {
     return;
   }
 
-  // ✅ Normalizar los valores según el modo
+  // ✅ Normalizar según el modo
   if (modoTurnos === "personalizado") {
     setHorasSeparacion(null);
     setSubModoJornada(null);
@@ -156,9 +174,10 @@ const handleFinalizar = () => {
     setClientesPorDia(null);
   }
 
-  // ✅ Si todo está bien, avanza
-  setPaso(3);
+  // ✅ Avanzar al Paso 2B (selección de Sección/Sub-sección)
+  setPaso(22);
 };
+
 
 
 
@@ -228,6 +247,7 @@ await setDoc(
     emailContacto: email,
     telefono,
     tipoNegocio,
+    subSeccion,
     slug,
     urlPersonal: `http://localhost:4321/agenda/${slug}`,
     plantilla: plantillaNormalizada,
@@ -296,20 +316,31 @@ await setDoc(
     );
   };
 
-{/* Loarder de cargando */}
+// --- función para iniciar sesión (ponerla arriba, antes de los returns) ---
+const handleLogin = async () => {
+  try {
+    await signInWithPopup(auth, googleProvider);
+    // onAuthStateChanged actualizará el estado y seguirá el flujo normal
+  } catch (e) {
+    console.error(e);
+    alert("No se pudo iniciar sesión. Intenta nuevamente.");
+  }
+};
+
+// --- Loader de cargando ---
 if (loading) {
   return (
     <div className="flex justify-center items-center py-10">
       <Loader
         mensaje="Cargando datos..."
         textColor="text-white"
-        circleColor="#ffffff"   // ✅ hex en lugar de bg-white
+        circleColor="#ffffff"
       />
     </div>
   );
 }
 
-
+// --- Ya tiene negocio registrado ---
 if (tieneNegocio === true) {
   return (
     <div className="text-center py-10 text-red-600 font-semibold">
@@ -318,38 +349,132 @@ if (tieneNegocio === true) {
   );
 }
 
+// --- No está logueado: mostramos card con botón de login ---
 if (tieneNegocio === null) {
   return (
-    <div className="text-center py-10 text-gray-700">
-      🔑 Debes iniciar sesión para registrar tu negocio
-    </div>
+    <div className="w-full">
+
+        <div className="max-w-xl mx-auto text-center space-y-4">
+          <div className="text-2xl font-semibold text-white">🔐 Debes iniciar sesión</div>
+          <p className="text-white/90">
+            Para registrar tu negocio primero iniciá sesión.
+          </p>
+
+          <button
+            onClick={handleLogin}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-indigo-700 font-semibold hover:bg-indigo-50 transition"
+          >
+            <span>Iniciar sesión con Google</span>
+          </button>
+
+          <div className="text-xs text-white/80">
+            Al continuar aceptas nuestros Términos y Política de Privacidad.
+          </div>
+        </div>
+      </div>
+
   );
 }
-
 
   return (
     <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-lg">
       {/* Paso 1 */}
 {paso === 1 && (
-  <FormRegisterEmpresa
-    valoresIniciales={{
-      nombreEmpresa: nombre,
-      correo: email,
-      telefono: telefono,
-      tipoNegocio: tipoNegocio,
-    }}
-    onSubmit={(valores) => {
-      setNombre(valores.nombreEmpresa || "");
-      setEmail(valores.correo || "");
-      setTelefono(valores.telefono || "");
-      setTipoNegocio(valores.tipoNegocio || "");
+  <div className="space-y-4">
+    {/* Nombre */}
+    <input
+      type="text"
+      value={nombre}
+      onChange={(e) => setNombre(e.target.value)}
+      placeholder="Nombre del negocio"
+      className="w-full p-2 border rounded"
+    />
+    {!nombreValido && nombre.length > 0 && (
+      <p className="text-red-600 text-sm">Debe tener al menos 3 caracteres</p>
+    )}
 
-      // 👉 si el form ya estaba válido (botón azul),
-      // avanzamos directo al paso 2
-      setPaso(2);
-    }}
-  />
+    {/* Email */}
+    <input
+      type="email"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      placeholder="Correo electrónico"
+      className="w-full p-2 border rounded"
+    />
+    {!emailValido && email.length > 0 && (
+      <p className="text-red-600 text-sm">Correo inválido</p>
+    )}
+
+    {/* Teléfono */}
+    <input
+      type="tel"
+      value={telefono}
+      onChange={(e) => setTelefono(e.target.value)}
+      placeholder="Número de teléfono"
+      className="w-full p-2 border rounded"
+    />
+    {!telefonoValido && telefono.length > 0 && (
+      <p className="text-red-600 text-sm">Debe tener entre 8 y 15 dígitos</p>
+    )}
+
+    {/* Categoría */}
+    <select
+      value={tipoNegocio}
+      onChange={(e) => {
+        setTipoNegocio(e.target.value);
+        setSubSeccion(""); // reset al cambiar categoría
+      }}
+      className="w-full p-2 border rounded"
+    >
+      <option value="">Selecciona tipo de negocio</option>
+      {CATEGORIAS.map((cat) => (
+        <option key={cat.id} value={cat.id}>
+          {cat.label}
+        </option>
+      ))}
+    </select>
+
+    {/* Sub-sección */}
+    {tipoNegocio && (
+      <select
+        value={subSeccion}
+        onChange={(e) => setSubSeccion(e.target.value)}
+        className="w-full p-2 border rounded"
+      >
+        <option value="">Selecciona sub-sección</option>
+        {CATEGORIAS.find((c) => c.id === tipoNegocio)?.subs.map((sub) => (
+          <option key={sub} value={sub}>
+            {sub}
+          </option>
+        ))}
+      </select>
+    )}
+
+    {/* Botón siguiente */}
+    <button
+      onClick={handleNext}
+      disabled={!(
+        nombreValido &&
+        emailValido &&
+        telefonoValido &&
+        tipoNegocio &&
+        subSeccion
+      )}
+      className={`w-full py-2 rounded text-white transition ${
+        nombreValido &&
+        emailValido &&
+        telefonoValido &&
+        tipoNegocio &&
+        subSeccion
+          ? "bg-blue-600 hover:bg-blue-700"
+          : "bg-gray-400 cursor-not-allowed"
+      }`}
+    >
+      Siguiente
+    </button>
+  </div>
 )}
+
       {/* Paso 2 */}
 {paso === 2 && (
   <FormRegisterEmpresa2
@@ -368,61 +493,44 @@ if (tieneNegocio === null) {
 )}
 
       {/* Paso 3 */}
-      {paso === 3 && (
-        <>
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">Elige tu plan</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Plan Agenda */}
-            <div className="border rounded-lg p-6 shadow hover:shadow-lg transition">
-              <h3 className="text-xl font-bold mb-2">Agenda</h3>
-              <p className="text-2xl font-extrabold text-blue-600 mb-4">$15 USD / mes</p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1">
-                <li>Hasta 3 empleados configurables</li>
-                <li>Cancelar turnos</li>
-                <li>Agregar servicios</li>
-                <li>Personalizar agenda</li>
-                <li>Ver turnos ocupados y disponibles</li>
-                <li>Ver qué usuario se agendó y qué servicio tomó</li>
-              </ul>
-              <button
-                onClick={() => {
-                  setPlanSeleccionado("agenda");
-                  setPaso(4);
-                }}
-                className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-              >
-                Seleccionar Agenda
-              </button>
-            </div>
-            {/* Plan Agenda + Web */}
-            <div className="border rounded-lg p-6 shadow hover:shadow-lg transition">
-              <h3 className="text-xl font-bold mb-2">Agenda + Web personalizada</h3>
-              <p className="text-2xl font-extrabold text-indigo-600 mb-4">$50 USD / mes</p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1">
-                <li>Página web acorde al negocio</li>
-                <li>Incluye agenda completa y personalizable</li>
-                <li>Ubicación en Google Maps</li>
-                <li>Indexada en buscadores</li>
-                <li>Mostrar trabajos de cada empleado</li>
-                <li>Panel de personalización: logo, texto, imágenes</li>
-                <li>Mensajes directos a clientes</li>
-                <li>Estadísticas mes a mes</li>
-                <li>Clientes y turnos más frecuentes</li>
-                <li>Servicios más consumidos</li>
-              </ul>
-              <button
-                onClick={() => {
-                  setPlanSeleccionado("web");
-                  setPaso(4);
-                }}
-                className="mt-4 w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
-              >
-                Seleccionar Agenda + Web
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+{paso === 3 && (
+  <>
+    <h2 className="text-2xl font-bold mb-6 text-gray-800">Elige tu plan</h2>
+
+    {/* una sola columna para que no quede espacio vacío */}
+    <div className="grid grid-cols-1 gap-6">
+      {/* Plan Agenda (visible) */}
+      <div className="border rounded-lg p-6 shadow hover:shadow-lg transition">
+        <h3 className="text-xl font-bold mb-2">Agenda</h3>
+        <p className="text-2xl font-extrabold text-blue-600 mb-4">$0 USD / mes</p>
+        <ul className="list-disc list-inside text-gray-700 space-y-1">
+          <li>Hasta 1 empleados configurables</li>
+          <li>Cancelar turnos</li>
+          <li>Agregar servicios</li>
+          <li>Personalizar agenda</li>
+          <li>Ver turnos ocupados y disponibles</li>
+          <li>Ver qué usuario se agendó y qué servicio tomó</li>
+        </ul>
+        <button
+          onClick={() => {
+            setPlanSeleccionado("agenda");
+            setPaso(4);
+          }}
+          className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          Seleccionar Agenda
+        </button>
+      </div>
+
+      {/*
+      // OCULTO: Plan Agenda + Web personalizada
+      <div className="border rounded-lg p-6 shadow hover:shadow-lg transition">
+        ...
+      </div>
+      */}
+    </div>
+  </>
+)}
 
       {/* Paso 4 */}
       {paso === 4 && (

@@ -163,6 +163,11 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     const ultimo = new Date(y, m + 1, 0);
     return ultimo >= fechaMinima && primero <= fechaMaxima;
   };
+  // ¿El slot ya pasó respecto a "ahora"?
+const esSlotPasado = (fecha: Date, hhmm: string) => {
+  const d = combinarFechaHora(fecha, hhmm);
+  return d < new Date();
+};
 
   const puedeIrAnterior = hayDiasEnMes(year, month - 1);
   const puedeIrSiguiente = hayDiasEnMes(year, month + 1);
@@ -184,6 +189,19 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
       }
     })();
   }, [negocio?.id]);
+
+  // ✅ Asegura que siempre haya un empleado seleccionado cuando el prop llega o cambia
+useEffect(() => {
+  const lista = negocio.empleadosData || [];
+  if (!lista.length) return;
+
+  // si no hay seleccionado o el seleccionado ya no existe, tomamos el primero
+  if (!empleadoSel || !lista.some(e => e.nombre === empleadoSel.nombre)) {
+    setEmpleadoSel(lista[0]);
+  }
+  // si sí existe, lo dejamos como está
+}, [negocio.empleadosData]);
+
 
   /* ---------- Escucha de turnos del EMPLEADO (no depende del día) ---------- */
   useEffect(() => {
@@ -317,9 +335,9 @@ const slots = useMemo(() => {
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">
       {/* Header + selector de empleado */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="text-xl font-semibold">Agenda del negocio</h2>
+        <h2 className="text-xl font-semibold">Mi Agenda</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-300">Empleado:</span>
+          <span className="text-sm text-gray-300">Seleccionar empleado:</span>
           <select
             className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
             value={empleadoSel?.nombre || ""}
@@ -418,27 +436,45 @@ const slots = useMemo(() => {
               )}
 
               {/* Slots del día (6 columnas) */}
-              <div className="max-h-[420px] overflow-auto pr-1">
-                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {slots.map((s, i) => {
-                    const ocupado = s.ocupado;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          if (ocupado) setDetalles(s.turno!);
-                          else setManualOpen({ visible: true, hora: s.hora, paso: 1 });
-                        }}
-                        className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none
-                          ${ocupado ? "bg-red-600/95 hover:bg-red-600 text-white" : "bg-emerald-600/90 hover:bg-emerald-600 text-white"}`}
-                        title={ocupado ? "Turno ocupado" : "Asignar manualmente"}
-                      >
-                        {s.hora}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+<div className="max-h-[420px] overflow-auto pr-1">
+  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    {slots.map((s, i) => {
+      const ocupado = s.ocupado;
+      const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
+
+      const clase = vencido
+        ? (ocupado
+            ? "bg-gray-700 hover:bg-gray-600 text-white"
+            : "bg-gray-700 text-gray-400 cursor-not-allowed")
+        : (ocupado
+            ? "bg-red-600/95 hover:bg-red-600 text-white"
+            : "bg-emerald-600/90 hover:bg-emerald-600 text-white");
+
+      return (
+        <button
+          key={i}
+          disabled={vencido && !ocupado}
+          onClick={() => {
+            if (ocupado) {
+              setDetalles(s.turno!);                // ver detalle (aunque esté vencido)
+            } else if (!vencido) {
+              setManualOpen({ visible: true, hora: s.hora, paso: 1 }); // solo si no venció
+            }
+          }}
+          className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none ${clase}`}
+          title={
+            vencido
+              ? (ocupado ? "Turno pasado (ver detalle)" : "Turno pasado")
+              : (ocupado ? "Turno ocupado" : "Asignar manualmente")
+          }
+        >
+          {s.hora}
+        </button>
+      );
+    })}
+  </div>
+</div>
+
             </>
           )}
         </div>
