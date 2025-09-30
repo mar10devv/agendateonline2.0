@@ -563,56 +563,66 @@ useEffect(() => {
   </div>
 </div>
             {/* Calendario + Botón Agendarse */}
-<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-center relative">
-  {/* ⚙️ Tuerca de configuración (solo dueño) */}
-  {/* Calendario / Agenda */}
-{modo === "dueño" ? (
-  // 🔹 Vista de AGENDA PARA NEGOCIO (cambia empleado, ve turnos y abre detalle del cliente)
-  <div className="order-3">
-    <AgendaNegocio
-      negocio={{
-        id: negocio.id,
-        nombre: negocio.nombre,
-        empleadosData: empleadosState || empleados || [],
-      }}
-    />
-  </div>
-) : (
-  // 🔹 Vista para CLIENTE (elige turno y abre modal Agendarse)
-  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-center relative">
-    <div className="max-w-sm w-full flex flex-col items-center">
-      <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
-      <div className="flex justify-center">
-        <CalendarioUI
-          empleado={
-            empleadoSeleccionado || {
-              nombre: "Demo",
-              calendario: { inicio: "08:00", fin: "16:00", clientesPorJornada: 8 },
-            }
-          }
-          servicio={
-            servicios.length > 0
-              ? servicios[0]
-              : { id: "demo", servicio: "Consulta Demo", precio: 0, duracion: 60 }
-          }
-          negocioId={negocio.id}
-          onSelectTurno={(t) => console.log("Turno elegido:", t)}
-          onAbrirModalCliente={() => setModalAgendarseAbierto(true)}
-        />
+<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col relative">
+  {modo === "dueño" ? (
+    // 🔹 Vista de AGENDA PARA NEGOCIO
+    <div className="order-3">
+      <AgendaNegocio
+        negocio={{
+          id: negocio.id,
+          nombre: negocio.nombre,
+          empleadosData: empleadosState || empleados || [],
+        }}
+      />
+    </div>
+  ) : (
+    <>
+      {/* 🔹 Mobile → mapa */}
+      <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden">
+        <h2 className="text-lg font-semibold mb-4">Ubicación</h2>
+        {ubicacion ? (
+          <div className="w-full h-64 rounded-md overflow-hidden border">
+            <MapContainer
+              key={`${ubicacion.lat}-${ubicacion.lng}`}
+              center={[ubicacion.lat, ubicacion.lng]}
+              zoom={16}
+              className="w-full h-full"
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap contributors'
+              />
+              <Marker position={[ubicacion.lat, ubicacion.lng]} icon={customIcon} />
+            </MapContainer>
+          </div>
+        ) : (
+          <p className="text-gray-400 text-sm">Ubicación no disponible.</p>
+        )}
       </div>
 
-      {/* Botón Agendarse (solo clientes) */}
-      <button
-        onClick={() => setModalAgendarseAbierto(true)}
-        className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
-      >
-        📅 Agendarse
-      </button>
-    </div>
-  </div>
+      {/* 🔹 Desktop → botón reservar turno */}
+      <div className="hidden md:flex w-full justify-center">
+        <button
+          onClick={() => setModalAgendarseAbierto(true)}
+          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
+        >
+          📅 Reservar turno
+        </button>
+      </div>
+    </>
+  )}
+</div>
+
+{/* Modal Agendarse */}
+{modalAgendarseAbierto && (
+  <ModalAgendarse
+    abierto={modalAgendarseAbierto}
+    onClose={() => setModalAgendarseAbierto(false)}
+    negocio={negocio}
+  />
 )}
 
-</div>
+
 
 {/* Modal Agendarse */}
 {modalAgendarseAbierto && (
@@ -860,8 +870,8 @@ useEffect(() => {
                </div>
       </div>
 
-      {/* 🔹 Botón flotante solo en mobile */}
-      <FloatingMenu />
+      {/* 🔹 Botón flotante solo para clientes */}
+{modo === "cliente" && <FloatingMenu negocio={negocio} />}
     </div>
   );
 }
