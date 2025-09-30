@@ -29,6 +29,7 @@ import {
 } from "../backend/agenda-backend";
 import CalendarioUI from "../ui/calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
+import AgendaNegocio from "./agendaNegocio";
 
 
 // 🌍 Leaflet
@@ -564,43 +565,53 @@ useEffect(() => {
             {/* Calendario + Botón Agendarse */}
 <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-center relative">
   {/* ⚙️ Tuerca de configuración (solo dueño) */}
-  {modo === "dueño" && (
-    <button
-      onClick={() => setModalCalendarioAbierto(true)}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar calendario"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-  )}
+  {/* Calendario / Agenda */}
+{modo === "dueño" ? (
+  // 🔹 Vista de AGENDA PARA NEGOCIO (cambia empleado, ve turnos y abre detalle del cliente)
+  <div className="order-3">
+    <AgendaNegocio
+      negocio={{
+        id: negocio.id,
+        nombre: negocio.nombre,
+        empleadosData: empleadosState || empleados || [],
+      }}
+    />
+  </div>
+) : (
+  // 🔹 Vista para CLIENTE (elige turno y abre modal Agendarse)
+  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-center relative">
+    <div className="max-w-sm w-full flex flex-col items-center">
+      <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
+      <div className="flex justify-center">
+        <CalendarioUI
+          empleado={
+            empleadoSeleccionado || {
+              nombre: "Demo",
+              calendario: { inicio: "08:00", fin: "16:00", clientesPorJornada: 8 },
+            }
+          }
+          servicio={
+            servicios.length > 0
+              ? servicios[0]
+              : { id: "demo", servicio: "Consulta Demo", precio: 0, duracion: 60 }
+          }
+          negocioId={negocio.id}
+          onSelectTurno={(t) => console.log("Turno elegido:", t)}
+          onAbrirModalCliente={() => setModalAgendarseAbierto(true)}
+        />
+      </div>
 
-  <div className="max-w-sm w-full flex flex-col items-center">
-    <h2 className="text-lg font-semibold mb-4">Mi Agenda</h2>
-<div className="flex justify-center">
-  
-  <CalendarioUI
-    empleado={empleadoSeleccionado || { nombre: "Demo", calendario: { inicio: "08:00", fin: "16:00", clientesPorJornada: 8 } }}
-    servicio={servicios.length > 0 ? servicios[0] : { id: "demo", servicio: "Consulta Demo", precio: 0, duracion: 60 }}
-    negocioId={negocio.id}
-    onSelectTurno={(t) => console.log("Turno elegido:", t)}
-     onAbrirModalCliente={() => setModalAgendarseAbierto(true)} 
-/>
-</div>
-
-
-    {/* 🔹 Botón Agendarse (solo clientes) */}
-    {modo === "cliente" && (
+      {/* Botón Agendarse (solo clientes) */}
       <button
         onClick={() => setModalAgendarseAbierto(true)}
         className="mt-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
       >
         📅 Agendarse
       </button>
-    )}
+    </div>
   </div>
+)}
+
 </div>
 
 {/* Modal Agendarse */}

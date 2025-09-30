@@ -1,0 +1,566 @@
+// src/components/agendaVirtual/admin/AgendaNegocio.tsx
+import { useEffect, useMemo, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  Timestamp,
+  getDoc,
+  doc,
+  getDocs,
+  addDoc,
+} from "firebase/firestore";
+import { db } from "../../../lib/firebase";
+
+/* ================== Tipos ================== */
+type Empleado = {
+  id?: string;
+  nombre: string;
+  calendario?: {
+    inicio?: string; // "HH:mm"
+    fin?: string;    // "HH:mm"
+    diasLibres?: number[];
+  };
+};
+type Negocio = { id: string; nombre: string; empleadosData?: Empleado[] };
+
+type TurnoNegocio = {
+  id: string;
+  servicioId?: string;
+  servicioNombre?: string;
+  duracion?: number;
+  empleadoId?: string | null;
+  empleadoNombre: string;
+  fecha?: string;
+  hora?: string;
+  inicioTs?: Date | Timestamp;
+  finTs?: Date | Timestamp;
+  clienteUid?: string | null;
+  clienteEmail?: string | null;
+  clienteTelefono?: string | null;
+  clienteNombre?: string | null;
+  creadoEn?: any;
+};
+
+type Servicio = { id: string; servicio: string; precio: number; duracion: number };
+
+/* =============== Helpers fecha/hora =============== */
+const esMismoDia = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const toDateSafe = (v: any): Date => {
+  if (!v) return new Date(NaN);
+  if (v instanceof Date) return v;
+  if (v instanceof Timestamp) return v.toDate();
+  if (typeof v?.toDate === "function") return v.toDate();
+  if (typeof v === "string") return new Date(v);
+  return new Date(v);
+};
+
+const toMin = (hhmm: string) => {
+  const [h, m] = (hhmm || "00:00").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+const minToHHMM = (m: number) => {
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+};
+const parseDuracionMin = (d: any): number => {
+  if (typeof d === "number") return d;
+  if (typeof d === "string") {
+    if (d.includes(":")) {
+      const [h, m] = d.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+    const n = Number(d);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 30;
+};
+const combinarFechaHora = (fecha: Date, hhmm: string) => {
+  const [h, m] = (hhmm || "00:00").split(":").map((n) => Number(n || 0));
+  const d = new Date(fecha);
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d;
+};
+const calcularInicioFinDesdeDoc = (t: any): { inicio: Date; fin: Date } | null => {
+  const ini = t.inicioTs ? toDateSafe(t.inicioTs) : null;
+  const fin = t.finTs ? toDateSafe(t.finTs) : null;
+  if (ini && fin && !isNaN(+ini) && !isNaN(+fin)) return { inicio: ini, fin };
+  const f = toDateSafe(t.fecha);
+  if (isNaN(+f)) return null;
+  const inicio = combinarFechaHora(f, t.hora || "00:00");
+  const dur = parseDuracionMin(t.duracion);
+  return { inicio, fin: new Date(inicio.getTime() + dur * 60000) };
+};
+const solapan = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
+  aStart < bEnd && aEnd > bStart;
+
+/* =============== Componente principal =============== */
+export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
+  const hoy = new Date();
+
+  // 🔄 Mismo rango que CalendarioUI (−10 / +30)
+  const fechaMinima = useMemo(() => {
+    const d = new Date(hoy);
+    d.setDate(hoy.getDate() - 10);
+    return d;
+  }, []);
+  const fechaMaxima = useMemo(() => {
+    const d = new Date(hoy);
+    d.setDate(hoy.getDate() + 30);
+    return d;
+  }, []);
+
+  const [empleadoSel, setEmpleadoSel] = useState<Empleado | null>(
+    negocio.empleadosData?.[0] || null
+  );
+  const [mesVisible, setMesVisible] = useState<Date>(new Date(hoy));
+  const [diaSel, setDiaSel] = useState<Date>(new Date(hoy));
+  const [turnos, setTurnos] = useState<TurnoNegocio[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+
+  // modales
+  const [detalles, setDetalles] = useState<TurnoNegocio | null>(null);
+  const [clienteExtra, setClienteExtra] = useState<{ nombre?: string; fotoPerfil?: string } | null>(null);
+
+  const [manualOpen, setManualOpen] = useState<{
+    visible: boolean;
+    hora: string | null;
+    paso: 1 | 2 | 3;
+    servicio?: Servicio | null;
+    nombre?: string;
+    email?: string;
+    telefono?: string;
+    error?: string | null;
+  }>({ visible: false, hora: null, paso: 1 });
+
+  /* ---------- Calendario del mes (igual a CalendarioUI) ---------- */
+  const year = mesVisible.getFullYear();
+  const month = mesVisible.getMonth();
+  const primerDia = new Date(year, month, 1);
+  const ultimoDia = new Date(year, month + 1, 0);
+  const diasEnMes = ultimoDia.getDate();
+  const inicioSemana = (primerDia.getDay() + 6) % 7; // Lunes=0
+
+  const dias: (Date | null)[] = [];
+  for (let i = 0; i < inicioSemana; i++) dias.push(null);
+  for (let d = 1; d <= diasEnMes; d++) {
+    const fecha = new Date(year, month, d);
+    if (fecha >= fechaMinima && fecha <= fechaMaxima) dias.push(fecha);
+  }
+
+  const hayDiasEnMes = (y: number, m: number) => {
+    const primero = new Date(y, m, 1);
+    const ultimo = new Date(y, m + 1, 0);
+    return ultimo >= fechaMinima && primero <= fechaMaxima;
+  };
+
+  const puedeIrAnterior = hayDiasEnMes(year, month - 1);
+  const puedeIrSiguiente = hayDiasEnMes(year, month + 1);
+
+  const irMesAnterior = () => puedeIrAnterior && setMesVisible(new Date(year, month - 1, 1));
+  const irMesSiguiente = () => puedeIrSiguiente && setMesVisible(new Date(year, month + 1, 1));
+
+  /* ---------- Cargar servicios del negocio (para asignación manual) ---------- */
+  useEffect(() => {
+    if (!negocio?.id) return;
+    (async () => {
+      try {
+        const ref = collection(db, "Negocios", negocio.id, "Precios");
+        const snap = await getDocs(ref);
+        const lista = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Servicio[];
+        setServicios(lista);
+      } catch {
+        setServicios([]);
+      }
+    })();
+  }, [negocio?.id]);
+
+  /* ---------- Escucha de turnos del día/empleado ---------- */
+  useEffect(() => {
+    if (!negocio?.id || !empleadoSel?.nombre || !diaSel) return;
+
+    const ref = collection(db, "Negocios", negocio.id, "Turnos");
+    const qBase = query(ref, where("empleadoNombre", "==", empleadoSel.nombre));
+
+    const off = onSnapshot(qBase, (snap) => {
+      const lista: TurnoNegocio[] = [];
+      snap.forEach((d) => {
+        const data = d.data() as any;
+        const par = calcularInicioFinDesdeDoc(data);
+        if (!par) return;
+        if (!esMismoDia(par.inicio, diaSel)) return;
+        lista.push({
+          id: d.id,
+          ...data,
+          inicioTs: par.inicio,
+          finTs: par.fin,
+        });
+      });
+      lista.sort((a, b) => +toDateSafe(a.inicioTs) - +toDateSafe(b.inicioTs));
+      setTurnos(lista);
+    });
+
+    return () => off();
+  }, [negocio?.id, empleadoSel?.nombre, diaSel]);
+
+  /* ---------- Slots 30' y ocupación (6 columnas, sin textos extra) ---------- */
+  const slots = useMemo(() => {
+    const cal = empleadoSel?.calendario || {};
+    const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
+    const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
+    const inicioJ = (hi || 0) * 60 + (mi || 0);
+    const finJ = (hf || 0) * 60 + (mf || 0);
+    const paso = 30;
+
+    const out: { hora: string; ocupado: boolean; turno?: TurnoNegocio }[] = [];
+    for (let m = inicioJ; m <= finJ; m += paso) {
+      const hhmm = minToHHMM(m);
+      const ini = combinarFechaHora(diaSel, hhmm);
+      const t = turnos.find((tt) => Math.abs(+toDateSafe(tt.inicioTs) - +ini) < 60 * 1000);
+      out.push({ hora: hhmm, ocupado: Boolean(t), turno: t });
+    }
+    return out;
+  }, [empleadoSel?.calendario, turnos, diaSel]);
+
+  /* ---------- Datos extra del cliente (para detalle) ---------- */
+  useEffect(() => {
+    const loadCliente = async () => {
+      setClienteExtra(null);
+      if (!detalles?.clienteUid) return;
+      try {
+        const docRef = doc(db, "Usuarios", detalles.clienteUid);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const d = snap.data() as any;
+          setClienteExtra({ nombre: d?.nombre, fotoPerfil: d?.fotoPerfil });
+        }
+      } catch {}
+    };
+    loadCliente();
+  }, [detalles?.clienteUid]);
+
+  /* ---------- Validación de hueco (sin solape) ---------- */
+  const puedeAsignarEn = (inicio: Date, durMin: number) => {
+    const fin = new Date(inicio.getTime() + durMin * 60000);
+    const reservas = turnos.map((t) => {
+      const par = calcularInicioFinDesdeDoc(t);
+      return par ? { i: +par.inicio, f: +par.fin } : null;
+    }).filter(Boolean) as { i: number; f: number }[];
+
+    const sI = +inicio, sF = +fin;
+    for (const r of reservas) {
+      if (solapan(sI, sF, r.i, r.f)) return false;
+    }
+    // también respetar jornada del empleado
+    const cal = empleadoSel?.calendario || {};
+    const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
+    const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
+    const jI = (hi || 0) * 60 + (mi || 0);
+    const jF = (hf || 0) * 60 + (mf || 0);
+    const slotMin = toMin(minToHHMM(inicio.getHours() * 60 + inicio.getMinutes()));
+    return slotMin >= jI && slotMin + durMin <= jF;
+  };
+
+  /* ------------------------------- UI ------------------------------- */
+  const nombreMes = mesVisible.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+
+  return (
+    <div className="bg-neutral-900 text-white p-5 rounded-2xl">
+      {/* Header + selector de empleado */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <h2 className="text-xl font-semibold">Agenda del negocio</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-300">Empleado:</span>
+          <select
+            className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
+            value={empleadoSel?.nombre || ""}
+            onChange={(e) => {
+              const emp = negocio.empleadosData?.find((x) => x.nombre === e.target.value) || null;
+              setEmpleadoSel(emp);
+            }}
+          >
+            {(negocio.empleadosData || []).map((e, i) => (
+              <option key={i} value={e.nombre}>{e.nombre}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Calendario + Slots */}
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+        {/* Calendario mensual */}
+        <div className="bg-neutral-800 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={irMesAnterior}
+              disabled={!puedeIrAnterior}
+              className={`px-2 ${puedeIrAnterior ? "text-gray-400 hover:text-white" : "text-gray-600 cursor-not-allowed"}`}
+              title="Mes anterior"
+            >◀</button>
+            <h3 className="text-sm font-semibold capitalize">{nombreMes}</h3>
+            <button
+              onClick={irMesSiguiente}
+              disabled={!puedeIrSiguiente}
+              className={`px-2 ${puedeIrSiguiente ? "text-gray-400 hover:text-white" : "text-gray-600 cursor-not-allowed"}`}
+              title="Mes siguiente"
+            >▶</button>
+          </div>
+
+          <div className="grid grid-cols-7 text-xs text-gray-400 mb-1">
+            {["L","M","X","J","V","S","D"].map((d, i) => (
+              <div key={i} className="w-10 h-8 flex items-center justify-center">{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-y-1 text-sm">
+            {dias.map((d, idx) =>
+              d ? (
+                <button
+                  key={idx}
+                  onClick={() => setDiaSel(d)}
+                  className={`w-10 h-8 flex items-center justify-center rounded-lg transition
+                    ${
+                      esMismoDia(d, hoy)
+                        ? "bg-white text-black font-bold"
+                        : esMismoDia(d, diaSel)
+                        ? "bg-indigo-600 text-white font-bold"
+                        : "hover:bg-neutral-700"
+                    }`}
+                >
+                  {d.getDate()}
+                </button>
+              ) : (
+                <div key={idx} className="w-10 h-8" />
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Slots del día (6 columnas, sin textos) */}
+        <div className="bg-neutral-800 rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3 sticky top-0 bg-neutral-800 z-10">
+            <div className="text-sm text-gray-300">
+              {empleadoSel?.nombre} • {diaSel.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}
+            </div>
+            <div className="text-xs text-gray-400">{turnos.length} turno{turnos.length === 1 ? "" : "s"}</div>
+          </div>
+
+          <div className="max-h-[420px] overflow-auto pr-1">
+            <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {slots.map((s, i) => {
+                const ocupado = s.ocupado;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (ocupado) setDetalles(s.turno!);
+                      else setManualOpen({ visible: true, hora: s.hora, paso: 1 });
+                    }}
+                    className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none
+                      ${ocupado ? "bg-red-600/95 hover:bg-red-600 text-white" : "bg-emerald-600/90 hover:bg-emerald-600 text-white"}`}
+                    title={ocupado ? "Turno ocupado" : "Asignar manualmente"}
+                  >
+                    {s.hora}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal detalle (rojo) */}
+      {detalles && (
+        <div className="fixed inset-0 z-[9999]">
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setDetalles(null); setClienteExtra(null); }} />
+          <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
+            <div className="w-full max-w-[720px] sm:rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
+                <h4 className="text-base sm:text-lg font-semibold">Detalle del turno</h4>
+                <button onClick={() => { setDetalles(null); setClienteExtra(null); }} className="text-gray-300 hover:text-white text-xl">×</button>
+              </div>
+              <div className="p-4 sm:p-6 space-y-3 text-sm">
+                <div className="font-medium">{clienteExtra?.nombre || detalles.clienteNombre || "Cliente"}</div>
+                <div className="text-gray-300">{detalles.clienteEmail || "Sin email"}</div>
+                <div><span className="text-gray-400">Servicio: </span><b>{detalles.servicioNombre || "-"}</b></div>
+                <div><span className="text-gray-400">Empleado: </span><b>{detalles.empleadoNombre}</b></div>
+                <div>
+                  <span className="text-gray-400">Día y hora: </span>
+                  <b>
+                    {toDateSafe(detalles.inicioTs).toLocaleDateString("es-ES")}{" "}
+                    {toDateSafe(detalles.inicioTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                    {" – "}
+                    {toDateSafe(detalles.finTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  </b>
+                </div>
+                <div><span className="text-gray-400">Duración: </span><b>{parseDuracionMin(detalles.duracion) || 30} min</b></div>
+                <div className="pt-2 flex justify-end">
+                  <button onClick={() => { setDetalles(null); setClienteExtra(null); }} className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Cerrar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal asignación manual (verde) */}
+      {manualOpen.visible && (
+        <div className="fixed inset-0 z-[10000]">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} />
+          <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
+            <div className="w-full max-w-[680px] sm:rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
+                <h4 className="text-base sm:text-lg font-semibold">Asignar turno manualmente</h4>
+                <button onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} className="text-gray-300 hover:text-white text-xl">×</button>
+              </div>
+
+              {/* Paso 1: confirmación */}
+              {manualOpen.paso === 1 && (
+                <div className="p-4 sm:p-6 space-y-4 text-sm">
+                  <p>¿Desea agendar manualmente un turno a las <b>{manualOpen.hora}</b> para <b>{empleadoSel?.nombre}</b> el <b>{diaSel.toLocaleDateString("es-ES")}</b>?</p>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Cancelar</button>
+                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 2 }))} className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">Continuar</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Paso 2: elegir servicio */}
+              {manualOpen.paso === 2 && (
+                <div className="p-4 sm:p-6 space-y-4 text-sm">
+                  <div className="text-gray-300">Selecciona un servicio:</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {servicios.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setManualOpen((st) => ({ ...st, servicio: s, paso: 3, error: null }))}
+                        className={`p-3 rounded-lg border transition text-left ${manualOpen.servicio?.id === s.id ? "border-indigo-500 bg-neutral-800" : "border-neutral-700 hover:bg-neutral-800"}`}
+                      >
+                        <div className="font-medium">{s.servicio}</div>
+                        <div className="text-gray-400 text-xs">{s.duracion} min • ${s.precio}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between">
+                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 1 }))} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">← Volver</button>
+                    <button
+                      onClick={() => setManualOpen((s) => ({ ...s, paso: 3 }))}
+                      disabled={!manualOpen.servicio}
+                      className={`px-3 py-2 rounded-lg ${manualOpen.servicio ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "bg-gray-700 text-gray-300 cursor-not-allowed"}`}
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Paso 3: datos del cliente + guardar */}
+              {manualOpen.paso === 3 && (
+                <div className="p-4 sm:p-6 space-y-4 text-sm">
+                  <div className="space-y-2">
+                    <label className="block text-gray-300">Nombre del cliente *</label>
+                    <input
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
+                      placeholder="Ej. Juan Pérez"
+                      value={manualOpen.nombre || ""}
+                      onChange={(e) => setManualOpen((s) => ({ ...s, nombre: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-300">Email (opcional)</label>
+                      <input
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
+                        placeholder="cliente@correo.com"
+                        value={manualOpen.email || ""}
+                        onChange={(e) => setManualOpen((s) => ({ ...s, email: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-300">Teléfono (opcional)</label>
+                      <input
+                        className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
+                        placeholder="+598 ..."
+                        value={manualOpen.telefono || ""}
+                        onChange={(e) => setManualOpen((s) => ({ ...s, telefono: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {manualOpen.error && (
+                    <div className="text-red-300 bg-red-900/30 border border-red-700 px-3 py-2 rounded-lg">
+                      {manualOpen.error}
+                    </div>
+                  )}
+
+                  <div className="flex justify-between">
+                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 2 }))} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">← Volver</button>
+                    <button
+                      onClick={async () => {
+                        // Validaciones
+                        if (!manualOpen.nombre?.trim()) {
+                          setManualOpen((s) => ({ ...s, error: "El nombre del cliente es obligatorio." }));
+                          return;
+                        }
+                        if (!manualOpen.servicio) {
+                          setManualOpen((s) => ({ ...s, error: "Seleccione un servicio." }));
+                          return;
+                        }
+
+                        try {
+                          const hora = manualOpen.hora!;
+                          const inicio = combinarFechaHora(diaSel, hora);
+                          const dur = parseDuracionMin(manualOpen.servicio.duracion);
+
+                          if (!puedeAsignarEn(inicio, dur)) {
+                            setManualOpen((s) => ({ ...s, error: "El servicio no entra en este horario o se solapa con otro turno." }));
+                            return;
+                          }
+
+                          const fin = new Date(inicio.getTime() + dur * 60000);
+                          const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+                          await addDoc(refNeg, {
+                            negocioId: negocio.id,
+                            negocioNombre: negocio.nombre,
+                            servicioId: manualOpen.servicio.id,
+                            servicioNombre: manualOpen.servicio.servicio,
+                            duracion: manualOpen.servicio.duracion,
+                            empleadoId: empleadoSel?.id || null,
+                            empleadoNombre: empleadoSel?.nombre,
+                            fecha: inicio.toISOString().split("T")[0],
+                            hora,
+                            inicioTs: inicio,
+                            finTs: fin,
+                            clienteNombre: manualOpen.nombre.trim(),
+                            clienteEmail: manualOpen.email || null,
+                            clienteTelefono: manualOpen.telefono || null,
+                            creadoEn: new Date(),
+                            creadoPor: "negocio-manual",
+                          });
+
+                          setManualOpen({ visible: false, hora: null, paso: 1 });
+                        } catch (e) {
+                          setManualOpen((s) => ({ ...s, error: "No se pudo guardar el turno." }));
+                        }
+                      }}
+                      className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      Guardar turno
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
