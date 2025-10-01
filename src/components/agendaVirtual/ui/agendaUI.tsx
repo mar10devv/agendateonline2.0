@@ -91,7 +91,12 @@ type Negocio = {
     lat: number;
     lng: number;
     direccion: string;
-  };  // 👈 agregado
+  };
+  redes?: {
+    instagram?: string;
+    facebook?: string;
+    telefono?: string;  // puede ser WhatsApp o número normal
+  };
 };
 
 type Props = {
@@ -185,7 +190,7 @@ const [modalAbierto, setModalAbierto] = useState(false);
 const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false);
 // 👇 Estado único para ModalCalendarioCliente
 const [modalClienteAbierto, setModalClienteAbierto] = useState(false);
-
+const [redes, setRedes] = useState<Negocio["redes"]>(negocio.redes || {});
 
 const handleGuardarUbicacion = () => {
   if (!navigator.geolocation) {
@@ -335,25 +340,32 @@ useEffect(() => {
     });
   });
 
-  // 👉 Escuchar negocio (ubicación + empleadosData)
-  const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
-  const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
-    if (!snap.empty) {
-      const data = snap.docs[0].data() as Negocio;
+// 👇 Definimos q
+const q = query(
+  collection(db, "Negocios"),
+  where("slug", "==", negocio.slug)
+);
 
-      console.log("Negocio cargado:", data);
+const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
+  if (!snap.empty) {
+    const data = snap.docs[0].data() as Negocio;
 
-      // ✅ Guardamos empleadosData en estado
-      if (data.empleadosData) {
-        setEmpleadosState(data.empleadosData);
-      }
+    console.log("Negocio cargado:", data);
 
-      // ✅ Guardamos ubicación en estado
-      if (data.ubicacion) {
-        setUbicacion(data.ubicacion);
-      }
+    if (data.empleadosData) {
+      setEmpleadosState(data.empleadosData);
     }
-  });
+
+    if (data.ubicacion) {
+      setUbicacion(data.ubicacion);
+    }
+
+    if (data.redes) {
+      setRedes(data.redes); // ✅ ahora redes también
+    }
+  }
+});
+
 
   // 🔹 Limpieza de listeners
   return () => {
@@ -471,10 +483,10 @@ useEffect(() => {
 <ModalPerfil
   abierto={modalPerfilAbierto}
   onCerrar={() => setModalPerfilAbierto(false)}
-  negocio={negocio}
+  negocio={{ ...negocio, redes }}
   onGuardar={async (data) => {
     try {
-      // Si viene nombre, usamos actualizarNombreYSlug
+      // 👉 Si viene nombre, usamos actualizarNombreYSlug
       if (data.nombre && data.nombre !== negocio.nombre) {
         const nuevoSlug = await actualizarNombreYSlug(negocio.slug, data.nombre);
         setNombreNegocio(data.nombre);
@@ -486,31 +498,35 @@ useEffect(() => {
         }
       }
 
-      // Guardar los otros campos (logo, descripción, redes)
+      // 👉 Guardar los otros campos (logo, descripción, redes)
       const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const negocioId = snap.docs[0].id;
         const negocioRef = doc(db, "Negocios", negocioId);
+
         await updateDoc(negocioRef, {
-          perfilLogo: data.perfilLogo || "",
-          descripcion: data.descripcion || "",
-          redes: data.redes || {},
+          perfilLogo: data.perfilLogo ?? negocio.perfilLogo ?? "",
+          descripcion: data.descripcion ?? negocio.descripcion ?? "",
+          "redes.instagram": data.redes?.instagram ?? negocio.redes?.instagram ?? "",
+          "redes.facebook":  data.redes?.facebook  ?? negocio.redes?.facebook  ?? "",
+          "redes.telefono":  data.redes?.telefono  ?? negocio.redes?.telefono  ?? "",
         });
       }
 
-      // Actualizar estado local
+      // 👉 Actualizar estado local
       if (data.perfilLogo) setLogo(data.perfilLogo);
       if (data.descripcion !== undefined) setNuevaDescripcion(data.descripcion);
+      if (data.redes) setRedes(data.redes);
 
     } catch (err) {
       console.error("❌ Error al guardar perfil:", err);
       alert("❌ No se pudo guardar los cambios de perfil");
-    } finally {
-      setModalPerfilAbierto(false);
+      // ⚠️ No cerramos el modal en caso de error
     }
   }}
 />
+
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
         <h2 className="text-lg font-semibold mb-4">Empleados</h2>
@@ -697,21 +713,54 @@ useEffect(() => {
   )}
 </div>
 
-  {/* Nombre */}
-  <h3 className="mt-4 text-lg font-semibold">{nombreNegocio}</h3>
+<div className="mt-6 flex items-center justify-center gap-4">
+  <a
+    href={redes?.instagram || "#"}
+    target={redes?.instagram ? "_blank" : "_self"}
+    rel="noopener noreferrer"
+    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
+      redes?.instagram
+        ? "bg-neutral-700 hover:bg-pink-600"
+        : "bg-neutral-800 opacity-40 cursor-not-allowed"
+    }`}
+  >
+    <Instagram className="w-4 h-4 text-white" />
+  </a>
 
-  {/* Redes */}
-  <div className="mt-6 flex items-center justify-center gap-4">
-    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-pink-600 transition">
-      <Instagram className="w-4 h-4 text-white" />
-    </a>
-    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-blue-600 transition">
-      <Facebook className="w-4 h-4 text-white" />
-    </a>
-    <a className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-700 hover:bg-green-600 transition">
-      <Phone className="w-4 h-4 text-white" />
-    </a>
-  </div>
+  <a
+    href={redes?.facebook || "#"}
+    target={redes?.facebook ? "_blank" : "_self"}
+    rel="noopener noreferrer"
+    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
+      redes?.facebook
+        ? "bg-neutral-700 hover:bg-blue-600"
+        : "bg-neutral-800 opacity-40 cursor-not-allowed"
+    }`}
+  >
+    <Facebook className="w-4 h-4 text-white" />
+  </a>
+
+  <a
+    href={
+      redes?.telefono
+        ? redes.telefono.startsWith("+")
+          ? `https://wa.me/${redes.telefono.replace(/\D/g, "")}`
+          : `tel:${redes.telefono}`
+        : "#"
+    }
+    target={redes?.telefono ? "_blank" : "_self"}
+    rel="noopener noreferrer"
+    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
+      redes?.telefono
+        ? "bg-neutral-700 hover:bg-green-600"
+        : "bg-neutral-800 opacity-40 cursor-not-allowed"
+    }`}
+  >
+    <Phone className="w-4 h-4 text-white" />
+  </a>
+</div>
+
+
 
   {/* Descripción editable */}
   <div className="mt-6 w-full px-2">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import { subirLogoNegocio, actualizarNombreYSlug } from "../backend/agenda-backend";
@@ -32,21 +32,39 @@ type Props = {
     slug?: string;
     nombreArchivoLogo?: string;
     tamanioArchivoLogo?: number;
-  }) => void;
+  }) => Promise<void> | void;
 };
 
 export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: Props) {
   const [subiendo, setSubiendo] = useState(false);
-  const [logo, setLogo] = useState(negocio.perfilLogo || "");
-  const [descripcion, setDescripcion] = useState(negocio.descripcion || "");
-  const [redes, setRedes] = useState(negocio.redes || {});
-  const [nombre, setNombre] = useState(negocio.nombre);
-  const [nombreArchivo, setNombreArchivo] = useState(negocio.nombreArchivoLogo || "");
-  const [tamanioArchivo, setTamanioArchivo] = useState(negocio.tamanioArchivoLogo || 0);
+  const [logo, setLogo] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [nombreArchivo, setNombreArchivo] = useState("");
+  const [tamanioArchivo, setTamanioArchivo] = useState(0);
+
+  // 👇 estado del botón: idle | guardando | exito
+  const [estadoGuardar, setEstadoGuardar] = useState<"idle" | "guardando" | "exito">("idle");
+
+  // 🔄 Sincronizar con negocio cada vez que abre el modal
+  useEffect(() => {
+    if (negocio) {
+      setLogo(negocio.perfilLogo || "");
+      setDescripcion(negocio.descripcion || "");
+      setInstagram(negocio.redes?.instagram || "");
+      setFacebook(negocio.redes?.facebook || "");
+      setTelefono(negocio.redes?.telefono || "");
+      setNombre(negocio.nombre || "");
+      setNombreArchivo(negocio.nombreArchivoLogo || "");
+      setTamanioArchivo(negocio.tamanioArchivoLogo || 0);
+    }
+  }, [negocio, abierto]);
 
   if (!abierto) return null;
 
-  // 📌 Subida de logo con control duplicado
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -72,35 +90,37 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
     }
   };
 
-  // 📌 Guardar todo (nombre+slug, logo, descripción, redes)
   const handleGuardar = async () => {
     try {
-      let nuevoSlug = negocio.slug;
+      setEstadoGuardar("guardando");
 
+      let nuevoSlug = negocio.slug;
       if (nombre !== negocio.nombre) {
-        // 👇 actualiza en Firestore y devuelve el nuevo slug
         nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
       }
 
-      onGuardar({
+      await onGuardar({
         perfilLogo: logo,
         descripcion,
-        redes,
+        redes: { instagram, facebook, telefono },
         nombre,
         slug: nuevoSlug,
         nombreArchivoLogo: nombreArchivo,
         tamanioArchivoLogo: tamanioArchivo,
       });
 
-      onCerrar();
+      setEstadoGuardar("exito");
 
-      // 🔄 Redirigir si el slug cambió
+      // volver a "idle" después de 2s
+      setTimeout(() => setEstadoGuardar("idle"), 2000);
+
       if (nuevoSlug !== negocio.slug) {
         window.location.href = `/agenda/${nuevoSlug}`;
       }
     } catch (err) {
       console.error("❌ Error al guardar nombre/slug:", err);
-      alert("No se pudo actualizar el nombre/slug");
+      alert("No se pudo actualizar el perfil");
+      setEstadoGuardar("idle");
     }
   };
 
@@ -145,7 +165,7 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
           />
         </div>
 
-        {/* ✍️ Nombre (actualiza también el slug) */}
+        {/* Nombre */}
         <input
           type="text"
           value={nombre}
@@ -154,7 +174,7 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
           className="w-full bg-neutral-800 rounded p-2 text-white text-center"
         />
 
-        {/* ✍️ Descripción */}
+        {/* Descripción */}
         <textarea
           maxLength={200}
           rows={4}
@@ -164,37 +184,48 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
           onChange={(e) => setDescripcion(e.target.value)}
         />
 
-        {/* 🌐 Redes */}
+        {/* Redes */}
         <div className="flex flex-col gap-3 w-full">
           <input
             type="text"
             placeholder="Link de Instagram"
             className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={redes.instagram || ""}
-            onChange={(e) => setRedes({ ...redes, instagram: e.target.value })}
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
           />
           <input
             type="text"
             placeholder="Link de Facebook"
             className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={redes.facebook || ""}
-            onChange={(e) => setRedes({ ...redes, facebook: e.target.value })}
+            value={facebook}
+            onChange={(e) => setFacebook(e.target.value)}
           />
           <input
             type="text"
             placeholder="Número de teléfono o WhatsApp"
             className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={redes.telefono || ""}
-            onChange={(e) => setRedes({ ...redes, telefono: e.target.value })}
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
           />
         </div>
 
-        {/* Guardar */}
+        {/* Botón guardar dinámico */}
         <button
           onClick={handleGuardar}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
+          disabled={estadoGuardar === "guardando"}
+          className={`px-4 py-2 rounded font-medium transition flex items-center justify-center gap-2
+            ${estadoGuardar === "idle" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""}
+            ${estadoGuardar === "guardando" ? "bg-gray-600 text-gray-200 cursor-not-allowed" : ""}
+            ${estadoGuardar === "exito" ? "bg-green-600 text-white" : ""}`}
         >
-          Guardar cambios
+          {estadoGuardar === "guardando" && (
+            <>
+              <LoaderSpinner size={18} color="white" />
+              Guardando...
+            </>
+          )}
+          {estadoGuardar === "exito" && "✅ Se guardó correctamente"}
+          {estadoGuardar === "idle" && "Guardar cambios"}
         </button>
       </div>
     </ModalGenerico>
