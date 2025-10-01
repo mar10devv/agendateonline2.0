@@ -248,7 +248,7 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
     >
       {/* Aviso / bloqueo */}
       {cargandoCheck && (
-        <div className="p-4 text-sm text-gray-300">Verificando turnos ya reservados...</div>
+        <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
       )}
 
       {!cargandoCheck && bloqueo.activo && (
