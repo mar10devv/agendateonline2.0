@@ -3,30 +3,30 @@ import type { Handler } from "@netlify/functions";
 import * as admin from "firebase-admin";
 import nodemailer from "nodemailer";
 
-/* ========= FIX: normalizar PRIVATE KEY (PEM o Base64) ========= */
+/* ------------------------- Helpers credenciales ------------------------- */
+type SA = {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+};
+
 function normalizePrivateKey(src?: string | null): string | undefined {
   if (!src) return undefined;
   let key = src.trim();
 
-  // Quitar comillas envolventes si las hubiera
-  if (
-    (key.startsWith('"') && key.endsWith('"')) ||
-    (key.startsWith("'") && key.endsWith("'"))
-  ) {
+  // Quitar comillas envolventes si las hay
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
     key = key.slice(1, -1);
   }
 
-  // Convertir "\n" escapados a saltos reales
+  // Si vienen \n escapados -> convertirlos
   if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
 
-  // Si no parece PEM, intentar decodificar Base64
+  // Si no parece PEM, intentar Base64
   if (!key.includes("BEGIN PRIVATE KEY") && !key.includes("BEGIN RSA PRIVATE KEY")) {
     try {
       const decoded = Buffer.from(key, "base64").toString("utf8");
-      if (
-        decoded.includes("BEGIN PRIVATE KEY") ||
-        decoded.includes("BEGIN RSA PRIVATE KEY")
-      ) {
+      if (decoded.includes("BEGIN PRIVATE KEY") || decoded.includes("BEGIN RSA PRIVATE KEY")) {
         key = decoded;
       }
     } catch {
@@ -36,25 +36,51 @@ function normalizePrivateKey(src?: string | null): string | undefined {
   return key;
 }
 
-/* ========= Firebase Admin ========= */
+function loadServiceAccount(): SA {
+  // Opción recomendada: TODO el JSON en una env BASE64
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (b64 && b64.trim()) {
+    const json = Buffer.from(b64, "base64").toString("utf8");
+    const sa = JSON.parse(json);
+    if (!sa.project_id || !sa.client_email || !sa.private_key) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT inválido: faltan campos");
+    }
+    // normalizamos por las dudas
+    sa.private_key = normalizePrivateKey(sa.private_key)!;
+    return sa;
+  }
+
+  // Alternativa: variables sueltas
+  const project_id = process.env.FIREBASE_PROJECT_ID || "";
+  const client_email = process.env.FIREBASE_CLIENT_EMAIL || "";
+  const private_key = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY) || "";
+
+  if (!project_id || !client_email || !private_key) {
+    throw new Error("Faltan credenciales Firebase (usa FIREBASE_SERVICE_ACCOUNT o las 3 env sueltas)");
+  }
+
+  return { project_id, client_email, private_key };
+}
+
+/* --------------------------- Firebase Admin ---------------------------- */
 if (!admin.apps.length) {
-  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+  const sa = loadServiceAccount();
   admin.initializeApp({
     credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
+      projectId: sa.project_id,
+      clientEmail: sa.client_email,
+      privateKey: sa.private_key,
     }),
   });
 }
 const db = admin.firestore();
 
-/* ========= Mailer ========= */
+/* ------------------------------- Mailer -------------------------------- */
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS, // App Password si 2FA
+    pass: process.env.GMAIL_PASS, // App Password si tu Gmail tiene 2FA
   },
 });
 
@@ -68,16 +94,17 @@ export const handler: Handler = async (event) => {
       event.httpMethod = "POST";
       event.body = JSON.stringify({ docPath });
     }
-
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Use POST" };
     }
 
     const { docPath } = JSON.parse(event.body || "{}");
     console.log("📩 confirmar-turno: docPath =", docPath);
+    if (!docPath) return { statusCode: 400, body: "Falta docPath" };
 
-    // ENV check sin exponer secretos
+    // Chequeo env sin exponer secretos
     console.log("ENV check:", {
+      FIREBASE_SERVICE_ACCOUNT: !!process.env.FIREBASE_SERVICE_ACCOUNT,
       FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
       FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
       FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
@@ -85,23 +112,15 @@ export const handler: Handler = async (event) => {
       GMAIL_PASS: !!process.env.GMAIL_PASS,
     });
 
-    if (!docPath) return { statusCode: 400, body: "Falta docPath" };
-
-    // Forzar que Firestore esté OK (si la key está mal, explota acá)
-    try {
-      await db.listCollections();
-      console.log("✅ Firestore listo");
-    } catch (e) {
-      console.error("❌ Firestore no inicializó:", (e as any)?.message || e);
-      return { statusCode: 500, body: "Firestore no inicializó" };
-    }
+    // Fuerza que Firestore esté OK (si la key está mal, falla acá)
+    await db.listCollections();
+    console.log("✅ Firestore listo");
 
     // 1) Traer turno
     const ref = db.doc(docPath);
     const snap = await ref.get();
     if (!snap.exists) return { statusCode: 404, body: "Turno no encontrado" };
-
-    const t = snap.data() || {};
+    const t: any = snap.data() || {};
     console.log("🧾 Turno:", {
       negocioNombre: t.negocioNombre,
       servicioNombre: t.servicioNombre,
@@ -119,8 +138,8 @@ export const handler: Handler = async (event) => {
     if (!clienteEmail && clienteUid) {
       try {
         const uSnap = await db.collection("Usuarios").doc(clienteUid).get();
-        const uData = uSnap.exists ? (uSnap.data() || {}) : {};
-        clienteEmail = uData.email || uData.correo;
+        const u = uSnap.exists ? (uSnap.data() || {}) : {};
+        clienteEmail = u.email || u.correo;
         console.log("📬 email resuelto desde Usuarios:", clienteEmail ?? null);
       } catch (e) {
         console.warn("⚠️ No pude leer Usuarios/{uid}:", (e as any)?.message || e);
@@ -151,7 +170,7 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, body: "Mailer no verificado" };
     }
 
-    // 4) Preparar y enviar
+    // 4) Enviar
     const negocioNombre = t.negocioNombre || "Tu negocio";
     const servicioNombre = t.servicioNombre || "Servicio";
     const empleadoNombre = t.empleadoNombre || "Empleado";
