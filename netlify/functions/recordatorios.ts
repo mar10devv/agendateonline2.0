@@ -2,7 +2,6 @@ import type { Handler } from "@netlify/functions";
 import * as admin from "firebase-admin";
 import nodemailer from "nodemailer";
 
-// Inicializar Firebase Admin solo una vez
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -15,78 +14,102 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// Configuración de Nodemailer con Gmail
 const transporter = nodemailer.createTransport({
   service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
 });
 
-// Tipo para turnos
 type Turno = {
   clienteEmail: string;
   clienteNombre?: string;
   negocioNombre?: string;
-  fecha: admin.firestore.Timestamp; // guardado en Firestore
+  fecha: admin.firestore.Timestamp;      // Timestamp del turno
+  creadoEn?: admin.firestore.Timestamp;  // Cuándo se tomó el turno
+  email24Enviado?: boolean;
+  email1hEnviado?: boolean;
 };
 
-// Función handler de Netlify
-const handler: Handler = async (event, context) => {
+const MS_HORA = 60 * 60 * 1000;
+
+export const handler: Handler = async () => {
   try {
     const ahora = new Date();
-    const snapshot = await db.collectionGroup("Turnos").get();
 
-    for (const doc of snapshot.docs) {
-      const turno = doc.data() as Turno;
+    // Ventanas de búsqueda "angostas" para reducir lecturas:
+    const win24Start = new Date(ahora.getTime() + 23.5 * MS_HORA);
+    const win24End   = new Date(ahora.getTime() + 24.5 * MS_HORA);
 
-      if (!turno.fecha || !turno.clienteEmail) continue;
+    const win1hStart = new Date(ahora.getTime() + 0.9 * MS_HORA);
+    const win1hEnd   = new Date(ahora.getTime() + 1.1 * MS_HORA);
 
-      const fechaTurno = turno.fecha.toDate();
-      const diffHoras = (fechaTurno.getTime() - ahora.getTime()) / (1000 * 60 * 60);
+    // ---- QUERY 24h ----
+    const q24 = await db
+      .collectionGroup("Turnos")
+      .where("fecha", ">=", admin.firestore.Timestamp.fromDate(win24Start))
+      .where("fecha", "<=", admin.firestore.Timestamp.fromDate(win24End))
+      .get();
 
-      // Recordatorio 24h antes
-      if (diffHoras > 23.5 && diffHoras < 24.5) {
-        await enviarMail(
-          turno.clienteEmail,
-          "📅 Recordatorio: tu turno es mañana",
-          `<p>Hola ${turno.clienteNombre || ""}, mañana tenés tu turno en <b>${turno.negocioNombre || "tu negocio"}</b> a las ${fechaTurno.toLocaleTimeString()}.</p>`
-        );
-      }
+    for (const doc of q24.docs) {
+      const t = doc.data() as Turno;
+      if (!t.fecha || !t.clienteEmail) continue;
+      if (t.email24Enviado) continue;
 
-      // Recordatorio 1h antes
-      if (diffHoras > 0.9 && diffHoras < 1.1) {
-        await enviarMail(
-          turno.clienteEmail,
-          "⏰ Recordatorio: tu turno en 1 hora",
-          `<p>Hola ${turno.clienteNombre || ""}, te recordamos tu turno en <b>${turno.negocioNombre || "tu negocio"}</b> a las ${fechaTurno.toLocaleTimeString()}.</p>`
-        );
-      }
+      const fechaTurno = t.fecha.toDate();
+      const creadoEn = t.creadoEn?.toDate(); // puede ser undefined si es viejo
+
+      // Regla: solo si se tomó con >=24h de anticipación
+      const limite = new Date(fechaTurno.getTime() - 24 * MS_HORA);
+      const cumpleAnticipacion = creadoEn ? (creadoEn.getTime() <= limite.getTime()) : true; // si no hay creadoEn, asumimos true
+
+      if (!cumpleAnticipacion) continue;
+
+      await transporter.sendMail({
+        from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
+        to: t.clienteEmail,
+        subject: "📅 Recordatorio: tu turno es mañana",
+        html: `
+          <p>Hola ${t.clienteNombre || ""},</p>
+          <p>Mañana tenés tu turno en <b>${t.negocioNombre || "tu negocio"}</b> a las <b>${fechaTurno.toLocaleTimeString()}</b>.</p>
+          <hr>
+          <p>Este es un mensaje automático, por favor no responder.</p>
+        `,
+      });
+
+      await doc.ref.update({ email24Enviado: true });
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, message: "Recordatorios revisados" }),
-    };
-  } catch (error: any) {
-    console.error("Error en recordatorios:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ success: false, error: error.message }),
-    };
+    // ---- QUERY 1h ----
+    const q1h = await db
+      .collectionGroup("Turnos")
+      .where("fecha", ">=", admin.firestore.Timestamp.fromDate(win1hStart))
+      .where("fecha", "<=", admin.firestore.Timestamp.fromDate(win1hEnd))
+      .get();
+
+    for (const doc of q1h.docs) {
+      const t = doc.data() as Turno;
+      if (!t.fecha || !t.clienteEmail) continue;
+      if (t.email1hEnviado) continue;
+
+      const fechaTurno = t.fecha.toDate();
+
+      await transporter.sendMail({
+        from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
+        to: t.clienteEmail,
+        subject: "⏰ Recordatorio: tu turno en 1 hora",
+        html: `
+          <p>Hola ${t.clienteNombre || ""},</p>
+          <p>Te recordamos tu turno en <b>${t.negocioNombre || "tu negocio"}</b> a las <b>${fechaTurno.toLocaleTimeString()}</b>.</p>
+          <hr>
+          <p>Este es un mensaje automático, por favor no responder.</p>
+        `,
+      });
+
+      await doc.ref.update({ email1hEnviado: true });
+    }
+
+    return { statusCode: 200, body: "Recordatorios procesados" };
+  } catch (e: any) {
+    console.error(e);
+    return { statusCode: 500, body: e.message };
   }
 };
-
-// Función auxiliar para enviar mail
-async function enviarMail(para: string, asunto: string, mensaje: string) {
-  const mailOptions = {
-    from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
-    to: para,
-    subject: asunto,
-    html: mensaje,
-  };
-  await transporter.sendMail(mailOptions);
-}
-
-export { handler };

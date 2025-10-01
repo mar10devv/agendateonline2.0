@@ -588,23 +588,35 @@ function PasoConfirmacion({
       const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
 
       // 1) Guardar en negocio
-      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
-      const docRef = await addDoc(refNeg, {
-        negocioId: negocio.id,
-        negocioNombre: negocio.nombre,
-        servicioId: servicio.id,
-        servicioNombre: servicio.servicio,
-        duracion: servicio.duracion,
-        empleadoId: empleado.id || null,
-        empleadoNombre: empleado.nombre,
-        fecha: fechaStr,
-        hora: turno.hora,
-        inicioTs: inicio, // Date -> Firestore Timestamp
-        finTs: fin,
-        clienteUid: uInfo.uid,
-        clienteEmail: uInfo.email,
-        creadoEn: new Date(),
-      });
+      // 1) Guardar en negocio
+const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+const docRef = await addDoc(refNeg, {
+  negocioId: negocio.id,
+  negocioNombre: negocio.nombre,
+  servicioId: servicio.id,
+  servicioNombre: servicio.servicio,
+  duracion: servicio.duracion,
+  empleadoId: empleado.id || null,
+  empleadoNombre: empleado.nombre,
+  fecha: fechaStr,
+  hora: turno.hora,
+  inicioTs: inicio,
+  finTs: fin,
+  clienteUid: uInfo.uid,
+  clienteEmail: uInfo.email,
+  creadoEn: new Date(),
+  emailConfirmacionEnviado: false,
+  email24Enviado: false,
+  email1hEnviado: false,
+});
+
+// 🔹 LLAMAR a la función Netlify para enviar mail
+await fetch("/.netlify/functions/confirmar-turno", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ docPath: docRef.path }),
+});
+
 
       // 2) Guardar COPIA en Usuarios/{uid}/Turnos
       if (uInfo.uid) {
