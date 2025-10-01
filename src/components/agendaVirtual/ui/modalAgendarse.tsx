@@ -12,6 +12,9 @@ import {
   getDoc,   // 👈 agregado
 } from "firebase/firestore";
 
+// al inicio de ModalAgendarse:
+import Loader from "../../ui/loaderSpinner";
+
 import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -559,8 +562,12 @@ function PasoConfirmacion({
   onConfirm,
   onBack,
 }: any) {
+  const [cargando, setCargando] = useState(false);
+
   const guardarTurno = async () => {
     try {
+      setCargando(true); // 🔹 activamos loader
+
       const auth = getAuth();
       const u = auth.currentUser;
       let uInfo = {
@@ -593,6 +600,7 @@ function PasoConfirmacion({
             minute: "2-digit",
           })}.`
         );
+        setCargando(false);
         return;
       }
 
@@ -617,7 +625,7 @@ function PasoConfirmacion({
         finTs: fin,
         clienteUid: uInfo.uid,
         clienteEmail: uInfo.email,
-        clienteNombre: uInfo.nombre, // 👈 agregado
+        clienteNombre: uInfo.nombre,
         creadoEn: new Date(),
         emailConfirmacionEnviado: false,
         email24Enviado: false,
@@ -655,32 +663,44 @@ function PasoConfirmacion({
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
       alert("Hubo un error al guardar el turno. Intenta de nuevo.");
+    } finally {
+      setCargando(false); // 🔹 apagamos loader siempre
     }
   };
+
   return (
     <div>
-      <p>Confirma tu turno:</p>
-      <ul className="mb-4 text-sm">
-        <li>Servicio: {servicio?.servicio}</li>
-        <li>Empleado: {empleado?.nombre}</li>
-        <li>
-          Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
-        </li>
-      </ul>
-      <div className="flex justify-end gap-4">
-        <button
-          onClick={onBack}
-          className="px-4 py-2 rounded bg-gray-700 text-white"
-        >
-          Volver
-        </button>
-        <button
-          onClick={guardarTurno}
-          className="px-4 py-2 rounded bg-green-600 text-white"
-        >
-          Confirmar
-        </button>
-      </div>
+      {cargando ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <Loader /> {/* 👈 tu componente ya importado */}
+          <p className="mt-4 text-sm text-gray-300">Guardando tu turno...</p>
+        </div>
+      ) : (
+        <>
+          <p>Confirma tu turno:</p>
+          <ul className="mb-4 text-sm">
+            <li>Servicio: {servicio?.servicio}</li>
+            <li>Empleado: {empleado?.nombre}</li>
+            <li>
+              Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
+            </li>
+          </ul>
+          <div className="flex justify-end gap-4">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 rounded bg-gray-700 text-white"
+            >
+              Volver
+            </button>
+            <button
+              onClick={guardarTurno}
+              className="px-4 py-2 rounded bg-green-600 text-white"
+            >
+              Confirmar
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
