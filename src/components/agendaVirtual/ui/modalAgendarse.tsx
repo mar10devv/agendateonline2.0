@@ -8,7 +8,10 @@ import {
   Timestamp,
   query,
   where,
+  doc,      // 👈 agregado
+  getDoc,   // 👈 agregado
 } from "firebase/firestore";
+
 import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -560,10 +563,21 @@ function PasoConfirmacion({
     try {
       const auth = getAuth();
       const u = auth.currentUser;
-      const uInfo = {
+      let uInfo = {
         uid: u?.uid ?? usuario?.uid ?? null,
         email: u?.email ?? usuario?.email ?? null,
+        nombre: u?.displayName ?? null,
       };
+
+      // 🔎 Buscar datos extra en Firestore si faltan
+      if (uInfo.uid) {
+        const userDoc = await getDoc(doc(db, "Usuarios", uInfo.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (!uInfo.email && data.email) uInfo.email = data.email;
+          if (!uInfo.nombre && data.nombre) uInfo.nombre = data.nombre;
+        }
+      }
 
       // 🔁 Re-verificación ANTES de guardar
       const bloqueo = await verificarTurnoActivoPorUsuarioYNegocio(
@@ -588,35 +602,34 @@ function PasoConfirmacion({
       const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
 
       // 1) Guardar en negocio
-      // 1) Guardar en negocio
-const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
-const docRef = await addDoc(refNeg, {
-  negocioId: negocio.id,
-  negocioNombre: negocio.nombre,
-  servicioId: servicio.id,
-  servicioNombre: servicio.servicio,
-  duracion: servicio.duracion,
-  empleadoId: empleado.id || null,
-  empleadoNombre: empleado.nombre,
-  fecha: fechaStr,
-  hora: turno.hora,
-  inicioTs: inicio,
-  finTs: fin,
-  clienteUid: uInfo.uid,
-  clienteEmail: uInfo.email,
-  creadoEn: new Date(),
-  emailConfirmacionEnviado: false,
-  email24Enviado: false,
-  email1hEnviado: false,
-});
+      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+      const docRef = await addDoc(refNeg, {
+        negocioId: negocio.id,
+        negocioNombre: negocio.nombre,
+        servicioId: servicio.id,
+        servicioNombre: servicio.servicio,
+        duracion: servicio.duracion,
+        empleadoId: empleado.id || null,
+        empleadoNombre: empleado.nombre,
+        fecha: fechaStr,
+        hora: turno.hora,
+        inicioTs: inicio,
+        finTs: fin,
+        clienteUid: uInfo.uid,
+        clienteEmail: uInfo.email,
+        clienteNombre: uInfo.nombre, // 👈 agregado
+        creadoEn: new Date(),
+        emailConfirmacionEnviado: false,
+        email24Enviado: false,
+        email1hEnviado: false,
+      });
 
-// 🔹 LLAMAR a la función Netlify para enviar mail
-await fetch("/.netlify/functions/confirmar-turno", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ docPath: docRef.path }),
-});
-
+      // 🔹 LLAMAR a la función Netlify para enviar mail
+      await fetch("/.netlify/functions/confirmar-turno", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docPath: docRef.path }),
+      });
 
       // 2) Guardar COPIA en Usuarios/{uid}/Turnos
       if (uInfo.uid) {
@@ -644,7 +657,6 @@ await fetch("/.netlify/functions/confirmar-turno", {
       alert("Hubo un error al guardar el turno. Intenta de nuevo.");
     }
   };
-
   return (
     <div>
       <p>Confirma tu turno:</p>
