@@ -26,6 +26,8 @@ export const handler: Handler = async (event) => {
 
   try {
     const { docPath } = JSON.parse(event.body || "{}");
+    console.log("📩 Petición recibida en confirmar-turno con docPath:", docPath);
+
     if (!docPath) {
       return { statusCode: 400, body: "Falta docPath" };
     }
@@ -34,14 +36,19 @@ export const handler: Handler = async (event) => {
     const snap = await docRef.get();
 
     if (!snap.exists) {
+      console.warn("⚠️ No existe el turno en Firestore:", docPath);
       return { statusCode: 404, body: "Turno no encontrado" };
     }
 
     const t = snap.data() as any;
+    console.log("📄 Datos del turno:", t);
 
     if (!t.clienteEmail) {
+      console.warn("⚠️ El turno no tiene clienteEmail:", t);
       return { statusCode: 400, body: "El turno no tiene clienteEmail" };
     }
+
+    console.log("🚀 Enviando mail a:", t.clienteEmail);
 
     // Enviar mail de confirmación
     await transporter.sendMail({
@@ -57,6 +64,8 @@ export const handler: Handler = async (event) => {
         <p><i>Este es un mensaje automático, no responder.</i></p>
       `,
     });
+
+    console.log("✅ Mail enviado con éxito a:", t.clienteEmail);
 
     // Marcamos en Firestore que ya se envió
     await docRef.update({ emailConfirmacionEnviado: true });
