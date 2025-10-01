@@ -45,6 +45,7 @@ type TurnoNegocio = {
 
 type Servicio = { id: string; servicio: string; precio: number; duracion: number | string };
 
+
 /* =============== Helpers fecha/hora =============== */
 const esMismoDia = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
@@ -131,6 +132,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   // modales
   const [detalles, setDetalles] = useState<TurnoNegocio | null>(null);
   const [clienteExtra, setClienteExtra] = useState<{ nombre?: string; fotoPerfil?: string } | null>(null);
+const [modalOpciones, setModalOpciones] = useState<{ visible: boolean; hora?: string | null }>({ visible: false });
 
   const [manualOpen, setManualOpen] = useState<{
     visible: boolean;
@@ -452,26 +454,28 @@ const slots = useMemo(() => {
             : "bg-emerald-600/90 hover:bg-emerald-600 text-white");
 
       return (
-        <button
-          key={i}
-          disabled={vencido && !ocupado}
-          onClick={() => {
-            if (ocupado) {
-              setDetalles(s.turno!);                // ver detalle (aunque esté vencido)
-            } else if (!vencido) {
-              setManualOpen({ visible: true, hora: s.hora, paso: 1 }); // solo si no venció
-            }
-          }}
-          className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none ${clase}`}
-          title={
-            vencido
-              ? (ocupado ? "Turno pasado (ver detalle)" : "Turno pasado")
-              : (ocupado ? "Turno ocupado" : "Asignar manualmente")
-          }
-        >
-          {s.hora}
-        </button>
-      );
+  <button
+    key={i}
+    disabled={vencido && !ocupado}
+    onClick={() => {
+      if (ocupado) {
+        setDetalles(s.turno!); // ver detalle (aunque esté vencido)
+      } else if (!vencido) {
+  setModalOpciones({ visible: true, hora: s.hora }); // abrimos modal con opciones
+}
+
+    }}
+    className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none ${clase}`}
+    title={
+      vencido
+        ? (ocupado ? "Turno pasado (ver detalle)" : "Turno pasado")
+        : (ocupado ? "Turno ocupado" : "Opciones de turno")
+    }
+  >
+    {s.hora}
+  </button>
+);
+
     })}
   </div>
 </div>
@@ -514,6 +518,66 @@ const slots = useMemo(() => {
           </div>
         </div>
       )}
+
+      {/* Modal opciones de turno */}
+{modalOpciones.visible && diaSel && (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
+    <div
+      className="absolute inset-0 bg-black/60"
+      onClick={() => setModalOpciones({ visible: false })}
+    />
+    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+      <h3 className="text-lg font-semibold mb-4">
+        Turno {modalOpciones.hora} • {diaSel.toLocaleDateString("es-ES")}
+      </h3>
+
+      <div className="flex flex-col gap-3">
+        {/* ➕ Agregar manualmente */}
+        <button
+          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+          onClick={() => {
+            setManualOpen({ visible: true, hora: modalOpciones.hora || null, paso: 1 });
+            setModalOpciones({ visible: false });
+          }}
+        >
+          ➕ Agregar manualmente
+        </button>
+
+        {/* 🚫 No trabajar */}
+        <button
+          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
+          onClick={async () => {
+            try {
+              const inicio = combinarFechaHora(diaSel!, modalOpciones.hora!);
+              const fin = new Date(inicio.getTime() + 30 * 60000);
+
+              const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+              await addDoc(refNeg, {
+                negocioId: negocio.id,
+                negocioNombre: negocio.nombre,
+                empleadoId: empleadoSel?.id || null,
+                empleadoNombre: empleadoSel?.nombre,
+                fecha: inicio.toISOString().split("T")[0],
+                hora: modalOpciones.hora,
+                inicioTs: inicio,
+                finTs: fin,
+                bloqueado: true,   // 👈 marca que el negocio no trabaja
+                creadoEn: new Date(),
+                creadoPor: "negocio-manual",
+              });
+
+              setModalOpciones({ visible: false });
+            } catch (e) {
+              console.error("❌ Error bloqueando turno:", e);
+            }
+          }}
+        >
+          🚫 No trabajar este turno
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Modal asignación manual (verde) */}
       {manualOpen.visible && diaSel && (
