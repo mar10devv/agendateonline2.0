@@ -63,6 +63,16 @@ const toDateSafe = (v: any): Date => {
   return new Date(v);
 };
 
+// Motivos predeterminados para cancelar
+const MOTIVOS_PREDETERMINADOS = [
+  "El empleado no podrá asistir",
+  "Inconveniente con el local",
+  "Reprogramación por agenda del negocio",
+  "Falla de energía/servicio en el local",
+  "Emergencia de último momento",
+  "El cliente solicitó cancelar",
+];
+
 const toMin = (hhmm: string) => {
   const [h, m] = (hhmm || "00:00").split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
@@ -123,6 +133,14 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     negocio.empleadosData?.[0] || null
   );
   const [mesVisible, setMesVisible] = useState<Date>(new Date(hoy));
+
+const [modalEliminar, setModalEliminar] = useState<{
+  visible: boolean;
+  turno?: TurnoNegocio | null;
+  motivo?: string;
+}>({ visible: false, turno: null, motivo: "" });
+
+
 
   // ⛔️ NO abrir horarios automáticamente
   const [diaSel, setDiaSel] = useState<Date | null>(null);
@@ -335,6 +353,34 @@ const slots = useMemo(() => {
         .sort((a, b) => +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any))
     : [];
 
+    const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
+  try {
+    // 1. Borrar de Firestore
+    await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
+
+    // 2. Enviar mail al cliente (Netlify Function / backend)
+    if (turno.clienteEmail) {
+      await fetch("/.netlify/functions/notificar-cancelacion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: turno.clienteEmail,
+          nombre: turno.clienteNombre,
+          servicio: turno.servicioNombre,
+          fecha: turno.fecha,
+          hora: turno.hora,
+          motivo,
+        }),
+      });
+    }
+
+    setModalEliminar({ visible: false, turno: null });
+  } catch (e) {
+    console.error("❌ Error eliminando turno:", e);
+  }
+};
+
+
   return (
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">
       {/* Header + selector de empleado */}
@@ -424,21 +470,33 @@ const slots = useMemo(() => {
                 </div>
               </div>
 
-              {/* Quién se agendó */}
-              {reservasDelDia.length > 0 && (
-                <ul className="mb-3 space-y-1 text-xs">
-                  {reservasDelDia.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1">
-                      <span className="font-semibold">
-                        {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <span className="truncate">
-                        {t.clienteNombre ?? "Reservado"} {t.servicioNombre ? `• ${t.servicioNombre}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {/* Quién se agendó o bloqueó */}
+{reservasDelDia.length > 0 && (
+  <ul className="mb-3 space-y-1 text-xs">
+    {reservasDelDia.map((t) => (
+      <li
+        key={t.id}
+        className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1"
+      >
+        <span className="font-semibold">
+          {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+
+        {/* 👇 diferenciamos bloqueado de reservado */}
+        <span className="truncate">
+          {t.bloqueado
+            ? "Bloqueado"
+            : t.clienteNombre ?? "Reservado"}
+          {t.servicioNombre && !t.bloqueado ? ` • ${t.servicioNombre}` : ""}
+        </span>
+      </li>
+    ))}
+  </ul>
+)}
+
 
               {/* Slots del día (6 columnas) */}
 <div className="max-h-[420px] overflow-auto pr-1">
@@ -465,6 +523,7 @@ const slots = useMemo(() => {
           disabled={vencido && !ocupado && !bloqueado}
           onClick={async () => {
             if (bloqueado) {
+
               // 👇 solo negocio puede liberar antes que venza
               if (!vencido) {
                 if (confirm("¿Desea liberar este turno para que vuelva a estar disponible?")) {
@@ -496,46 +555,153 @@ const slots = useMemo(() => {
     })}
   </div>
 </div>
-
-
             </>
           )}
         </div>
       </div>
+{/* Modal detalle de turno (se abre al tocar un slot rojo) */}
+{detalles && (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
+    <div
+      className="absolute inset-0 bg-black/60"
+      onClick={() => {
+        setDetalles(null);
+        setClienteExtra(null);
+      }}
+    />
+    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+      <h3 className="text-lg font-semibold mb-4">Detalle del turno</h3>
 
-      {/* Modal detalle (rojo) */}
-      {detalles && (
-        <div className="fixed inset-0 z-[9999]">
-          <div className="absolute inset-0 bg-black/60" onClick={() => { setDetalles(null); setClienteExtra(null); }} />
-          <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
-            <div className="w-full max-w-[720px] sm:rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
-                <h4 className="text-base sm:text-lg font-semibold">Detalle del turno</h4>
-                <button onClick={() => { setDetalles(null); setClienteExtra(null); }} className="text-gray-300 hover:text-white text-xl">×</button>
-              </div>
-              <div className="p-4 sm:p-6 space-y-3 text-sm">
-                <div className="font-medium">{clienteExtra?.nombre || detalles.clienteNombre || "Cliente"}</div>
-                <div className="text-gray-300">{detalles.clienteEmail || "Sin email"}</div>
-                <div><span className="text-gray-400">Servicio: </span><b>{detalles.servicioNombre || "-"}</b></div>
-                <div><span className="text-gray-400">Empleado: </span><b>{detalles.empleadoNombre}</b></div>
-                <div>
-                  <span className="text-gray-400">Día y hora: </span>
-                  <b>
-                    {toDateSafe(detalles.inicioTs).toLocaleDateString("es-ES")}{" "}
-                    {toDateSafe(detalles.inicioTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                    {" – "}
-                    {toDateSafe(detalles.finTs).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                  </b>
-                </div>
-                <div><span className="text-gray-400">Duración: </span><b>{parseDuracionMin(detalles.duracion) || 30} min</b></div>
-                <div className="pt-2 flex justify-end">
-                  <button onClick={() => { setDetalles(null); setClienteExtra(null); }} className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Cerrar</button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="space-y-2 text-sm">
+        <div><span className="text-gray-400">Hora:</span> <b>{detalles.hora}</b></div>
+        <div><span className="text-gray-400">Fecha:</span> <b>{detalles.fecha}</b></div>
+        <div><span className="text-gray-400">Empleado:</span> <b>{detalles.empleadoNombre}</b></div>
+
+        {!detalles.bloqueado ? (
+          <>
+            <div><span className="text-gray-400">Servicio:</span> <b>{detalles.servicioNombre || "—"}</b></div>
+            <div><span className="text-gray-400">Cliente:</span> <b>{detalles.clienteNombre || "—"}</b></div>
+            <div><span className="text-gray-400">Email:</span> <b>{detalles.clienteEmail || "—"}</b></div>
+            <div><span className="text-gray-400">Teléfono:</span> <b>{detalles.clienteTelefono || "—"}</b></div>
+            {clienteExtra?.nombre && (
+              <div className="text-xs text-gray-400">Perfil: {clienteExtra.nombre}</div>
+            )}
+          </>
+        ) : (
+          <div className="text-amber-300">Este horario está bloqueado por el negocio.</div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 mt-5">
+        <button
+          onClick={() => {
+            setDetalles(null);
+            setClienteExtra(null);
+          }}
+          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+        >
+          Cerrar
+        </button>
+
+        {!detalles.bloqueado && (
+          <button
+            onClick={() => {
+              setModalEliminar({ visible: true, turno: detalles, motivo: "" });
+              setDetalles(null);
+              setClienteExtra(null);
+            }}
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+          >
+            Eliminar turno
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Modal eliminar turno */}
+{modalEliminar.visible && modalEliminar.turno && (
+  <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-6">
+    <div
+      className="absolute inset-0 bg-black/60"
+      onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "" })}
+    />
+    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+      <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
+
+      <p className="text-sm mb-4">
+        Estás por eliminar el turno de{" "}
+        <b>{modalEliminar.turno.clienteNombre || "Cliente"}</b> a las{" "}
+        <b>{modalEliminar.turno.hora}</b> el{" "}
+        <b>{modalEliminar.turno.fecha}</b>.
+      </p>
+
+      {/* Chips de motivos rápidos */}
+      <div className="mb-3">
+        <div className="text-sm text-gray-300 mb-2">Elige un motivo rápido:</div>
+        <div className="flex flex-wrap gap-2">
+          {MOTIVOS_PREDETERMINADOS.map((m) => {
+            const activo = (modalEliminar.motivo || "").trim() === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() =>
+                  setModalEliminar((s) => ({ ...s, motivo: m }))
+                }
+                className={`px-3 py-1.5 rounded-full text-xs border transition
+                  ${activo
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-neutral-800 text-gray-200 border-neutral-700 hover:bg-neutral-700"}`}
+                title={m}
+              >
+                {m}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      <label className="block text-sm text-gray-300 mb-2">
+        Motivo de cancelación (se notificará al cliente):
+      </label>
+      <textarea
+        className="w-full p-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm mb-4"
+        rows={3}
+        placeholder="Ej. El empleado no podrá asistir"
+        value={modalEliminar.motivo || ""}
+        onChange={(e) =>
+          setModalEliminar((s) => ({
+            ...s,
+            motivo: e.target.value,
+          }))
+        }
+      />
+
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "" })}
+          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+        >
+          Cancelar
+        </button>
+
+        <button
+          onClick={() => {
+            const motivo = (modalEliminar.motivo || "").trim();
+            handleEliminarTurno(modalEliminar.turno!, motivo);
+          }}
+          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+        >
+          Eliminar turno
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       {/* Modal opciones de turno */}
 {modalOpciones.visible && diaSel && (
