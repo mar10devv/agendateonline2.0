@@ -1,5 +1,6 @@
 // src/components/agendaVirtual/admin/AgendaNegocio.tsx
 import { useEffect, useMemo, useState } from "react";
+import { writeBatch } from "firebase/firestore";
 import {
   collection,
   onSnapshot,
@@ -360,20 +361,21 @@ const handleEliminarTurno = async (
   motivo: string
 ): Promise<boolean> => {
   try {
-    // 1) Borrar en negocio
-await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
+    const batch = writeBatch(db);
 
-// 2) Borrar en cliente (si hay UID)
-if (turno.clienteUid) {
-  try {
-    await deleteDoc(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
-    console.log("✅ Turno borrado también del cliente");
-  } catch (err) {
-    console.error("❌ No se pudo borrar el turno del cliente:", err);
-  }
-}
+    // 1) Eliminar en negocio
+    batch.delete(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
 
-    // 2) Notificar por email al cliente (solo si hay email)
+    // 2) Eliminar en cliente (si hay UID)
+    if (turno.clienteUid) {
+      batch.delete(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
+    }
+
+    // ✅ Ejecutar el batch de forma atómica
+    await batch.commit();
+    console.log("✅ Turno borrado en negocio y cliente");
+
+    // 3) Notificar por email al cliente (si hay email)
     if (turno.clienteEmail) {
       try {
         const origin =
@@ -390,7 +392,6 @@ if (turno.clienteUid) {
           motivo,
           negocioNombre: negocio.nombre,
           slug: negocio.slug ?? null,
-          // 👇 siempre construimos la URL con el slug (aunque sea vacío)
           agendaUrl: `${origin}/agenda/${negocio.slug || ""}`,
         };
 
