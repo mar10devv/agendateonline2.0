@@ -8,10 +8,12 @@ import {
   Timestamp,
   query,
   where,
-  doc,      // 👈 agregado
-  getDoc, 
-  deleteDoc,    // 👈 agregado
+  doc,
+  getDoc,
+  deleteDoc,
+  Firestore
 } from "firebase/firestore";
+import type { DocumentReference, DocumentData } from "firebase/firestore"; // ✅ Import solo de tipos
 
 // al inicio de ModalAgendarse:
 import Loader from "../../ui/loaderSpinner";
@@ -50,13 +52,28 @@ type Props = {
 };
 
 // ✅ Tipo consistente para el bloqueo
-type Bloqueo = { 
-  activo: boolean; 
-  inicio: Date | null; 
-  fin: Date | null; 
+type Bloqueo = {
+  activo: boolean;
+  inicio: Date | null;
+  fin: Date | null;
   docPath?: string | null;
 };
 
+// ✅ Helper global para construir un DocumentReference desde un path
+function docFromPath(path: string): DocumentReference<DocumentData> {
+  const segments = path.split("/").filter(Boolean);
+  if (segments.length < 2) {
+    throw new Error("Path inválido en docFromPath: " + path);
+  }
+  // ✅ Se fuerza a Firestore + segments como [string,...]
+  return doc(db as Firestore, ...segments as [string, ...string[]]);
+}
+
+// ✅ Tipo para los datos que guarda un turno en Usuarios/{uid}/Turnos
+type TurnoData = {
+  negocioId?: string;
+  turnoIdNegocio?: string;
+};
 
 /* -------------------- HELPERS -------------------- */
 function toDateSafe(f: any): Date {
@@ -86,13 +103,11 @@ function combinarFechaHora(fecha: Date, hhmm: string): Date {
   return d;
 }
 function calcularInicioFinDesdeDoc(t: any): { inicio: Date; fin: Date } | null {
-  // prioridad: inicioTs/finTs
   const inicioTs = t.inicioTs ? toDateSafe(t.inicioTs) : null;
   const finTs = t.finTs ? toDateSafe(t.finTs) : null;
   if (inicioTs && finTs && !isNaN(+inicioTs) && !isNaN(+finTs)) {
     return { inicio: inicioTs, fin: finTs };
   }
-  // fallback legacy: fecha+hora+duracion
   const f = toDateSafe(t.fecha);
   if (isNaN(+f)) return null;
   const inicio = combinarFechaHora(f, t.hora || "00:00");
@@ -101,11 +116,7 @@ function calcularInicioFinDesdeDoc(t: any): { inicio: Date; fin: Date } | null {
   return { inicio, fin };
 }
 
-/* -------------------- VERIFICACIÓN DE TURNO ACTIVO --------------------
-   Regla: bloquea si existe un turno con fin > ahora.
-   1) Usuarios/{uid}/Turnos  (primario)
-   2) Negocios/{negocioId}/Turnos (compat)
------------------------------------------------------------------------ */
+/* -------------------- VERIFICACIÓN DE TURNO ACTIVO -------------------- */
 async function verificarTurnoActivoPorUsuarioYNegocio(
   negocioId: string,
   u: { uid?: string | null; email?: string | null } | null
@@ -115,28 +126,26 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
   const ahora = new Date();
   let inicioSel: Date | null = null;
   let finSel: Date | null = null;
-let docPathSel: string | null = null;
+  let docPathSel: string | null = null;
 
+  const pick = (inicio: Date, fin: Date, docPath: string) => {
+    if (fin <= ahora) return;
+    if (!inicioSel || inicio < inicioSel) {
+      inicioSel = inicio;
+      finSel = fin;
+      docPathSel = docPath;
+    }
+  };
 
-const pick = (inicio: Date, fin: Date, docPath: string) => {
-  if (fin <= ahora) return;
-  if (!inicioSel || inicio < inicioSel) {
-    inicioSel = inicio;
-    finSel = fin;
-    docPathSel = docPath;
-  }
-};
-
-
-  // --- 1) Usuarios/{uid}/Turnos: intento con where("finTs", ">", now) ---
   try {
     const refUser = collection(db, "Usuarios", u.uid, "Turnos");
-
-    // Preferimos filtrar en servidor por finTs (si existe)
-    // A) con negocioId (puede requerir índice). Si falla, B) sin negocioId.
     let snaps: any[] = [];
     try {
-      const q1 = query(refUser, where("negocioId", "==", negocioId), where("finTs", ">", ahora));
+      const q1 = query(
+        refUser,
+        where("negocioId", "==", negocioId),
+        where("finTs", ">", ahora)
+      );
       snaps.push(await getDocs(q1));
     } catch {
       const q2 = query(refUser, where("finTs", ">", ahora));
@@ -148,22 +157,14 @@ const pick = (inicio: Date, fin: Date, docPath: string) => {
         const t = doc.data();
         const par = calcularInicioFinDesdeDoc(t);
         if (!par) return;
-        if (t.negocioId && t.negocioId !== negocioId) return; // si viene marcado por otro negocio
+        if (t.negocioId && t.negocioId !== negocioId) return;
         pick(par.inicio, par.fin, doc.ref.path);
-
       });
     }
- if (inicioSel && finSel) {
-  return {
-    activo: true,
-    inicio: inicioSel,
-    fin: finSel,
-    docPath: docPathSel,
-  };
-}
+    if (inicioSel && finSel) {
+      return { activo: true, inicio: inicioSel, fin: finSel, docPath: docPathSel };
+    }
 
-
-    // Fallback: leer todo y calcular (por si no hay finTs)
     const allSnap = await getDocs(refUser);
     allSnap.forEach((doc) => {
       const t = doc.data();
@@ -171,34 +172,35 @@ const pick = (inicio: Date, fin: Date, docPath: string) => {
       const par = calcularInicioFinDesdeDoc(t);
       if (!par) return;
       pick(par.inicio, par.fin, doc.ref.path);
-
     });
     if (inicioSel && finSel) {
-  return {
-    activo: true,
-    inicio: inicioSel,
-    fin: finSel,
-    docPath: docPathSel,
-  };
-}
+      return { activo: true, inicio: inicioSel, fin: finSel, docPath: docPathSel };
+    }
+  } catch {}
 
-  } catch {
-    // seguimos con negocio
-  }
-
-  // --- 2) Negocios/{negocioId}/Turnos: intento con where("finTs", ">", now) ---
   try {
     const refNeg = collection(db, "Negocios", negocioId, "Turnos");
     let negSnaps: any[] = [];
     try {
-      if (u.uid) negSnaps.push(await getDocs(query(refNeg, where("clienteUid", "==", u.uid), where("finTs", ">", ahora))));
+      if (u.uid)
+        negSnaps.push(
+          await getDocs(
+            query(refNeg, where("clienteUid", "==", u.uid), where("finTs", ">", ahora))
+          )
+        );
     } catch {
       if (u.uid) negSnaps.push(await getDocs(query(refNeg, where("clienteUid", "==", u.uid))));
     }
     try {
-      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email), where("finTs", ">", ahora))));
+      if (u.email)
+        negSnaps.push(
+          await getDocs(
+            query(refNeg, where("clienteEmail", "==", u.email), where("finTs", ">", ahora))
+          )
+        );
     } catch {
-      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
+      if (u.email)
+        negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
     }
 
     for (const s of negSnaps) {
@@ -207,24 +209,14 @@ const pick = (inicio: Date, fin: Date, docPath: string) => {
         const par = calcularInicioFinDesdeDoc(t);
         if (!par) return;
         pick(par.inicio, par.fin, doc.ref.path);
-
       });
     }
     if (inicioSel && finSel) {
-  return {
-    activo: true,
-    inicio: inicioSel,
-    fin: finSel,
-    docPath: docPathSel,
-  };
-}
-
-  } catch {
-    // nada
-  }
+      return { activo: true, inicio: inicioSel, fin: finSel, docPath: docPathSel };
+    }
+  } catch {}
 
   return { activo: false, inicio: null, fin: null, docPath: null };
-
 }
 
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
@@ -233,31 +225,22 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [turno, setTurno] = useState<any>(null);
 
-  // Usuario actual (para reusar en confirmación)
-  const [usuario, setUsuario] = useState<{ uid?: string | null; email?: string | null } | null>(null);
-
-  // Bloqueo por turno ya reservado
+  const [usuario, setUsuario] = useState<{ uid?: string | null; email?: string | null } | null>(
+    null
+  );
   const [cargandoCheck, setCargandoCheck] = useState(false);
-  const [bloqueo, setBloqueo] = useState<Bloqueo>({
-    activo: false,
-    inicio: null,
-    fin: null,
-  });
+  const [bloqueo, setBloqueo] = useState<Bloqueo>({ activo: false, inicio: null, fin: null });
 
   const siguiente = () => setPaso((p) => p + 1);
   const volver = () => setPaso((p) => p - 1);
 
-  // Al abrir modal, obtener usuario y chequear bloqueo (usuario → negocio)
   useEffect(() => {
     if (!abierto || !negocio?.id) return;
-
     setCargandoCheck(true);
     const auth = getAuth();
-
     const off = onAuthStateChanged(auth, async (u) => {
       const info = u ? { uid: u.uid, email: u.email } : null;
       setUsuario(info);
-
       if (!u) {
         setBloqueo({ activo: false, inicio: null, fin: null });
         setCargandoCheck(false);
@@ -272,164 +255,91 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
         setCargandoCheck(false);
       }
     });
-
     return () => off();
   }, [abierto, negocio?.id]);
 
   if (!abierto) return null;
 
   return (
-    <ModalBase
-      abierto={abierto}
-      onClose={onClose}
-      titulo="Agendar turno"
-      maxWidth="max-w-lg"
-    >
-      {/* Aviso / bloqueo */}
+    <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
       {cargandoCheck && (
         <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
       )}
 
       {!cargandoCheck && bloqueo.activo && (
-  <div className="p-4 space-y-3">
-    <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
-      <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
-      <div className="text-amber-200 text-sm">
-        Día:{" "}
-        <b>
-          {bloqueo.inicio?.toLocaleDateString("es-ES", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </b>{" "}
-        a las{" "}
-        <b>
-          {bloqueo.inicio?.toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </b>
-        . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
-      </div>
-    </div>
+        <div className="p-4 space-y-3">
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+            <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
+            <div className="text-amber-200 text-sm">
+              Día:{" "}
+              <b>
+                {bloqueo.inicio?.toLocaleDateString("es-ES", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </b>{" "}
+              a las{" "}
+              <b>
+                {bloqueo.inicio?.toLocaleTimeString("es-ES", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </b>
+              . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
+            </div>
+          </div>
 
-    <div className="flex justify-end gap-3">
-      <button
-        onClick={onClose}
-        className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
-      >
-        Entendido
-      </button>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+            >
+              Entendido
+            </button>
 
-      {bloqueo.docPath && (
-  <button
-    onClick={async () => {
-      if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-      try {
-        // 1. Referencia al doc en Usuarios/{uid}/Turnos
-        const refUser = doc(db, bloqueo.docPath!);
-        const snap = await getDoc(refUser);
-        const data = snap.exists() ? snap.data() : null;
+            {bloqueo.docPath && (
+              <button
+                onClick={async () => {
+                  if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+                  try {
+                    const refUser = docFromPath(bloqueo.docPath!);
+                    const snap = await getDoc(refUser);
+                    const data = snap.exists() ? (snap.data() as TurnoData) : null;
 
-        // 2. Borrar la copia en Usuarios/{uid}/Turnos
-        await deleteDoc(refUser);
+                    await deleteDoc(refUser);
 
-        // 3. Si hay referencia al turno del negocio → eliminar también ahí
-        if (data?.negocioId && data?.turnoIdNegocio) {
-          const refNeg = doc(
-            db,
-            "Negocios",
-            data.negocioId,
-            "Turnos",
-            data.turnoIdNegocio
-          );
-          await deleteDoc(refNeg);
-        }
+                    if (data?.negocioId && data?.turnoIdNegocio) {
+                      const refNeg = doc(
+                        db,
+                        "Negocios",
+                        data.negocioId,
+                        "Turnos",
+                        data.turnoIdNegocio
+                      );
+                      await deleteDoc(refNeg);
+                    }
 
-        alert("Tu turno fue cancelado y el horario quedó libre.");
-        onClose();
-      } catch (err) {
-        console.error("Error cancelando turno:", err);
-        alert("Hubo un error al cancelar el turno.");
-      }
-    }}
-    className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-  >
-    Cancelar turno
-  </button>
-      )}
-    </div>
-  </div>
-)}
-
-
-      {/* Flujo original SOLO si no hay bloqueo */}
-      {!cargandoCheck && !bloqueo.activo && (
-        <>
-          {paso === 1 && (
-            <PasoServicios
-              negocio={negocio}
-              onSelect={(s: Servicio) => {
-                setServicio(s);
-                siguiente();
-              }}
-            />
-          )}
-
-          {paso === 2 && servicio && (
-            <PasoEmpleados
-              servicio={servicio}
-              negocio={negocio}
-              onSelect={(e: Empleado) => {
-                setEmpleado(e);
-                siguiente();
-              }}
-              onBack={volver}
-            />
-          )}
-
-          {paso === 3 && empleado && servicio && (
-            <PasoTurnos
-              empleado={empleado}
-              servicio={servicio}
-              negocio={negocio}
-              onSelect={(t: any) => {
-                setTurno(t);
-                siguiente();
-              }}
-              onBack={volver}
-            />
-          )}
-
-          {paso === 4 && servicio && empleado && (
-            <PasoConfirmacion
-              servicio={servicio}
-              empleado={empleado}
-              turno={turno}
-              negocio={negocio}
-              usuario={usuario}
-              onConfirm={() => {
-                siguiente();
-              }}
-              onBack={volver}
-            />
-          )}
-
-          {paso === 5 && (
-            <PasoFinal
-              negocio={negocio}
-              onClose={() => {
-                onClose();
-              }}
-            />
-          )}
-        </>
+                    alert("Tu turno fue cancelado y el horario quedó libre.");
+                    onClose();
+                  } catch (err) {
+                    console.error("Error cancelando turno:", err);
+                    alert("Hubo un error al cancelar el turno.");
+                  }
+                }}
+                className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+              >
+                Cancelar turno
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </ModalBase>
   );
 }
+
 
 /* ============================================================
    SUBCOMPONENTES
