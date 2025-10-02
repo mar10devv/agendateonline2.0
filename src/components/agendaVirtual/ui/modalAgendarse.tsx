@@ -324,25 +324,41 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
       </button>
 
       {bloqueo.docPath && (
-        <button
-          onClick={async () => {
-            if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-            try {
-              if (bloqueo.docPath) {
-  await deleteDoc(doc(db, bloqueo.docPath as string));
-}
+  <button
+    onClick={async () => {
+      if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+      try {
+        // 1. Referencia al doc en Usuarios/{uid}/Turnos
+        const refUser = doc(db, bloqueo.docPath!);
+        const snap = await getDoc(refUser);
+        const data = snap.exists() ? snap.data() : null;
 
-              alert("Tu turno fue cancelado.");
-              onClose();
-            } catch (err) {
-              console.error("Error cancelando turno:", err);
-              alert("Hubo un error al cancelar el turno.");
-            }
-          }}
-          className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-        >
-          Cancelar turno
-        </button>
+        // 2. Borrar la copia en Usuarios/{uid}/Turnos
+        await deleteDoc(refUser);
+
+        // 3. Si hay referencia al turno del negocio → eliminar también ahí
+        if (data?.negocioId && data?.turnoIdNegocio) {
+          const refNeg = doc(
+            db,
+            "Negocios",
+            data.negocioId,
+            "Turnos",
+            data.turnoIdNegocio
+          );
+          await deleteDoc(refNeg);
+        }
+
+        alert("Tu turno fue cancelado y el horario quedó libre.");
+        onClose();
+      } catch (err) {
+        console.error("Error cancelando turno:", err);
+        alert("Hubo un error al cancelar el turno.");
+      }
+    }}
+    className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+  >
+    Cancelar turno
+  </button>
       )}
     </div>
   </div>
@@ -685,6 +701,7 @@ function PasoConfirmacion({
         hora: turno.hora,
         inicioTs: inicio,
         finTs: fin,
+        
         clienteUid: uInfo.uid,
         clienteEmail: uInfo.email,
         clienteNombre: uInfo.nombre,
