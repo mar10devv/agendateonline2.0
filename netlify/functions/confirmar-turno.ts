@@ -26,9 +26,7 @@ function normalizePrivateKey(src?: string | null): string | undefined {
       if (decoded.includes("BEGIN PRIVATE KEY") || decoded.includes("BEGIN RSA PRIVATE KEY")) {
         key = decoded;
       }
-    } catch {
-      // no era base64
-    }
+    } catch {}
   }
   return key;
 }
@@ -153,7 +151,7 @@ Si necesitás reprogramar, respondé a este correo.
 
     const html = `<!doctype html>
 <html>
-  <body style="margin:0;padding:24px;background:linear-gradient(90deg,#22c55e,#16a34a);font-family:Inter,Arial,Helvetica,sans-serif;color:#fff">
+  <body style="margin:0;padding:24px;background:linear-gradient(90deg,#2563eb,#4f46e5);font-family:Inter,Arial,Helvetica,sans-serif;color:#fff">
     <div style="max-width:560px;margin:0 auto;background:rgba(0,0,0,0.10);backdrop-filter:saturate(180%) blur(4px);border:1px solid rgba(255,255,255,0.15);border-radius:14px;overflow:hidden">
       <div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.12)">
         <strong style="font-size:16px">Confirmación de turno • ${negocioNombre}</strong>
