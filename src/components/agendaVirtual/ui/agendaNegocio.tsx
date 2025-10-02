@@ -373,6 +373,8 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise
             hora: turno.hora,
             motivo,
             negocioNombre: negocio.nombre,
+            slug: (negocio as any).slug,               // 👈 agrega tu slug
+    agendaUrl: (negocio as any).slug ? `/agenda/${(negocio as any).slug}` : undefined, // opcional
           }),
         });
 
