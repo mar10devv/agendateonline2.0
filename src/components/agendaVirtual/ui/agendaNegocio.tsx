@@ -353,28 +353,42 @@ const slots = useMemo(() => {
         .sort((a, b) => +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any))
     : [];
 
-    const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
+    // 🔴 Reemplaza todo tu handleEliminarTurno por este
+const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
   try {
-    // 1. Borrar de Firestore
+    // 1) Borrar de Firestore
     await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
 
-    // 2. Enviar mail al cliente (Netlify Function / backend)
+    // 2) Notificar por email al cliente (sólo si hay email)
     if (turno.clienteEmail) {
-      await fetch("/.netlify/functions/notificar-cancelacion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: turno.clienteEmail,
-          nombre: turno.clienteNombre,
-          servicio: turno.servicioNombre,
-          fecha: turno.fecha,
-          hora: turno.hora,
-          motivo,
-        }),
-      });
+      try {
+        const res = await fetch("/.netlify/functions/notificar-cancelacion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: turno.clienteEmail,
+            nombre: turno.clienteNombre,
+            servicio: turno.servicioNombre,
+            fecha: turno.fecha,
+            hora: turno.hora,
+            motivo,                      // ← texto personalizado o chip
+            negocioNombre: negocio.nombre,
+          }),
+        });
+
+        const txt = await res.text();
+        if (!res.ok) {
+          console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
+        } else {
+          console.log("✅ Mail de cancelación enviado:", txt);
+        }
+      } catch (err) {
+        console.error("❌ Error de red enviando el mail:", err);
+      }
     }
 
-    setModalEliminar({ visible: false, turno: null });
+    // 3) Cerrar modal y limpiar motivo
+    setModalEliminar({ visible: false, turno: null, motivo: "" });
   } catch (e) {
     console.error("❌ Error eliminando turno:", e);
   }
