@@ -299,40 +299,46 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
               Entendido
             </button>
 
-            {bloqueo.docPath && (
-              <button
-                onClick={async () => {
-                  if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-                  try {
-                    const refUser = docFromPath(bloqueo.docPath!);
-                    const snap = await getDoc(refUser);
-                    const data = snap.exists() ? (snap.data() as TurnoData) : null;
+           {bloqueo.docPath && (
+  <button
+    onClick={async () => {
+      if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+      try {
+        const refUser = docFromPath(bloqueo.docPath!);
+        const snap = await getDoc(refUser);
+        const data = snap.exists() ? (snap.data() as TurnoData) : null;
 
-                    await deleteDoc(refUser);
+        // ❌ Eliminar el turno en Usuarios/{uid}/Turnos
+        await deleteDoc(refUser);
 
-                    if (data?.negocioId && data?.turnoIdNegocio) {
-                      const refNeg = doc(
-                        db,
-                        "Negocios",
-                        data.negocioId,
-                        "Turnos",
-                        data.turnoIdNegocio
-                      );
-                      await deleteDoc(refNeg);
-                    }
+        // ❌ Eliminar también el turno en Negocios/{negocioId}/Turnos
+        if (data?.negocioId && data?.turnoIdNegocio) {
+          const refNeg = doc(
+            db,
+            "Negocios",
+            data.negocioId,
+            "Turnos",
+            data.turnoIdNegocio
+          );
+          await deleteDoc(refNeg);
+        }
 
-                    alert("Tu turno fue cancelado y el horario quedó libre.");
-                    onClose();
-                  } catch (err) {
-                    console.error("Error cancelando turno:", err);
-                    alert("Hubo un error al cancelar el turno.");
-                  }
-                }}
-                className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-              >
-                Cancelar turno
-              </button>
-            )}
+        // ✅ Resetear el estado de bloqueo para volver al flujo normal
+        setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
+        setPaso(1); // reiniciamos al paso inicial de elegir servicio
+
+        alert("Tu turno fue cancelado y el horario quedó libre.");
+      } catch (err) {
+        console.error("Error cancelando turno:", err);
+        alert("Hubo un error al cancelar el turno.");
+      }
+    }}
+    className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+  >
+    Cancelar turno
+  </button>
+)}
+
           </div>
         </div>
       )}
