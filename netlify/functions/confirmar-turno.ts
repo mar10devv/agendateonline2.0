@@ -14,15 +14,12 @@ function normalizePrivateKey(src?: string | null): string | undefined {
   if (!src) return undefined;
   let key = src.trim();
 
-  // Quitar comillas envolventes si las hay
   if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
     key = key.slice(1, -1);
   }
 
-  // Si vienen \n escapados -> convertirlos
   if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
 
-  // Si no parece PEM, intentar Base64
   if (!key.includes("BEGIN PRIVATE KEY") && !key.includes("BEGIN RSA PRIVATE KEY")) {
     try {
       const decoded = Buffer.from(key, "base64").toString("utf8");
@@ -30,14 +27,13 @@ function normalizePrivateKey(src?: string | null): string | undefined {
         key = decoded;
       }
     } catch {
-      // no era base64, seguimos igual
+      // no era base64
     }
   }
   return key;
 }
 
 function loadServiceAccount(): SA {
-  // Opción recomendada: TODO el JSON en una env BASE64
   const b64 = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (b64 && b64.trim()) {
     const json = Buffer.from(b64, "base64").toString("utf8");
@@ -45,18 +41,16 @@ function loadServiceAccount(): SA {
     if (!sa.project_id || !sa.client_email || !sa.private_key) {
       throw new Error("FIREBASE_SERVICE_ACCOUNT inválido: faltan campos");
     }
-    // normalizamos por las dudas
     sa.private_key = normalizePrivateKey(sa.private_key)!;
     return sa;
   }
 
-  // Alternativa: variables sueltas
   const project_id = process.env.FIREBASE_PROJECT_ID || "";
   const client_email = process.env.FIREBASE_CLIENT_EMAIL || "";
   const private_key = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY) || "";
 
   if (!project_id || !client_email || !private_key) {
-    throw new Error("Faltan credenciales Firebase (usa FIREBASE_SERVICE_ACCOUNT o las 3 env sueltas)");
+    throw new Error("Faltan credenciales Firebase");
   }
 
   return { project_id, client_email, private_key };
@@ -80,13 +74,12 @@ const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS, // App Password si tu Gmail tiene 2FA
+    pass: process.env.GMAIL_PASS,
   },
 });
 
 export const handler: Handler = async (event) => {
   try {
-    // GET de prueba: ?docPath=...
     if (event.httpMethod === "GET") {
       const url = new URL(event.rawUrl);
       const docPath = url.searchParams.get("docPath");
@@ -99,39 +92,15 @@ export const handler: Handler = async (event) => {
     }
 
     const { docPath } = JSON.parse(event.body || "{}");
-    console.log("📩 confirmar-turno: docPath =", docPath);
     if (!docPath) return { statusCode: 400, body: "Falta docPath" };
 
-    // Chequeo env sin exponer secretos
-    console.log("ENV check:", {
-      FIREBASE_SERVICE_ACCOUNT: !!process.env.FIREBASE_SERVICE_ACCOUNT,
-      FIREBASE_PROJECT_ID: !!process.env.FIREBASE_PROJECT_ID,
-      FIREBASE_CLIENT_EMAIL: !!process.env.FIREBASE_CLIENT_EMAIL,
-      FIREBASE_PRIVATE_KEY: !!process.env.FIREBASE_PRIVATE_KEY,
-      GMAIL_USER: !!process.env.GMAIL_USER,
-      GMAIL_PASS: !!process.env.GMAIL_PASS,
-    });
-
-    // Fuerza que Firestore esté OK (si la key está mal, falla acá)
     await db.listCollections();
-    console.log("✅ Firestore listo");
 
-    // 1) Traer turno
     const ref = db.doc(docPath);
     const snap = await ref.get();
     if (!snap.exists) return { statusCode: 404, body: "Turno no encontrado" };
     const t: any = snap.data() || {};
-    console.log("🧾 Turno:", {
-      negocioNombre: t.negocioNombre,
-      servicioNombre: t.servicioNombre,
-      empleadoNombre: t.empleadoNombre,
-      fecha: t.fecha,
-      hora: t.hora,
-      clienteEmail: t.clienteEmail ?? null,
-      clienteUid: t.clienteUid ?? null,
-    });
 
-    // 2) Resolver email del cliente
     let clienteEmail: string | undefined = t.clienteEmail;
     const clienteUid: string | undefined = t.clienteUid;
 
@@ -140,14 +109,10 @@ export const handler: Handler = async (event) => {
         const uSnap = await db.collection("Usuarios").doc(clienteUid).get();
         const u = uSnap.exists ? (uSnap.data() || {}) : {};
         clienteEmail = u.email || u.correo;
-        console.log("📬 email resuelto desde Usuarios:", clienteEmail ?? null);
-      } catch (e) {
-        console.warn("⚠️ No pude leer Usuarios/{uid}:", (e as any)?.message || e);
-      }
+      } catch {}
     }
 
     if (!clienteEmail) {
-      console.warn("⚠️ Sin email de cliente → no se envía.");
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: "Sin email de cliente",
@@ -156,12 +121,9 @@ export const handler: Handler = async (event) => {
       return { statusCode: 200, body: "Sin email. No se envió." };
     }
 
-    // 3) Verificar mailer
     try {
       await transporter.verify();
-      console.log("✅ Gmail transporter OK");
-    } catch (e) {
-      console.error("❌ transporter.verify:", (e as any)?.message || e);
+    } catch {
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: "Mailer no verificado",
@@ -170,16 +132,15 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, body: "Mailer no verificado" };
     }
 
-    // 4) Enviar
     const negocioNombre = t.negocioNombre || "Tu negocio";
     const servicioNombre = t.servicioNombre || "Servicio";
     const empleadoNombre = t.empleadoNombre || "Empleado";
     const fecha = t.fecha || "";
     const hora = t.hora || "";
 
-    const subject = `✅ Confirmación de turno – ${negocioNombre} (${fecha} ${hora})`;
+    const subject = `✅ Confirmación de turno${servicioNombre ? " • " + servicioNombre : ""} • ${negocioNombre}`;
     const text = `
-Hola! Tu turno fue confirmado.
+Hola! Tu turno fue confirmado ✅
 
 • Negocio: ${negocioNombre}
 • Servicio: ${servicioNombre}
@@ -190,19 +151,32 @@ Hola! Tu turno fue confirmado.
 Si necesitás reprogramar, respondé a este correo.
 `.trim();
 
-    const html = `
-<div style="font-family: Arial, sans-serif; line-height:1.5;">
-  <h2>✅ Tu turno fue confirmado</h2>
-  <p><b>Negocio:</b> ${negocioNombre}</p>
-  <p><b>Servicio:</b> ${servicioNombre}</p>
-  <p><b>Empleado:</b> ${empleadoNombre}</p>
-  <p><b>Fecha:</b> ${fecha} &nbsp;&nbsp; <b>Hora:</b> ${hora}</p>
-  <p style="margin-top:16px;">Si necesitás reprogramar, respondé a este correo.</p>
-</div>
-`.trim();
+    const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;background:linear-gradient(90deg,#22c55e,#16a34a);font-family:Inter,Arial,Helvetica,sans-serif;color:#fff">
+    <div style="max-width:560px;margin:0 auto;background:rgba(0,0,0,0.10);backdrop-filter:saturate(180%) blur(4px);border:1px solid rgba(255,255,255,0.15);border-radius:14px;overflow:hidden">
+      <div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.12)">
+        <strong style="font-size:16px">Confirmación de turno • ${negocioNombre}</strong>
+      </div>
+      <div style="padding:20px 20px 8px 20px;font-size:14px;line-height:1.6;color:#fff">
+        <p>Hola!</p>
+        <p>Tu turno fue <strong>confirmado con éxito ✅</strong></p>
+        <ul style="list-style:none;padding:0;margin:14px 0">
+          <li>• <strong>Servicio:</strong> ${servicioNombre}</li>
+          <li>• <strong>Empleado:</strong> ${empleadoNombre}</li>
+          <li>• <strong>Fecha:</strong> ${fecha}</li>
+          <li>• <strong>Hora:</strong> ${hora}</li>
+        </ul>
+        <p style="margin-top:16px">Si necesitás reprogramar, podés responder a este correo.</p>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.12);opacity:.9;font-size:12px;color:#fff">
+        ${negocioNombre}
+      </div>
+    </div>
+  </body>
+</html>`;
 
     try {
-      console.log("🚀 Enviando a:", clienteEmail, "asunto:", subject);
       await transporter.sendMail({
         from: `"${negocioNombre}" <${process.env.GMAIL_USER}>`,
         to: clienteEmail,
@@ -210,7 +184,6 @@ Si necesitás reprogramar, respondé a este correo.
         text,
         html,
       });
-      console.log("📤 Email ENVIADO a:", clienteEmail);
 
       await ref.update({
         emailConfirmacionEnviado: true,
@@ -219,7 +192,6 @@ Si necesitás reprogramar, respondé a este correo.
       });
       return { statusCode: 200, body: "OK: email enviado" };
     } catch (e) {
-      console.error("❌ sendMail:", (e as any)?.message || e);
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: String((e as any)?.message || e),
@@ -227,8 +199,7 @@ Si necesitás reprogramar, respondé a este correo.
       });
       return { statusCode: 500, body: "Error enviando confirmación" };
     }
-  } catch (err) {
-    console.error("❌ Error general confirmar-turno:", (err as any)?.message || err);
+  } catch {
     return { statusCode: 500, body: "Error interno" };
   }
 };
