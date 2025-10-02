@@ -24,7 +24,7 @@ type Empleado = {
     diasLibres?: number[];
   };
 };
-type Negocio = { id: string; nombre: string; empleadosData?: Empleado[] };
+type Negocio = { id: string; nombre: string; empleadosData?: Empleado[]; slug?: string }; // 👈 agrega slug
 
 type TurnoNegocio = {
   id: string;
@@ -354,7 +354,11 @@ const slots = useMemo(() => {
     : [];
 
     // 🔴 Reemplaza todo tu handleEliminarTurno por este
-const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise<boolean> => {
+// (Asegúrate de que el tipo Negocio tenga: slug?: string)
+const handleEliminarTurno = async (
+  turno: TurnoNegocio,
+  motivo: string
+): Promise<boolean> => {
   try {
     // 1) Borrar de Firestore
     await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
@@ -362,6 +366,14 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise
     // 2) Notificar por email al cliente (sólo si hay email)
     if (turno.clienteEmail) {
       try {
+        // URL absoluta para el link de la agenda en el email
+        const origin =
+          typeof window !== "undefined" && window.location?.origin
+            ? window.location.origin
+            : "";
+        const agendaUrl =
+          negocio.slug ? `${origin}/n/${negocio.slug}` : undefined; // ajusta la ruta si es distinta
+
         const res = await fetch("/.netlify/functions/notificar-cancelacion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -373,14 +385,18 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise
             hora: turno.hora,
             motivo,
             negocioNombre: negocio.nombre,
-            slug: (negocio as any).slug,               // 👈 agrega tu slug
-    agendaUrl: (negocio as any).slug ? `/agenda/${(negocio as any).slug}` : undefined, // opcional
+            slug: negocio.slug,
+            agendaUrl, // 👈 absoluta para que funcione en el cliente de correo
           }),
         });
 
         const txt = await res.text();
         if (!res.ok) {
-          console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
+          console.error(
+            "❌ No se pudo enviar el mail de cancelación:",
+            res.status,
+            txt
+          );
         } else {
           console.log("✅ Mail de cancelación enviado:", txt);
         }
@@ -389,14 +405,13 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise
       }
     }
 
-    // No cerrar acá: dejamos que el botón muestre "El turno fue eliminado"
+    // No cerramos acá: dejamos que el botón muestre "Se eliminó el turno"
     return true;
   } catch (e) {
     console.error("❌ Error eliminando turno:", e);
     return false;
   }
 };
-
 
 
   return (
