@@ -435,21 +435,22 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
       loop={true} // 🔄 carrusel infinito
       className="!w-full !h-auto custom-swiper pb-10"
       breakpoints={{
-        320: { slidesPerView: 3 },   // 📱 Mobile
-        640: { slidesPerView: 4 },   // 📲 Tablet
+        320: { slidesPerView: 2 },   // 📱 Mobile
+        640: { slidesPerView: 3 },   // 📲 Tablet
         1024: { slidesPerView: 4 },  // 💻 PC
       }}
     >
       {servicios.map((s, idx) => (
         <SwiperSlide key={s.id || idx} className="flex justify-center">
           <div className="flex flex-col justify-center items-center 
-                          w-32 h-24 bg-neutral-900 rounded-xl p-2 text-center">
-            <p className="font-medium text-white text-sm truncate w-full">
-              {s.servicio}
-            </p>
-            <span className="text-sm text-gray-400">${s.precio}</span>
-            <span className="text-xs text-gray-500">{s.duracion} min</span>
-          </div>
+                w-32 h-auto min-h-[96px] bg-neutral-900 rounded-xl p-2 text-center">
+  <p className="font-medium text-white text-sm text-center whitespace-normal break-words leading-tight">
+    {s.servicio}
+  </p>
+  <span className="text-sm text-gray-400">${s.precio}</span>
+  <span className="text-xs text-gray-500">{s.duracion} min</span>
+</div>
+
         </SwiperSlide>
       ))}
     </Swiper>
@@ -520,8 +521,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     }
   }}
 />
-
-
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
         <h2 className="text-lg font-semibold mb-4">Empleados</h2>
@@ -638,9 +637,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     negocio={negocio}
   />
 )}
-
-
-
 
 {/* Modal Agendarse */}
 {modalAgendarseAbierto && (
@@ -761,8 +757,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     <Phone className="w-4 h-4 text-white" />
   </a>
 </div>
-
-
 
   {/* Descripción editable */}
   <div className="mt-6 w-full px-2">
