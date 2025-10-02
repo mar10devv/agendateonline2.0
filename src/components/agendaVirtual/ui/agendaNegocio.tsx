@@ -355,6 +355,7 @@ const slots = useMemo(() => {
 
     // 🔴 Reemplaza todo tu handleEliminarTurno por este
 // (Asegúrate de que el tipo Negocio tenga: slug?: string)
+// ✅ Reemplazo de handleEliminarTurno (no construye agendaUrl en el cliente)
 const handleEliminarTurno = async (
   turno: TurnoNegocio,
   motivo: string
@@ -366,14 +367,6 @@ const handleEliminarTurno = async (
     // 2) Notificar por email al cliente (sólo si hay email)
     if (turno.clienteEmail) {
       try {
-        // URL absoluta para el link de la agenda en el email
-        const origin =
-          typeof window !== "undefined" && window.location?.origin
-            ? window.location.origin
-            : "";
-        const agendaUrl =
-          negocio.slug ? `${origin}/n/${negocio.slug}` : undefined; // ajusta la ruta si es distinta
-
         const res = await fetch("/.netlify/functions/notificar-cancelacion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -385,18 +378,14 @@ const handleEliminarTurno = async (
             hora: turno.hora,
             motivo,
             negocioNombre: negocio.nombre,
-            slug: negocio.slug,
-            agendaUrl, // 👈 absoluta para que funcione en el cliente de correo
+            // 👇 manda SOLO el slug; la función armará la URL absoluta
+            slug: negocio.slug ?? null,
           }),
         });
 
         const txt = await res.text();
         if (!res.ok) {
-          console.error(
-            "❌ No se pudo enviar el mail de cancelación:",
-            res.status,
-            txt
-          );
+          console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
         } else {
           console.log("✅ Mail de cancelación enviado:", txt);
         }
@@ -405,14 +394,12 @@ const handleEliminarTurno = async (
       }
     }
 
-    // No cerramos acá: dejamos que el botón muestre "Se eliminó el turno"
     return true;
   } catch (e) {
     console.error("❌ Error eliminando turno:", e);
     return false;
   }
 };
-
 
   return (
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">
