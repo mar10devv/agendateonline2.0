@@ -24,13 +24,17 @@ const MS_HORA = 60 * 60 * 1000;
 export const handler: Handler = async () => {
   try {
     const ahora = new Date();
+    console.log("⏰ Ejecutando recordatorios en:", ahora.toISOString());
 
-    // Ventanas de búsqueda
-    const win24Start = new Date(ahora.getTime() + 23.5 * MS_HORA);
-    const win24End   = new Date(ahora.getTime() + 24.5 * MS_HORA);
+    // Ventanas de búsqueda (más amplias para no perder turnos)
+    const win24Start = new Date(ahora.getTime() + 23 * MS_HORA);
+    const win24End   = new Date(ahora.getTime() + 25 * MS_HORA);
 
-    const win1hStart = new Date(ahora.getTime() + 0.9 * MS_HORA);
-    const win1hEnd   = new Date(ahora.getTime() + 1.1 * MS_HORA);
+    const win1hStart = new Date(ahora.getTime() + 50 * 60 * 1000); // 50 min
+    const win1hEnd   = new Date(ahora.getTime() + 70 * 60 * 1000); // 70 min
+
+    console.log("Ventana 24h:", win24Start.toISOString(), "-", win24End.toISOString());
+    console.log("Ventana 1h:", win1hStart.toISOString(), "-", win1hEnd.toISOString());
 
     /* -------- Recordatorio 24h -------- */
     const snap24 = await db
@@ -39,12 +43,18 @@ export const handler: Handler = async () => {
       .where("inicioTs", "<=", admin.firestore.Timestamp.fromDate(win24End))
       .get();
 
+    console.log("📌 Turnos encontrados para 24h:", snap24.size);
+
     for (const doc of snap24.docs) {
       const t = doc.data() as any;
       if (!t.inicioTs || !t.clienteEmail) continue;
-      if (t.email24Enviado) continue;
+      if (t.email24Enviado) {
+        console.log("⏭️ Ya se envió recordatorio 24h a:", t.clienteEmail);
+        continue;
+      }
 
       const fechaTurno = t.inicioTs.toDate();
+      console.log("➡️ Enviando recordatorio 24h a:", t.clienteEmail, fechaTurno);
 
       await transporter.sendMail({
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
@@ -69,12 +79,18 @@ export const handler: Handler = async () => {
       .where("inicioTs", "<=", admin.firestore.Timestamp.fromDate(win1hEnd))
       .get();
 
+    console.log("📌 Turnos encontrados para 1h:", snap1h.size);
+
     for (const doc of snap1h.docs) {
       const t = doc.data() as any;
       if (!t.inicioTs || !t.clienteEmail) continue;
-      if (t.email1hEnviado) continue;
+      if (t.email1hEnviado) {
+        console.log("⏭️ Ya se envió recordatorio 1h a:", t.clienteEmail);
+        continue;
+      }
 
       const fechaTurno = t.inicioTs.toDate();
+      console.log("➡️ Enviando recordatorio 1h a:", t.clienteEmail, fechaTurno);
 
       await transporter.sendMail({
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,

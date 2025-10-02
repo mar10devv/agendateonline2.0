@@ -436,7 +436,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
       className="!w-full !h-auto custom-swiper pb-10"
       breakpoints={{
         320: { slidesPerView: 2.5 },   // 📱 Mobile
-        640: { slidesPerView: 3 },   // 📲 Tablet
+        640: { slidesPerView: 3.5 },   // 📲 Tablet
         1024: { slidesPerView: 4 },  // 💻 PC
       }}
     >
