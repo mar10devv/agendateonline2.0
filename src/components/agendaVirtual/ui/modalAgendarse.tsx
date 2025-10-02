@@ -261,89 +261,141 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   if (!abierto) return null;
 
   return (
-    <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
-      {cargandoCheck && (
-        <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
-      )}
+  <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
+    {cargandoCheck && (
+      <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
+    )}
 
-      {!cargandoCheck && bloqueo.activo && (
-        <div className="p-4 space-y-3">
-          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
-            <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
-            <div className="text-amber-200 text-sm">
-              Día:{" "}
-              <b>
-                {bloqueo.inicio?.toLocaleDateString("es-ES", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </b>{" "}
-              a las{" "}
-              <b>
-                {bloqueo.inicio?.toLocaleTimeString("es-ES", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </b>
-              . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
-            >
-              Entendido
-            </button>
-
-           {bloqueo.docPath && (
-  <button
-    onClick={async () => {
-      if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-      try {
-        const refUser = docFromPath(bloqueo.docPath!);
-        const snap = await getDoc(refUser);
-        const data = snap.exists() ? (snap.data() as TurnoData) : null;
-
-        // ❌ Eliminar el turno en Usuarios/{uid}/Turnos
-        await deleteDoc(refUser);
-
-        // ❌ Eliminar también el turno en Negocios/{negocioId}/Turnos
-        if (data?.negocioId && data?.turnoIdNegocio) {
-          const refNeg = doc(
-            db,
-            "Negocios",
-            data.negocioId,
-            "Turnos",
-            data.turnoIdNegocio
-          );
-          await deleteDoc(refNeg);
-        }
-
-        // ✅ Resetear el estado de bloqueo para volver al flujo normal
-        setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
-        setPaso(1); // reiniciamos al paso inicial de elegir servicio
-
-        alert("Tu turno fue cancelado y el horario quedó libre.");
-      } catch (err) {
-        console.error("Error cancelando turno:", err);
-        alert("Hubo un error al cancelar el turno.");
-      }
-    }}
-    className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-  >
-    Cancelar turno
-  </button>
-)}
-
+    {/* 🔹 Si el usuario YA tiene turno reservado */}
+    {!cargandoCheck && bloqueo.activo && (
+      <div className="p-4 space-y-3">
+        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+          <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
+          <div className="text-amber-200 text-sm">
+            Día:{" "}
+            <b>
+              {bloqueo.inicio?.toLocaleDateString("es-ES", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </b>{" "}
+            a las{" "}
+            <b>
+              {bloqueo.inicio?.toLocaleTimeString("es-ES", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </b>
+            . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
           </div>
         </div>
-      )}
-    </ModalBase>
-  );
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+          >
+            Entendido
+          </button>
+
+          {bloqueo.docPath && (
+            <button
+              onClick={async () => {
+                if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+                try {
+                  const refUser = docFromPath(bloqueo.docPath!);
+                  const snap = await getDoc(refUser);
+                  const data = snap.exists() ? (snap.data() as TurnoData) : null;
+
+                  // ❌ Eliminar el turno en Usuarios/{uid}/Turnos
+                  await deleteDoc(refUser);
+
+                  // ❌ Eliminar también el turno en Negocios/{negocioId}/Turnos
+                  if (data?.negocioId && data?.turnoIdNegocio) {
+                    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", data.turnoIdNegocio);
+                    await deleteDoc(refNeg);
+                  }
+
+                  // ✅ Resetear estados
+                  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
+                  setPaso(1);
+                  setServicio(null);
+                  setEmpleado(null);
+                  setTurno(null);
+
+                  alert("Tu turno fue cancelado y el horario quedó libre.");
+                } catch (err) {
+                  console.error("Error cancelando turno:", err);
+                  alert("Hubo un error al cancelar el turno.");
+                }
+              }}
+              className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+            >
+              Cancelar turno
+            </button>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* 🔹 Si NO tiene turno reservado → mostrar flujo normal */}
+    {!cargandoCheck && !bloqueo.activo && (
+      <>
+        {paso === 1 && (
+          <PasoServicios
+            negocio={negocio}
+            onSelect={(s) => {
+              setServicio(s);
+              setPaso(2);
+            }}
+          />
+        )}
+
+        {paso === 2 && servicio && (
+          <PasoEmpleados
+            servicio={servicio}
+            negocio={negocio}
+            onSelect={(e) => {
+              setEmpleado(e);
+              setPaso(3);
+            }}
+            onBack={() => setPaso(1)}
+          />
+        )}
+
+        {paso === 3 && empleado && servicio && (
+          <PasoTurnos
+            negocio={negocio}
+            empleado={empleado}
+            servicio={servicio}
+            onSelect={(t) => {
+              setTurno(t);
+              setPaso(4);
+            }}
+            onBack={() => setPaso(2)}
+          />
+        )}
+
+        {paso === 4 && turno && servicio && empleado && (
+          <PasoConfirmacion
+            servicio={servicio}
+            empleado={empleado}
+            turno={turno}
+            negocio={negocio}
+            usuario={usuario}
+            onConfirm={() => setPaso(5)}
+            onBack={() => setPaso(3)}
+          />
+        )}
+
+        {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
+      </>
+    )}
+  </ModalBase>
+);
+
 }
 
 
