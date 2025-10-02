@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   deleteDoc,
+  setDoc,
   Firestore
 } from "firebase/firestore";
 import type { DocumentReference, DocumentData } from "firebase/firestore"; // ✅ Import solo de tipos
@@ -611,109 +612,81 @@ function PasoConfirmacion({
   const [cargando, setCargando] = useState(false);
 
   const guardarTurno = async () => {
-    try {
-      setCargando(true); // 🔹 activamos loader
+  try {
+    setCargando(true);
 
-      const auth = getAuth();
-      const u = auth.currentUser;
-      let uInfo = {
-        uid: u?.uid ?? usuario?.uid ?? null,
-        email: u?.email ?? usuario?.email ?? null,
-        nombre: u?.displayName ?? null,
-      };
+    const auth = getAuth();
+    const u = auth.currentUser;
+    let uInfo = {
+      uid: u?.uid ?? usuario?.uid ?? null,
+      email: u?.email ?? usuario?.email ?? null,
+      nombre: u?.displayName ?? null,
+    };
 
-      // 🔎 Buscar datos extra en Firestore si faltan
-      if (uInfo.uid) {
-        const userDoc = await getDoc(doc(db, "Usuarios", uInfo.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (!uInfo.email && data.email) uInfo.email = data.email;
-          if (!uInfo.nombre && data.nombre) uInfo.nombre = data.nombre;
-        }
+    // 🔎 Buscar datos extra en Firestore si faltan
+    if (uInfo.uid) {
+      const userDoc = await getDoc(doc(db, "Usuarios", uInfo.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (!uInfo.email && data.email) uInfo.email = data.email;
+        if (!uInfo.nombre && data.nombre) uInfo.nombre = data.nombre;
       }
-
-      // 🔁 Re-verificación ANTES de guardar
-      const bloqueo = await verificarTurnoActivoPorUsuarioYNegocio(
-        negocio.id,
-        uInfo
-      );
-      if (bloqueo.activo) {
-        alert(
-          `Ya tienes un turno reservado el ${bloqueo.inicio?.toLocaleDateString(
-            "es-ES"
-          )} a las ${bloqueo.inicio?.toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}.`
-        );
-        setCargando(false);
-        return;
-      }
-
-      // Calculamos inicio/fin y guardamos esos campos (inicioTs/finTs)
-      const fechaStr = turno.fecha.toISOString().split("T")[0]; // "YYYY-MM-DD"
-      const inicio = combinarFechaHora(turno.fecha, turno.hora);
-      const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
-
-      // 1) Guardar en negocio
-      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
-      const docRef = await addDoc(refNeg, {
-        negocioId: negocio.id,
-        negocioNombre: negocio.nombre,
-        servicioId: servicio.id,
-        servicioNombre: servicio.servicio,
-        duracion: servicio.duracion,
-        empleadoId: empleado.id || null,
-        empleadoNombre: empleado.nombre,
-        fecha: fechaStr,
-        hora: turno.hora,
-        inicioTs: inicio,
-        finTs: fin,
-        
-        clienteUid: uInfo.uid,
-        clienteEmail: uInfo.email,
-        clienteNombre: uInfo.nombre,
-        creadoEn: new Date(),
-        emailConfirmacionEnviado: false,
-        email24Enviado: false,
-        email1hEnviado: false,
-      });
-
-      // 🔹 LLAMAR a la función Netlify para enviar mail
-      await fetch("/.netlify/functions/confirmar-turno", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ docPath: docRef.path }),
-      });
-
-      // 2) Guardar COPIA en Usuarios/{uid}/Turnos
-      if (uInfo.uid) {
-        const refUserTurns = collection(db, "Usuarios", uInfo.uid, "Turnos");
-        await addDoc(refUserTurns, {
-          negocioId: negocio.id,
-          negocioNombre: negocio.nombre,
-          turnoIdNegocio: docRef.id,
-          servicioId: servicio.id,
-          servicioNombre: servicio.servicio,
-          duracion: servicio.duracion,
-          empleadoId: empleado.id || null,
-          empleadoNombre: empleado.nombre,
-          fecha: fechaStr,
-          hora: turno.hora,
-          inicioTs: inicio,
-          finTs: fin,
-          creadoEn: new Date(),
-        });
-      }
-
-      onConfirm();
-    } catch (err) {
-      console.error("❌ Error guardando turno:", err);
-      alert("Hubo un error al guardar el turno. Intenta de nuevo.");
-    } finally {
-      setCargando(false); // 🔹 apagamos loader siempre
     }
-  };
+
+    // Calculamos inicio/fin
+    const fechaStr = turno.fecha.toISOString().split("T")[0];
+    const inicio = combinarFechaHora(turno.fecha, turno.hora);
+    const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
+
+    // 1️⃣ Generar un ID único
+    const refNeg = doc(collection(db, "Negocios", negocio.id, "Turnos"));
+    const turnoId = refNeg.id;
+
+    const dataFinal = {
+      negocioId: negocio.id,
+      negocioNombre: negocio.nombre,
+      servicioId: servicio.id,
+      servicioNombre: servicio.servicio,
+      duracion: servicio.duracion,
+      empleadoId: empleado.id || null,
+      empleadoNombre: empleado.nombre,
+      fecha: fechaStr,
+      hora: turno.hora,
+      inicioTs: inicio,
+      finTs: fin,
+
+      clienteUid: uInfo.uid,
+      clienteEmail: uInfo.email,
+      clienteNombre: uInfo.nombre,
+      creadoEn: new Date(),
+      emailConfirmacionEnviado: false,
+      email24Enviado: false,
+      email1hEnviado: false,
+    };
+
+    // 2️⃣ Guardar en negocio
+    await setDoc(refNeg, dataFinal);
+
+    // 3️⃣ Guardar en usuario con el mismo ID
+    if (uInfo.uid) {
+      await setDoc(doc(db, "Usuarios", uInfo.uid, "Turnos", turnoId), dataFinal);
+    }
+
+    // 4️⃣ Enviar confirmación
+    await fetch("/.netlify/functions/confirmar-turno", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docPath: refNeg.path }),
+    });
+
+    onConfirm();
+  } catch (err) {
+    console.error("❌ Error guardando turno:", err);
+    alert("Hubo un error al guardar el turno. Intenta de nuevo.");
+  } finally {
+    setCargando(false);
+  }
+};
 
   return (
     <div>
