@@ -49,7 +49,13 @@ type Props = {
 };
 
 // ✅ Tipo consistente para el bloqueo
-type Bloqueo = { activo: boolean; inicio: Date | null; fin: Date | null };
+type Bloqueo = { 
+  activo: boolean; 
+  inicio: Date | null; 
+  fin: Date | null; 
+  docPath?: string | null;
+};
+
 
 /* -------------------- HELPERS -------------------- */
 function toDateSafe(f: any): Date {
@@ -108,14 +114,18 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
   const ahora = new Date();
   let inicioSel: Date | null = null;
   let finSel: Date | null = null;
+let docPathSel: string | null = null;
 
-  const pick = (inicio: Date, fin: Date) => {
-    if (fin <= ahora) return;
-    if (!inicioSel || inicio < inicioSel) {
-      inicioSel = inicio;
-      finSel = fin;
-    }
-  };
+
+const pick = (inicio: Date, fin: Date, docPath: string) => {
+  if (fin <= ahora) return;
+  if (!inicioSel || inicio < inicioSel) {
+    inicioSel = inicio;
+    finSel = fin;
+    docPathSel = docPath;
+  }
+};
+
 
   // --- 1) Usuarios/{uid}/Turnos: intento con where("finTs", ">", now) ---
   try {
@@ -138,10 +148,19 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
         const par = calcularInicioFinDesdeDoc(t);
         if (!par) return;
         if (t.negocioId && t.negocioId !== negocioId) return; // si viene marcado por otro negocio
-        pick(par.inicio, par.fin);
+        pick(par.inicio, par.fin, doc.ref.path);
+
       });
     }
-    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+ if (inicioSel && finSel) {
+  return {
+    activo: true,
+    inicio: inicioSel,
+    fin: finSel,
+    docPath: docPathSel,
+  };
+}
+
 
     // Fallback: leer todo y calcular (por si no hay finTs)
     const allSnap = await getDocs(refUser);
@@ -150,9 +169,18 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
       if (t.negocioId && t.negocioId !== negocioId) return;
       const par = calcularInicioFinDesdeDoc(t);
       if (!par) return;
-      pick(par.inicio, par.fin);
+      pick(par.inicio, par.fin, doc.ref.path);
+
     });
-    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+    if (inicioSel && finSel) {
+  return {
+    activo: true,
+    inicio: inicioSel,
+    fin: finSel,
+    docPath: docPathSel,
+  };
+}
+
   } catch {
     // seguimos con negocio
   }
@@ -177,15 +205,25 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
         const t = doc.data();
         const par = calcularInicioFinDesdeDoc(t);
         if (!par) return;
-        pick(par.inicio, par.fin);
+        pick(par.inicio, par.fin, doc.ref.path);
+
       });
     }
-    if (inicioSel && finSel) return { activo: true, inicio: inicioSel, fin: finSel };
+    if (inicioSel && finSel) {
+  return {
+    activo: true,
+    inicio: inicioSel,
+    fin: finSel,
+    docPath: docPathSel,
+  };
+}
+
   } catch {
     // nada
   }
 
-  return { activo: false, inicio: null, fin: null };
+  return { activo: false, inicio: null, fin: null, docPath: null };
+
 }
 
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
