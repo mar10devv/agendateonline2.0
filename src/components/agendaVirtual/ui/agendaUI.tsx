@@ -709,6 +709,12 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   )}
 </div>
 
+{/* Nombre y slug */}
+<div className="mt-4">
+  <p className="text-lg font-semibold">{nombreNegocio}</p>
+
+</div>
+
 <div className="mt-6 flex items-center justify-center gap-4">
   <a
     href={redes?.instagram || "#"}
