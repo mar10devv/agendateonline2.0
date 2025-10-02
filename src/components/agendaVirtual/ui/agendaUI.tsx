@@ -588,6 +588,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
           id: negocio.id,
           nombre: negocio.nombre,
           empleadosData: empleadosState || empleados || [],
+          slug: negocio.slug, 
         }}
       />
     </div>

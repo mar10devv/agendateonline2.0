@@ -354,8 +354,7 @@ const slots = useMemo(() => {
     : [];
 
     // 🔴 Reemplaza todo tu handleEliminarTurno por este
-// (Asegúrate de que el tipo Negocio tenga: slug?: string)
-// ✅ Reemplazo de handleEliminarTurno (no construye agendaUrl en el cliente)
+// ✅ Versión robusta: envía slug + agendaUrl absoluta y loguea el payload
 const handleEliminarTurno = async (
   turno: TurnoNegocio,
   motivo: string
@@ -364,23 +363,34 @@ const handleEliminarTurno = async (
     // 1) Borrar de Firestore
     await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
 
-    // 2) Notificar por email al cliente (sólo si hay email)
+    // 2) Notificar por email al cliente (solo si hay email)
     if (turno.clienteEmail) {
       try {
+        const origin =
+          typeof window !== "undefined" && window.location?.origin
+            ? window.location.origin
+            : "";
+
+        const payload = {
+          email: turno.clienteEmail,
+          nombre: turno.clienteNombre,
+          servicio: turno.servicioNombre,
+          fecha: turno.fecha,
+          hora: turno.hora,
+          motivo,
+          negocioNombre: negocio.nombre,
+          slug: negocio.slug ?? null, // 👈 puede venir undefined si el padre no lo pasó
+          // 👇 respaldo: URL absoluta por si slug llega vacío
+          agendaUrl:
+            negocio.slug && origin ? `${origin}/agenda/${negocio.slug}` : undefined,
+        };
+
+        console.log("[frontend] notificar-cancelacion payload →", payload);
+
         const res = await fetch("/.netlify/functions/notificar-cancelacion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: turno.clienteEmail,
-            nombre: turno.clienteNombre,
-            servicio: turno.servicioNombre,
-            fecha: turno.fecha,
-            hora: turno.hora,
-            motivo,
-            negocioNombre: negocio.nombre,
-            // 👇 manda SOLO el slug; la función armará la URL absoluta
-            slug: negocio.slug ?? null,
-          }),
+          body: JSON.stringify(payload),
         });
 
         const txt = await res.text();
