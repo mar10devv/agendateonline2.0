@@ -9,7 +9,8 @@ import {
   query,
   where,
   doc,      // 👈 agregado
-  getDoc,   // 👈 agregado
+  getDoc, 
+  deleteDoc,    // 👈 agregado
 } from "firebase/firestore";
 
 // al inicio de ModalAgendarse:
@@ -290,40 +291,63 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
       )}
 
       {!cargandoCheck && bloqueo.activo && (
-        <div className="p-4 space-y-3">
-          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
-            <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
-            <div className="text-amber-200 text-sm">
-              Día:{" "}
-              <b>
-                {bloqueo.inicio?.toLocaleDateString("es-ES", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </b>{" "}
-              a las{" "}
-              <b>
-                {bloqueo.inicio?.toLocaleTimeString("es-ES", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </b>
-              . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
-            </div>
-          </div>
+  <div className="p-4 space-y-3">
+    <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+      <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
+      <div className="text-amber-200 text-sm">
+        Día:{" "}
+        <b>
+          {bloqueo.inicio?.toLocaleDateString("es-ES", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </b>{" "}
+        a las{" "}
+        <b>
+          {bloqueo.inicio?.toLocaleTimeString("es-ES", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </b>
+        . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
+      </div>
+    </div>
 
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
+    <div className="flex justify-end gap-3">
+      <button
+        onClick={onClose}
+        className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+      >
+        Entendido
+      </button>
+
+      {bloqueo.docPath && (
+        <button
+          onClick={async () => {
+            if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+            try {
+              if (bloqueo.docPath) {
+  await deleteDoc(doc(db, bloqueo.docPath as string));
+}
+
+              alert("Tu turno fue cancelado.");
+              onClose();
+            } catch (err) {
+              console.error("Error cancelando turno:", err);
+              alert("Hubo un error al cancelar el turno.");
+            }
+          }}
+          className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+        >
+          Cancelar turno
+        </button>
       )}
+    </div>
+  </div>
+)}
+
 
       {/* Flujo original SOLO si no hay bloqueo */}
       {!cargandoCheck && !bloqueo.activo && (
