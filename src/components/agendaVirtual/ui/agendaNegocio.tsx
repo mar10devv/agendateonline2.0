@@ -138,8 +138,8 @@ const [modalEliminar, setModalEliminar] = useState<{
   visible: boolean;
   turno?: TurnoNegocio | null;
   motivo?: string;
-}>({ visible: false, turno: null, motivo: "" });
-
+  estado?: "idle" | "loading" | "success" | "error";
+}>({ visible: false, turno: null, motivo: "", estado: "idle" });
 
 
   // ⛔️ NO abrir horarios automáticamente
@@ -354,7 +354,7 @@ const slots = useMemo(() => {
     : [];
 
     // 🔴 Reemplaza todo tu handleEliminarTurno por este
-const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
+const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string): Promise<boolean> => {
   try {
     // 1) Borrar de Firestore
     await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
@@ -371,7 +371,7 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
             servicio: turno.servicioNombre,
             fecha: turno.fecha,
             hora: turno.hora,
-            motivo,                      // ← texto personalizado o chip
+            motivo,
             negocioNombre: negocio.nombre,
           }),
         });
@@ -387,12 +387,14 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
       }
     }
 
-    // 3) Cerrar modal y limpiar motivo
-    setModalEliminar({ visible: false, turno: null, motivo: "" });
+    // No cerrar acá: dejamos que el botón muestre "El turno fue eliminado"
+    return true;
   } catch (e) {
     console.error("❌ Error eliminando turno:", e);
+    return false;
   }
 };
+
 
 
   return (
@@ -573,6 +575,7 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
           )}
         </div>
       </div>
+      
 {/* Modal detalle de turno (se abre al tocar un slot rojo) */}
 {detalles && (
   <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
@@ -620,7 +623,7 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
         {!detalles.bloqueado && (
           <button
             onClick={() => {
-              setModalEliminar({ visible: true, turno: detalles, motivo: "" });
+              setModalEliminar({ visible: true, turno: detalles, motivo: "", estado: "idle" });
               setDetalles(null);
               setClienteExtra(null);
             }}
@@ -639,7 +642,10 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
   <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-6">
     <div
       className="absolute inset-0 bg-black/60"
-      onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "" })}
+      onClick={() => {
+        if (modalEliminar.estado === "loading") return; // no cerrar mientras carga
+        setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" });
+      }}
     />
     <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
       <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
@@ -661,13 +667,14 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
               <button
                 key={m}
                 type="button"
-                onClick={() =>
-                  setModalEliminar((s) => ({ ...s, motivo: m }))
-                }
+                disabled={modalEliminar.estado === "loading"}
+                onClick={() => setModalEliminar((s) => ({ ...s, motivo: m }))}
                 className={`px-3 py-1.5 rounded-full text-xs border transition
-                  ${activo
-                    ? "bg-indigo-600 text-white border-indigo-500"
-                    : "bg-neutral-800 text-gray-200 border-neutral-700 hover:bg-neutral-700"}`}
+                  ${
+                    activo
+                      ? "bg-indigo-600 text-white border-indigo-500"
+                      : "bg-neutral-800 text-gray-200 border-neutral-700 hover:bg-neutral-700"
+                  } ${modalEliminar.estado === "loading" ? "opacity-60 cursor-not-allowed" : ""}`}
                 title={m}
               >
                 {m}
@@ -685,6 +692,7 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
         rows={3}
         placeholder="Ej. El empleado no podrá asistir"
         value={modalEliminar.motivo || ""}
+        disabled={modalEliminar.estado === "loading"}
         onChange={(e) =>
           setModalEliminar((s) => ({
             ...s,
@@ -695,25 +703,69 @@ const handleEliminarTurno = async (turno: TurnoNegocio, motivo: string) => {
 
       <div className="flex justify-end gap-2">
         <button
-          onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "" })}
-          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+          onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" })}
+          disabled={modalEliminar.estado === "loading"}
+          className={`px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 ${
+            modalEliminar.estado === "loading" ? "opacity-60 cursor-not-allowed" : ""
+          }`}
         >
           Cancelar
         </button>
 
+        {/* Botón rojo con loader y estados */}
         <button
-          onClick={() => {
+          onClick={async () => {
+            if (modalEliminar.estado === "loading") return;
+
+            setModalEliminar((s) => ({ ...s, estado: "loading" }));
+
             const motivo = (modalEliminar.motivo || "").trim();
-            handleEliminarTurno(modalEliminar.turno!, motivo);
+            const ok = await handleEliminarTurno(modalEliminar.turno!, motivo);
+
+            if (ok) {
+              setModalEliminar((s) => ({ ...s, estado: "success" }));
+              setTimeout(() => {
+                setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" });
+              }, 1200);
+            } else {
+              setModalEliminar((s) => ({ ...s, estado: "error" }));
+            }
           }}
-          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+          disabled={
+            modalEliminar.estado === "loading" ||
+            (modalEliminar.motivo || "").trim().length === 0
+          }
+          aria-busy={modalEliminar.estado === "loading"}
+          className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
+            ${
+              modalEliminar.estado === "success"
+                ? "bg-emerald-600"
+                : modalEliminar.estado === "loading"
+                ? "bg-red-600 cursor-wait"
+                : modalEliminar.estado === "error"
+                ? "bg-red-700"
+                : "bg-red-600 hover:bg-red-700"
+            }`}
         >
-          Eliminar turno
+          {modalEliminar.estado === "loading" && (
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"></path>
+            </svg>
+          )}
+          {modalEliminar.estado === "success"
+            ? "Se eliminó el turno"
+            : modalEliminar.estado === "loading"
+            ? "Eliminando turno…"
+            : modalEliminar.estado === "error"
+            ? "Error. Reintentar"
+            : "Eliminar turno"}
         </button>
       </div>
     </div>
   </div>
 )}
+
 
 
 
