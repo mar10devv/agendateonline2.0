@@ -15,8 +15,11 @@ import LoaderAgenda from "../ui/loaderAgenda"; // 👈 tu loader
 type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente";
 
-export default function AgendaVirtual() {
-  const slug = window.location.pathname.split("/")[2];
+type Props = {
+  slug: string; // 👈 ahora el componente recibe el slug
+};
+
+export default function AgendaVirtual({ slug }: Props) {
   const [estado, setEstado] = useState<Estado>("cargando");
   const [modo, setModo] = useState<Modo>("cliente");
   const [negocio, setNegocio] = useState<Negocio | null>(null);
@@ -47,10 +50,7 @@ export default function AgendaVirtual() {
   if (estado === "cargando") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white gap-6">
-        {/* Loader con animación */}
         <LoaderAgenda />
-
-        {/* Texto debajo del logo */}
         <p className="text-lg font-medium animate-pulse">
           Cargando agenda...
         </p>

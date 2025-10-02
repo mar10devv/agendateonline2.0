@@ -1,18 +1,51 @@
 ---
-// src/pages/enlace/[slug].astro
-export const prerender = false; // 🚀 evita el error de getStaticPaths
+export const prerender = false;
 import AgendaVirtual from "../../components/agendaVirtual/agendaVirtual";
 import "../../styles/global.css";
+
+const { slug } = Astro.params;
 ---
 
 <html lang="es">
   <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agenda</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>{slug} | AgendateOnline</title>
+
+    <!-- SEO -->
+    <meta
+      name="description"
+      content={`Reservá turnos online en ${slug} con AgendateOnline. Agenda rápida, fácil y gratuita para clientes y negocios.`}
+    />
+    <meta
+      name="keywords"
+      content={`agenda online, turnos, reservas, citas, ${slug}, agendateonline`}
+    />
+    <meta name="robots" content="index, follow" />
+
+    <!-- OpenGraph -->
+    <meta property="og:title" content={`${slug} | AgendateOnline`} />
+    <meta
+      property="og:description"
+      content={`Reservá tu turno online en ${slug} con AgendateOnline. Agenda fácil, rápida y gratuita.`}
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={`https://agendateonline.com/agenda/${slug}`} />
+    <meta property="og:image" content="https://agendateonline.com/banner-default.webp" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${slug} | AgendateOnline`} />
+    <meta
+      name="twitter:description"
+      content={`Reservá turnos online en ${slug} con AgendateOnline.`}
+    />
+    <meta name="twitter:image" content="https://agendateonline.com/banner-default.webp" />
   </head>
   <body class="bg-black text-white">
     <main class="w-full flex justify-center">
-      <AgendaVirtual client:only="react" />
+      <AgendaVirtual client:only="react" slug={slug!} />
     </main>
   </body>
 </html>
