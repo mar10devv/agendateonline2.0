@@ -7,3 +7,7 @@
 
 [[blobs]]
   name = "mp_tokens"
+
+# 🚀 Scheduler para recordatorios
+[functions."recordatorios"]
+  schedule = "*/15 * * * *"
