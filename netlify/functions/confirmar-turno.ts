@@ -135,6 +135,7 @@ export const handler: Handler = async (event) => {
     const empleadoNombre = t.empleadoNombre || "Empleado";
     const fecha = t.fecha || "";
     const hora = t.hora || "";
+    const slug = t.slugNegocio || negocioNombre.replace(/\s+/g, "-").toLowerCase();
 
     const subject = `✅ Confirmación de turno${servicioNombre ? " • " + servicioNombre : ""} • ${negocioNombre}`;
     const text = `
@@ -146,7 +147,7 @@ Hola! Tu turno fue confirmado ✅
 • Fecha: ${fecha}
 • Hora: ${hora}
 
-Si necesitás reprogramar, respondé a este correo.
+Si necesitás cancelar tu turno entrá en https://agendateonline.com/agenda/${slug}
 `.trim();
 
     const html = `<!doctype html>
@@ -165,7 +166,13 @@ Si necesitás reprogramar, respondé a este correo.
           <li>• <strong>Fecha:</strong> ${fecha}</li>
           <li>• <strong>Hora:</strong> ${hora}</li>
         </ul>
-        <p style="margin-top:16px">Si necesitás reprogramar, podés responder a este correo.</p>
+        <p style="margin-top:16px">Si necesitás <b>cancelar tu turno</b>, podés hacerlo aquí:</p>
+        <p style="text-align:center;margin:20px 0;">
+          <a href="https://agendateonline.com/agenda/${slug}" 
+             style="display:inline-block;background:#ef4444;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">
+            Cancelar turno
+          </a>
+        </p>
       </div>
       <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.12);opacity:.9;font-size:12px;color:#fff">
         ${negocioNombre}
