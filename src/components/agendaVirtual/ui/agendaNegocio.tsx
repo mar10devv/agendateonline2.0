@@ -360,8 +360,18 @@ const handleEliminarTurno = async (
   motivo: string
 ): Promise<boolean> => {
   try {
-    // 1) Borrar de Firestore
-    await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
+    // 1) Borrar en negocio
+await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
+
+// 2) Borrar en cliente (si hay UID)
+if (turno.clienteUid) {
+  try {
+    await deleteDoc(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
+    console.log("✅ Turno borrado también del cliente");
+  } catch (err) {
+    console.error("❌ No se pudo borrar el turno del cliente:", err);
+  }
+}
 
     // 2) Notificar por email al cliente (solo si hay email)
     if (turno.clienteEmail) {
