@@ -32,7 +32,7 @@ type Props = {
     slug?: string;
     nombreArchivoLogo?: string;
     tamanioArchivoLogo?: number;
-  }) => Promise<void> | void;
+  }) => void;
 };
 
 export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: Props) {
@@ -45,9 +45,6 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   const [nombre, setNombre] = useState("");
   const [nombreArchivo, setNombreArchivo] = useState("");
   const [tamanioArchivo, setTamanioArchivo] = useState(0);
-
-  // 👇 estado del botón: idle | guardando | exito
-  const [estadoGuardar, setEstadoGuardar] = useState<"idle" | "guardando" | "exito">("idle");
 
   // 🔄 Sincronizar con negocio cada vez que abre el modal
   useEffect(() => {
@@ -91,38 +88,44 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   };
 
   const handleGuardar = async () => {
-    try {
-      setEstadoGuardar("guardando");
-
-      let nuevoSlug = negocio.slug;
-      if (nombre !== negocio.nombre) {
-        nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
-      }
-
-      await onGuardar({
-        perfilLogo: logo,
-        descripcion,
-        redes: { instagram, facebook, telefono },
-        nombre,
-        slug: nuevoSlug,
-        nombreArchivoLogo: nombreArchivo,
-        tamanioArchivoLogo: tamanioArchivo,
-      });
-
-      setEstadoGuardar("exito");
-
-      // volver a "idle" después de 2s
-      setTimeout(() => setEstadoGuardar("idle"), 2000);
-
-      if (nuevoSlug !== negocio.slug) {
-        window.location.href = `/agenda/${nuevoSlug}`;
-      }
-    } catch (err) {
-      console.error("❌ Error al guardar nombre/slug:", err);
-      alert("No se pudo actualizar el perfil");
-      setEstadoGuardar("idle");
+  let nuevoSlug = negocio.slug;
+  try {
+    // 👉 Si el nombre cambió → actualiza nombre + slug
+    if (nombre !== negocio.nombre) {
+      nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
     }
-  };
+
+    // 👉 Guardar otros cambios
+    await onGuardar({
+      perfilLogo: logo,
+      descripcion,
+      redes: { instagram, facebook, telefono },
+      nombre,
+      slug: nuevoSlug,
+      nombreArchivoLogo: nombreArchivo,
+      tamanioArchivoLogo: tamanioArchivo,
+    });
+
+    // 👉 Mostrar éxito (puede ser un toast o cerrar modal)
+    console.log("✅ Perfil actualizado correctamente");
+    onCerrar();
+
+    // 👉 Redirigir SOLO si el slug cambió
+    if (nuevoSlug !== negocio.slug) {
+      window.location.href = `/agenda/${nuevoSlug}`;
+    }
+  } catch (err: any) {
+    console.error("❌ Error en handleGuardar:", err);
+
+    // Diferenciar errores
+    if (err.message?.includes("Ya existe")) {
+      alert("❌ Ya existe un negocio con ese nombre/slug");
+    } else {
+      alert("❌ No se pudo guardar los cambios, intenta nuevamente");
+    }
+  }
+};
+
 
   return (
     <ModalGenerico
@@ -209,23 +212,11 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
           />
         </div>
 
-        {/* Botón guardar dinámico */}
         <button
           onClick={handleGuardar}
-          disabled={estadoGuardar === "guardando"}
-          className={`px-4 py-2 rounded font-medium transition flex items-center justify-center gap-2
-            ${estadoGuardar === "idle" ? "bg-indigo-600 hover:bg-indigo-700 text-white" : ""}
-            ${estadoGuardar === "guardando" ? "bg-gray-600 text-gray-200 cursor-not-allowed" : ""}
-            ${estadoGuardar === "exito" ? "bg-green-600 text-white" : ""}`}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
         >
-          {estadoGuardar === "guardando" && (
-            <>
-              <LoaderSpinner size={18} color="white" />
-              Guardando...
-            </>
-          )}
-          {estadoGuardar === "exito" && "✅ Se guardó correctamente"}
-          {estadoGuardar === "idle" && "Guardar cambios"}
+          Guardar cambios
         </button>
       </div>
     </ModalGenerico>

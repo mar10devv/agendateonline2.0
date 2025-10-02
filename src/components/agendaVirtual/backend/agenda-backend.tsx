@@ -13,6 +13,9 @@ import {
   getDocs,
   updateDoc,
   addDoc,
+  getDoc,
+  setDoc,
+  deleteDoc,
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
@@ -411,7 +414,6 @@ export async function actualizarNombreNegocio(
   await updateDoc(negocioRef, { nombre: nuevoNombre });
 }
 
-// ✏️ Actualizar nombre + slug
 export async function actualizarNombreYSlug(
   slugActual: string,
   nuevoNombre: string
@@ -422,25 +424,30 @@ export async function actualizarNombreYSlug(
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9\-]/g, "");
 
-  const existeSnap = await getDocs(
-    query(collection(db, "Negocios"), where("slug", "==", nuevoSlug))
-  );
-  if (!existeSnap.empty) {
-    throw new Error("❌ Ya existe un negocio con ese nombre/slug.");
-  }
-
+  // 👉 Buscar el doc actual por slugActual
   const negocioDocs = await getDocs(
     query(collection(db, "Negocios"), where("slug", "==", slugActual))
   );
   if (negocioDocs.empty) throw new Error("❌ Negocio no encontrado");
 
   const negocioId = negocioDocs.docs[0].id;
-  const negocioRef = doc(db, "Negocios", negocioId);
 
+  // 👉 Verificar si ya existe otro negocio con ese nuevo slug
+  const existeSnap = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", nuevoSlug))
+  );
+  if (!existeSnap.empty && existeSnap.docs[0].id !== negocioId) {
+    throw new Error("❌ Ya existe otro negocio con ese slug.");
+  }
+
+  // 👉 Actualizar el doc actual
+  const negocioRef = doc(db, "Negocios", negocioId);
   await updateDoc(negocioRef, {
     nombre: nuevoNombre,
     slug: nuevoSlug,
   });
 
+  // ✅ Devolvemos el nuevo slug (sin intentar buscar de nuevo)
   return nuevoSlug;
 }
+

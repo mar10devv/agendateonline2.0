@@ -1,4 +1,3 @@
-// src/components/agendaVirtual/agendaVirtual.tsx
 import { useEffect, useState } from "react";
 import {
   detectarUsuario,
@@ -16,7 +15,7 @@ type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente";
 
 type Props = {
-  slug: string; // 👈 ahora el componente recibe el slug
+  slug: string;
 };
 
 export default function AgendaVirtual({ slug }: Props) {
@@ -46,7 +45,13 @@ export default function AgendaVirtual({ slug }: Props) {
     });
   }, [slug, fechaSeleccionada]);
 
-  // 👇 Pantalla de carga
+  // 🔹 👉 ACTUALIZAR <title> dinámicamente con el nombre real
+  useEffect(() => {
+    if (negocio?.nombre) {
+      document.title = `${negocio.nombre} | AgendateOnline`;
+    }
+  }, [negocio]);
+
   if (estado === "cargando") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white gap-6">

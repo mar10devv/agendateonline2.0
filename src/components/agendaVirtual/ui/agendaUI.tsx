@@ -486,46 +486,41 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   negocio={{ ...negocio, redes }}
   onGuardar={async (data) => {
     try {
-      // 👉 Si viene nombre, usamos actualizarNombreYSlug
+      let nuevoSlug = negocio.slug;
+
+      // 👉 Si cambia el nombre, también actualizamos el slug
       if (data.nombre && data.nombre !== negocio.nombre) {
-        const nuevoSlug = await actualizarNombreYSlug(negocio.slug, data.nombre);
+        nuevoSlug = await actualizarNombreYSlug(negocio.id, data.nombre); // 🔹 ahora usa negocio.id
         setNombreNegocio(data.nombre);
 
-        // 🔄 Redirigir si el slug cambió
+        // 🔄 Redirigir si cambió el slug
         if (nuevoSlug !== negocio.slug) {
           window.location.href = `/agenda/${nuevoSlug}`;
           return;
         }
       }
 
-      // 👉 Guardar los otros campos (logo, descripción, redes)
-      const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const negocioId = snap.docs[0].id;
-        const negocioRef = doc(db, "Negocios", negocioId);
-
-        await updateDoc(negocioRef, {
-          perfilLogo: data.perfilLogo ?? negocio.perfilLogo ?? "",
-          descripcion: data.descripcion ?? negocio.descripcion ?? "",
-          "redes.instagram": data.redes?.instagram ?? negocio.redes?.instagram ?? "",
-          "redes.facebook":  data.redes?.facebook  ?? negocio.redes?.facebook  ?? "",
-          "redes.telefono":  data.redes?.telefono  ?? negocio.redes?.telefono  ?? "",
-        });
-      }
+      // 👉 Guardar otros campos usando negocio.id (no depende del slug)
+      const negocioRef = doc(db, "Negocios", negocio.id);
+      await updateDoc(negocioRef, {
+        perfilLogo: data.perfilLogo ?? negocio.perfilLogo ?? "",
+        descripcion: data.descripcion ?? negocio.descripcion ?? "",
+        "redes.instagram": data.redes?.instagram ?? negocio.redes?.instagram ?? "",
+        "redes.facebook":  data.redes?.facebook  ?? negocio.redes?.facebook  ?? "",
+        "redes.telefono":  data.redes?.telefono  ?? negocio.redes?.telefono  ?? "",
+      });
 
       // 👉 Actualizar estado local
       if (data.perfilLogo) setLogo(data.perfilLogo);
       if (data.descripcion !== undefined) setNuevaDescripcion(data.descripcion);
       if (data.redes) setRedes(data.redes);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ Error al guardar perfil:", err);
-      alert("❌ No se pudo guardar los cambios de perfil");
-      // ⚠️ No cerramos el modal en caso de error
     }
   }}
 />
+
 
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">

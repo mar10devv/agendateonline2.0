@@ -1,9 +1,28 @@
 ---
 export const prerender = false;
+
 import AgendaVirtual from "../../components/agendaVirtual/agendaVirtual";
 import "../../styles/global.css";
 
+import { db } from "../../lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+
+// Obtenemos el slug desde la URL
 const { slug } = Astro.params;
+const safeSlug = slug ?? "";
+
+// Buscamos el negocio en Firestore usando el slug
+let negocioNombre: string = safeSlug;
+try {
+  const q = query(collection(db, "Negocios"), where("slug", "==", safeSlug));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const docSnap = snap.docs[0];
+    negocioNombre = docSnap.data().nombre ?? safeSlug;
+  }
+} catch (e) {
+  console.error("Error obteniendo negocio:", e);
+}
 ---
 
 <html lang="es">
@@ -11,41 +30,39 @@ const { slug } = Astro.params;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>{slug} | AgendateOnline</title>
+    <!-- ✅ Ahora usamos el nombre real del negocio -->
+    <title>{negocioNombre} | AgendateOnline</title>
 
-    <!-- SEO -->
     <meta
       name="description"
-      content={`Reservá turnos online en ${slug} con AgendateOnline. Agenda rápida, fácil y gratuita para clientes y negocios.`}
+      content={`Reservá turnos online en ${negocioNombre} con AgendateOnline. Agenda rápida, fácil y gratuita para clientes y negocios.`}
     />
     <meta
       name="keywords"
-      content={`agenda online, turnos, reservas, citas, ${slug}, agendateonline`}
+      content={`agenda online, turnos, reservas, citas, ${negocioNombre}, agendateonline`}
     />
     <meta name="robots" content="index, follow" />
 
-    <!-- OpenGraph -->
-    <meta property="og:title" content={`${slug} | AgendateOnline`} />
+    <meta property="og:title" content={`${negocioNombre} | AgendateOnline`} />
     <meta
       property="og:description"
-      content={`Reservá tu turno online en ${slug} con AgendateOnline. Agenda fácil, rápida y gratuita.`}
+      content={`Reservá tu turno online en ${negocioNombre} con AgendateOnline. Agenda fácil, rápida y gratuita.`}
     />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={`https://agendateonline.com/agenda/${slug}`} />
+    <meta property="og:url" content={`https://agendateonline.com/agenda/${safeSlug}`} />
     <meta property="og:image" content="https://agendateonline.com/banner-default.webp" />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={`${slug} | AgendateOnline`} />
+    <meta name="twitter:title" content={`${negocioNombre} | AgendateOnline`} />
     <meta
       name="twitter:description"
-      content={`Reservá turnos online en ${slug} con AgendateOnline.`}
+      content={`Reservá turnos online en ${negocioNombre} con AgendateOnline.`}
     />
     <meta name="twitter:image" content="https://agendateonline.com/banner-default.webp" />
   </head>
   <body class="bg-black text-white">
     <main class="w-full flex justify-center">
-      <AgendaVirtual client:only="react" slug={slug!} />
+      <AgendaVirtual client:only="react" slug={safeSlug} />
     </main>
   </body>
 </html>
