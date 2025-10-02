@@ -435,7 +435,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
       loop={true} // 🔄 carrusel infinito
       className="!w-full !h-auto custom-swiper pb-10"
       breakpoints={{
-        320: { slidesPerView: 2 },   // 📱 Mobile
+        320: { slidesPerView: 2.5 },   // 📱 Mobile
         640: { slidesPerView: 3 },   // 📲 Tablet
         1024: { slidesPerView: 4 },  // 💻 PC
       }}
