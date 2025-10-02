@@ -379,10 +379,9 @@ const handleEliminarTurno = async (
           hora: turno.hora,
           motivo,
           negocioNombre: negocio.nombre,
-          slug: negocio.slug ?? null, // 👈 puede venir undefined si el padre no lo pasó
-          // 👇 respaldo: URL absoluta por si slug llega vacío
-          agendaUrl:
-            negocio.slug && origin ? `${origin}/agenda/${negocio.slug}` : undefined,
+          slug: negocio.slug ?? null,
+          // 👇 siempre construimos la URL con el slug (aunque sea vacío)
+          agendaUrl: `${origin}/agenda/${negocio.slug || ""}`,
         };
 
         console.log("[frontend] notificar-cancelacion payload →", payload);
@@ -410,6 +409,7 @@ const handleEliminarTurno = async (
     return false;
   }
 };
+
 
   return (
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">

@@ -1,3 +1,4 @@
+// netlify/functions/notificar-cancelacion.ts
 import type { Handler } from "@netlify/functions";
 import nodemailer from "nodemailer";
 
@@ -31,7 +32,7 @@ const htmlTemplate = ({
   fecha,
   hora,
   motivo,
-  agendaHref, // 👈 link ya resuelto
+  agendaHref,
 }: {
   negocioNombre?: string | null;
   nombre?: string | null;
@@ -66,9 +67,13 @@ const htmlTemplate = ({
         <p style="margin-top:16px">Si deseas reprogramar, podés volver a ingresar a nuestra agenda.</p>
         ${
           agendaHref
-            ? `<a href="${agendaHref}" style="display:inline-block;margin-top:8px;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.18);color:#fff;text-decoration:none">Ir a la agenda</a>
-               <div style="margin-top:8px;font-size:12px;text-decoration:underline;">
-                 <a href="${agendaHref}" style="color:#fff">${agendaHref}</a>
+            ? `<div style="margin-top:16px;text-align:center">
+                 <a href="${agendaHref}" 
+                    style="display:inline-block;padding:12px 20px;border-radius:8px;
+                           background:#ffffff;color:#2563eb;font-weight:bold;
+                           text-decoration:none;font-size:14px">
+                   🔄 Agendarme de nuevo
+                 </a>
                </div>`
             : ""
         }
@@ -105,12 +110,11 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, headers: corsHeaders, body: "Falta email del cliente." };
     }
 
-    // ✅ construir el link aunque no llegue agendaUrl
     const base = getBaseUrl();
-// ✅ ahora (usa /agenda/)
-const agendaHref =
-  (agendaUrl && String(agendaUrl).trim()) ||
-  (slug ? `${base}/agenda/${slug}` : null);
+    // ✅ Construir link SIEMPRE con fallback
+    const agendaHref =
+      (agendaUrl && String(agendaUrl).trim()) ||
+      (slug && slug.trim() ? `${base}/agenda/${slug}` : base);
 
     const subject =
       `Cancelación de turno` +
