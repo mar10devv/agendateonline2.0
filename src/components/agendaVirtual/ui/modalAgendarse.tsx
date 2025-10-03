@@ -305,32 +305,37 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
             <button
               onClick={async () => {
                 if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-                try {
-                  const refUser = docFromPath(bloqueo.docPath!);
-                  const snap = await getDoc(refUser);
-                  const data = snap.exists() ? (snap.data() as TurnoData) : null;
+try {
+  const refUser = docFromPath(bloqueo.docPath!);
 
-                  // ❌ Eliminar el turno en Usuarios/{uid}/Turnos
-                  await deleteDoc(refUser);
+  // 1️⃣ Obtener datos del turno para saber negocioId
+  const snap = await getDoc(refUser);
+  if (!snap.exists()) throw new Error("Turno no encontrado en usuario");
+  const data = snap.data() as TurnoData & { negocioId: string };
 
-                  // ❌ Eliminar también el turno en Negocios/{negocioId}/Turnos
-                  if (data?.negocioId && data?.turnoIdNegocio) {
-                    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", data.turnoIdNegocio);
-                    await deleteDoc(refNeg);
-                  }
+  // 2️⃣ Borrar turno en usuario
+  await deleteDoc(refUser);
 
-                  // ✅ Resetear estados
-                  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
-                  setPaso(1);
-                  setServicio(null);
-                  setEmpleado(null);
-                  setTurno(null);
+  // 3️⃣ Borrar turno en negocio usando el MISMO id
+  if (data.negocioId) {
+    const turnoId = refUser.id; // mismo ID en ambas colecciones
+    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", turnoId);
+    await deleteDoc(refNeg);
+  }
 
-                  alert("Tu turno fue cancelado y el horario quedó libre.");
-                } catch (err) {
-                  console.error("Error cancelando turno:", err);
-                  alert("Hubo un error al cancelar el turno.");
-                }
+  // ✅ Resetear estados
+  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
+  setPaso(1);
+  setServicio(null);
+  setEmpleado(null);
+  setTurno(null);
+
+  alert("Tu turno fue cancelado y el horario quedó libre.");
+} catch (err) {
+  console.error("Error cancelando turno:", err);
+  alert("Hubo un error al cancelar el turno.");
+}
+
               }}
               className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
             >

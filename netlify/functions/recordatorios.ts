@@ -1,6 +1,5 @@
-import type { Handler } from "@netlify/functions";
-import * as admin from "firebase-admin";
-import nodemailer from "nodemailer";
+const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -21,12 +20,12 @@ const transporter = nodemailer.createTransport({
 
 const MS_HORA = 60 * 60 * 1000;
 
-export const handler: Handler = async () => {
+exports.handler = async function () {
   try {
     const ahora = new Date();
     console.log("⏰ Ejecutando recordatorios en:", ahora.toISOString());
 
-    // Ventanas de búsqueda (más amplias para no perder turnos)
+    // Ventanas de búsqueda (más amplias)
     const win24Start = new Date(ahora.getTime() + 23 * MS_HORA);
     const win24End   = new Date(ahora.getTime() + 25 * MS_HORA);
 
@@ -46,7 +45,7 @@ export const handler: Handler = async () => {
     console.log("📌 Turnos encontrados para 24h:", snap24.size);
 
     for (const doc of snap24.docs) {
-      const t = doc.data() as any;
+      const t = doc.data();
       if (!t.inicioTs || !t.clienteEmail) continue;
       if (t.email24Enviado) {
         console.log("⏭️ Ya se envió recordatorio 24h a:", t.clienteEmail);
@@ -60,13 +59,10 @@ export const handler: Handler = async () => {
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
         to: t.clienteEmail,
         subject: "📅 Recordatorio: tu turno es mañana",
-        html: `
-          <p>Hola ${t.clienteNombre || ""},</p>
-          <p>Mañana tenés tu turno en <b>${t.negocioNombre || "tu negocio"}</b> 
-          a las <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
-          <hr>
-          <p>Este es un mensaje automático, por favor no responder.</p>
-        `,
+        html: `<p>Hola ${t.clienteNombre || ""},</p>
+               <p>Mañana tenés tu turno en <b>${t.negocioNombre || "tu negocio"}</b> 
+               a las <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
+               <hr><p>Este es un mensaje automático, por favor no responder.</p>`,
       });
 
       await doc.ref.update({ email24Enviado: true });
@@ -82,7 +78,7 @@ export const handler: Handler = async () => {
     console.log("📌 Turnos encontrados para 1h:", snap1h.size);
 
     for (const doc of snap1h.docs) {
-      const t = doc.data() as any;
+      const t = doc.data();
       if (!t.inicioTs || !t.clienteEmail) continue;
       if (t.email1hEnviado) {
         console.log("⏭️ Ya se envió recordatorio 1h a:", t.clienteEmail);
@@ -96,20 +92,17 @@ export const handler: Handler = async () => {
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
         to: t.clienteEmail,
         subject: "⏰ Recordatorio: tu turno en 1 hora",
-        html: `
-          <p>Hola ${t.clienteNombre || ""},</p>
-          <p>Tu turno en <b>${t.negocioNombre || "tu negocio"}</b> es a las 
-          <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
-          <hr>
-          <p>Este es un mensaje automático, por favor no responder.</p>
-        `,
+        html: `<p>Hola ${t.clienteNombre || ""},</p>
+               <p>Tu turno en <b>${t.negocioNombre || "tu negocio"}</b> es a las 
+               <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
+               <hr><p>Este es un mensaje automático, por favor no responder.</p>`,
       });
 
       await doc.ref.update({ email1hEnviado: true });
     }
 
     return { statusCode: 200, body: "Recordatorios procesados" };
-  } catch (e: any) {
+  } catch (e) {
     console.error("❌ Error en recordatorios:", e);
     return { statusCode: 500, body: e.message };
   }
