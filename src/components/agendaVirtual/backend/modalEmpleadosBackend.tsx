@@ -11,6 +11,7 @@ import {
   getDownloadURL 
 } from "firebase/storage";
 import { guardarConfigNegocio, obtenerConfigNegocio } from "../../../lib/firestore";
+import { compressImageFileToWebP } from "../../../lib/imageUtils"; // 👈 importamos el helper
 
 // 🔒 Tipo base de Empleado
 export type Empleado = {
@@ -26,19 +27,28 @@ export type Empleado = {
   };
 };
 
-
-// 🚀 Subida de imágenes a ImgBB
+// 🚀 Subida de imágenes a ImgBB (con compresión WebP)
 export async function subirImagenImgBB(file: File): Promise<string | null> {
-  const formData = new FormData();
-  formData.append("image", file);
+  try {
 
-  const res = await fetch(
-    `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
-    { method: "POST", body: formData }
-  );
+    // 🔥 1) Comprimir antes de subir
+    const compressedFile = await compressImageFileToWebP(file);
 
-  const data = await res.json();
-  return data?.data?.display_url || null;
+    const formData = new FormData();
+    formData.append("image", compressedFile);
+
+    // 🔥 2) Subir a ImgBB
+    const res = await fetch(
+      `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
+      { method: "POST", body: formData }
+    );
+
+    const data = await res.json();
+    return data?.data?.display_url || null;
+  } catch (err) {
+    console.error("❌ Error subiendo foto de empleado:", err);
+    return null;
+  }
 }
 
 // 📌 Subida de foto a Firebase Storage (opcional si no usás ImgBB)
@@ -71,7 +81,6 @@ export function crearEmpleadoVacio(): Empleado {
     },
   };
 }
-
 
 // 📌 Actualizar datos de un empleado dentro de config
 export function actualizarEmpleado(

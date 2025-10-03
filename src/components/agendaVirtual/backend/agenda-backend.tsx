@@ -1,4 +1,7 @@
 // src/components/agendaVirtual/backend/agenda-backend.ts
+import imageCompression from "browser-image-compression";
+import { compressImageFileToWebP } from "../../../lib/imageUtils";
+
 import {
   getAuth,
   onAuthStateChanged,
@@ -323,9 +326,13 @@ export async function subirLogoNegocio(file: File): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error("No hay usuario autenticado");
 
-  const formData = new FormData();
-  formData.append("image", file);
+  // 🔥 1) Comprimir antes de subir
+  const compressedFile = await compressImageFileToWebP(file);
 
+  const formData = new FormData();
+  formData.append("image", compressedFile);
+
+  // 🔥 2) Subir a ImgBB
   const res = await fetch(
     `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
     { method: "POST", body: formData }
@@ -338,6 +345,7 @@ export async function subirLogoNegocio(file: File): Promise<string> {
 
   const url = data.data.display_url;
 
+  // 🔥 3) Guardar en Firestore
   const negocioDocs = await getDocs(
     query(collection(db, "Negocios"), where("ownerUid", "==", user.uid))
   );

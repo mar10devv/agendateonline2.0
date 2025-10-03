@@ -8,8 +8,9 @@ import {
   type Empleado,
   type Negocio,
 } from "./backend/agenda-backend";
+import { getCache, setCache } from "../../lib/cacheAgenda"; // 👈 usamos cache
 import AgendaVirtualUI from "./ui/agendaUI";
-import LoaderAgenda from "../ui/loaderAgenda"; // 👈 tu loader
+import LoaderAgenda from "../ui/loaderAgenda";
 
 type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente";
@@ -32,20 +33,40 @@ export default function AgendaVirtual({ slug }: Props) {
     detectarUsuario(slug, async (estado, modo, user, negocio) => {
       setEstado(estado);
       setModo(modo);
-      setNegocio(negocio);
+
+      // 1️⃣ Intentar cargar negocio desde cache
+      const cachedNegocio = getCache<Negocio>(slug, "negocio");
+      if (cachedNegocio) {
+        setNegocio(cachedNegocio);
+      }
 
       if (estado === "listo" && negocio) {
+        // Actualizar negocio y cachearlo (TTL 1h)
+        setNegocio(negocio);
+        setCache(slug, "negocio", negocio, 60 * 60 * 1000);
+
+        // 2️⃣ Intentar cargar empleados desde cache
+        const cachedEmps = getCache<Empleado[]>(slug, "empleados");
+        if (cachedEmps && cachedEmps.length > 0) {
+          setEmpleados(cachedEmps);
+        }
+
+        // Firestore siempre para refrescar empleados y turnos
         const [emps, tns] = await Promise.all([
           getEmpleados(slug),
           getTurnos(slug, fechaSeleccionada),
         ]);
+
         setEmpleados(emps);
         setTurnos(tns);
+
+        // Cachear empleados (TTL 30 min)
+        setCache(slug, "empleados", emps, 30 * 60 * 1000);
       }
     });
   }, [slug, fechaSeleccionada]);
 
-  // 🔹 👉 ACTUALIZAR <title> dinámicamente con el nombre real
+  // 🔹 👉 ACTUALIZAR <title> dinámicamente
   useEffect(() => {
     if (negocio?.nombre) {
       document.title = `${negocio.nombre} | AgendateOnline`;
@@ -56,9 +77,7 @@ export default function AgendaVirtual({ slug }: Props) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white gap-6">
         <LoaderAgenda />
-        <p className="text-lg font-medium animate-pulse">
-          Cargando agenda...
-        </p>
+        <p className="text-lg font-medium animate-pulse">Cargando agenda...</p>
       </div>
     );
   }

@@ -14,6 +14,7 @@
     "@netlify/blobs": "^10.0.11",
     "animate.css": "^4.1.1",
     "astro": "^5.13.2",
+    "browser-image-compression": "^2.0.2",
     "firebase": "^12.1.0",
     "firebase-admin": "^13.5.0",
     "gsap": "^3.13.0",

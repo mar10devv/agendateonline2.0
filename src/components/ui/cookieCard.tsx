@@ -1,22 +1,25 @@
+// src/components/ui/CookieCard.tsx
 import { useEffect, useState } from "react";
+import { getCookieConsent, setCookieConsent } from "../../lib/cacheAgenda";
 
 export default function CookieCard() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem("cookieConsent");
+    const consent = getCookieConsent();
     if (!consent) {
       setVisible(true);
     }
   }, []);
 
   const acceptCookies = () => {
-    localStorage.setItem("cookieConsent", "accepted");
+    setCookieConsent(true);
     setVisible(false);
   };
 
   const declineCookies = () => {
-    localStorage.setItem("cookieConsent", "declined");
+    // Guardamos false explícitamente para que no vuelva a aparecer
+    setCookieConsent(false);
     setVisible(false);
   };
 
@@ -25,7 +28,7 @@ export default function CookieCard() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <div className="w-[300px] h-[220px] bg-white rounded-lg flex flex-col items-center justify-center p-6 gap-3 shadow-lg">
-        {/* Cookie Icon */}
+        {/* Icono cookie */}
         <svg
           xmlSpace="preserve"
           viewBox="0 0 122.88 122.25"
@@ -46,18 +49,17 @@ export default function CookieCard() {
           </g>
         </svg>
 
-        {/* Text */}
+        {/* Texto */}
         <p className="text-lg font-bold text-gray-900">Usamos cookies 🍪</p>
         <p className="text-center text-sm text-gray-600">
           Usamos cookies para mejorar tu experiencia en AgéndateOnline.{" "}
           <a href="/politica-cookies" className="text-blue-600 underline">
-  Leer políticas
-</a>
-
+            Leer políticas
+          </a>
           .
         </p>
 
-        {/* Buttons */}
+        {/* Botones */}
         <div className="flex gap-4 mt-2">
           <button
             onClick={acceptCookies}
