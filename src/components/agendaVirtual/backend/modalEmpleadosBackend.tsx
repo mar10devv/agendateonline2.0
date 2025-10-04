@@ -14,11 +14,17 @@ import { guardarConfigNegocio, obtenerConfigNegocio } from "../../../lib/firesto
 import { compressImageFileToWebP } from "../../../lib/imageUtils"; // 👈 importamos el helper
 
 // 🔒 Tipo base de Empleado
+// 🔒 Tipo base de Empleado
 export type Empleado = {
   id?: string;
   nombre: string;
+  email?: string;
+  rol?: "empleado" | "admin";
+  admin?: boolean;
+  adminEmail?: string;
   fotoPerfil?: string;
-  nombreArchivo?: string;   // 👈 nuevo campo para evitar duplicados
+  foto?: string; // 👈 agregado para compatibilidad con UI anterior
+  nombreArchivo?: string;
   trabajos: string[];
   calendario: {
     inicio: string;
@@ -27,10 +33,11 @@ export type Empleado = {
   };
 };
 
+
+
 // 🚀 Subida de imágenes a ImgBB (con compresión WebP)
 export async function subirImagenImgBB(file: File): Promise<string | null> {
   try {
-
     // 🔥 1) Comprimir antes de subir
     const compressedFile = await compressImageFileToWebP(file);
 
@@ -72,8 +79,12 @@ export async function guardarEmpleados(uid: string, config: any) {
 export function crearEmpleadoVacio(): Empleado {
   return {
     nombre: "",
+    email: "",
+    rol: "empleado",
+    admin: false,
+    adminEmail: "",
     fotoPerfil: "",
-    trabajos: [],  // 👈 empezamos vacío de verdad
+    trabajos: [],
     calendario: {
       inicio: "",
       fin: "",
@@ -81,6 +92,7 @@ export function crearEmpleadoVacio(): Empleado {
     },
   };
 }
+
 
 // 📌 Actualizar datos de un empleado dentro de config
 export function actualizarEmpleado(

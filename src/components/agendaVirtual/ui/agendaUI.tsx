@@ -104,14 +104,14 @@ type Props = {
   empleados: Empleado[];
   turnos: Turno[];
   negocio: Negocio;
-  modo: "dueño" | "cliente";
+  modo: "dueño" | "cliente" | "admin"; // 👑 ahora soporta admin
   plan: "gratis" | "lite" | "gold";
   usuario?: {
     nombre?: string;
     fotoPerfil?: string;
+    email?: string; // 👈 importante para validar contra adminEmail
   };
 };
-
 
 export default function AgendaVirtualUI({
   empleados,
@@ -160,6 +160,24 @@ const handleMouseDown = (e: React.MouseEvent) => {
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mouseup", handleMouseUp);
 };
+
+
+const puedeEditar = (tipo: "servicios" | "empleados" | "perfil" | "ubicacion") => {
+  if (modo === "dueño") return true;
+
+  if (modo === "admin" && usuario?.email) {
+    const empleadoAdmin = empleadosState.find(
+      (e: any) => e.admin === true && e.adminEmail === usuario.email
+    );
+    // 👉 admin solo puede editar servicios y su perfil propio
+    if (empleadoAdmin) {
+      return tipo === "empleados" || tipo === "perfil";
+    }
+  }
+
+  return false;
+};
+
 
  // 👇 Hook para logo
   const [logo, setLogo] = useAgendaCache<string>(
@@ -524,32 +542,34 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 />
             {/* Empleados */}
 <div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
-        <h2 className="text-lg font-semibold mb-4">Empleados</h2>
-{modo === "dueño" && (
-  <>
-    <button
-      onClick={() => setModalAbierto(true)}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar empleados"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+  <h2 className="text-lg font-semibold mb-4">Empleados</h2>
+
+  {/* 👑 Dueño y Admin pueden abrir el modal de empleados de ESTE negocio */}
+  {(modo === "dueño" || modo === "admin") && (
+    <>
+      <button
+        onClick={() => setModalAbierto(true)}
+        className="absolute top-4 right-4"
+      >
+        <img
+          src={ConfigIcon}
+          alt="Configurar empleados"
+          className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+        />
+      </button>
+
+      {/* Modal empleados → siempre abre el del negocio actual */}
+      <ModalEmpleadosUI
+        abierto={modalAbierto}
+        onCerrar={() => setModalAbierto(false)}
+        negocioId={negocio.id}   // 👈 este es el que manda
       />
-    </button>
+    </>
+  )}
 
-    {/* Modal empleados */}
-    <ModalEmpleadosUI
-      abierto={modalAbierto}
-      onCerrar={() => setModalAbierto(false)}
-    />
-  </>
-)}
-
-
-<div className="flex gap-6 flex-wrap mt-2 justify-center">
+  <div className="flex gap-6 flex-wrap mt-2 justify-center">
     {empleadosState && empleadosState.length > 0 ? (
-  empleadosState.map((e, idx) => (
+      empleadosState.map((e, idx) => (
         <button
           key={idx}
           onClick={() => setEmpleadoSeleccionado(e)}
@@ -573,8 +593,11 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     )}
   </div>
 </div>
+
+
+
            {/* Calendario + Botón Agendarse */}
-{modo === "dueño" && (
+{(modo === "dueño" || modo === "admin") && (
   <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden">
     <AgendaNegocio
       negocio={{
@@ -588,7 +611,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 )}
 
 <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative">
-  {modo === "dueño" ? (
+  {(modo === "dueño" || modo === "admin") ? (
     <div className="order-3 w-full">
       <AgendaNegocio
         negocio={{
@@ -599,7 +622,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
         }}
       />
     </div>
-  ) : (
+  ) : modo === "cliente" ? (
     <div className="w-full justify-center flex">
       <button
         onClick={() => setModalAgendarseAbierto(true)}
@@ -608,9 +631,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
         📅 Reservar turno
       </button>
     </div>
-  )}
+  ) : null}
 </div>
-
 
 {/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
 <div className="order-4 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4">

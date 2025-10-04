@@ -13,7 +13,7 @@ import AgendaVirtualUI from "./ui/agendaUI";
 import LoaderAgenda from "../ui/loaderAgenda";
 
 type Estado = "cargando" | "no-sesion" | "listo";
-type Modo = "dueño" | "cliente";
+type Modo = "dueño" | "cliente" | "admin"; // 👈 ahora soporta admin
 
 type Props = {
   slug: string;
@@ -32,7 +32,6 @@ export default function AgendaVirtual({ slug }: Props) {
   useEffect(() => {
     detectarUsuario(slug, async (estado, modo, user, negocio) => {
       setEstado(estado);
-      setModo(modo);
 
       // 1️⃣ Intentar cargar negocio desde cache
       const cachedNegocio = getCache<Negocio>(slug, "negocio");
@@ -62,6 +61,25 @@ export default function AgendaVirtual({ slug }: Props) {
 
         // Cachear empleados (TTL 30 min)
         setCache(slug, "empleados", emps, 30 * 60 * 1000);
+
+        // 👑 Detección de rol
+        if (user) {
+          if (user.uid === negocio.id) {
+            setModo("dueño");
+          } else {
+            // Buscar si es admin
+            const esAdmin = emps.find(
+              (e) => e.admin === true && e.adminEmail === user.email
+            );
+            if (esAdmin) {
+              setModo("admin");
+            } else {
+              setModo("cliente");
+            }
+          }
+        } else {
+          setModo("cliente");
+        }
       }
     });
   }, [slug, fechaSeleccionada]);
@@ -113,7 +131,7 @@ export default function AgendaVirtual({ slug }: Props) {
       empleados={empleados}
       turnos={turnos}
       negocio={negocio}
-      modo={modo}
+      modo={modo} // 👈 ahora puede ser "dueño" | "admin" | "cliente"
       plan={negocio.tipoPremium ?? "gratis"}
     />
   );

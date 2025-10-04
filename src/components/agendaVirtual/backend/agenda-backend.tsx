@@ -1,7 +1,5 @@
 // src/components/agendaVirtual/backend/agenda-backend.ts
-import imageCompression from "browser-image-compression";
 import { compressImageFileToWebP } from "../../../lib/imageUtils";
-
 import {
   getAuth,
   onAuthStateChanged,
@@ -16,28 +14,11 @@ import {
   getDocs,
   updateDoc,
   addDoc,
-  getDoc,
-  setDoc,
-  deleteDoc,
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
-export async function getNegocioPorSlug(slug: string) {
-  const q = query(collection(db, "Negocios"), where("slug", "==", slug));
-  const snap = await getDocs(q);
-
-  if (snap.empty) return null;
-
-  const negocio = snap.docs[0].data();
-
-  return {
-    id: snap.docs[0].id,
-    ...negocio, // 👈 esto asegura que también venga "ubicacion"
-  };
-}
-
-// 🔒 Tipos
+// ---------------------- Tipos ----------------------
 export type Turno = {
   id: string;
   cliente: string;
@@ -50,14 +31,6 @@ export type Turno = {
   uidCliente?: string;
 };
 
-export type Empleado = {
-  id?: string;
-  nombre: string;
-  foto?: string;
-  especialidad?: string;
-  calendario?: any;
-};
-
 export type Servicio = {
   id?: string;
   servicio: string;
@@ -66,7 +39,7 @@ export type Servicio = {
 };
 
 export type Negocio = {
-  id: string; 
+  id: string;
   nombre: string;
   direccion: string;
   slug: string;
@@ -76,45 +49,42 @@ export type Negocio = {
   tipoPremium?: "gratis" | "lite" | "gold";
   empleadosData?: Empleado[];
   servicios?: Servicio[];
-  fotoPerfil?: string;           // 👈 foto de un único empleado
+  fotoPerfil?: string;
   configuracionAgenda?: any;
-  descripcion?: string;          // 👈 agregado ahora
-  ubicacion?: {                  // 👈 NUEVO
+  descripcion?: string;
+  ubicacion?: {
     lat: number;
     lng: number;
     direccion: string;
   };
 };
 
+// ✅ Importamos el tipo Empleado unificado
+import type { Empleado } from "./modalEmpleadosBackend";
 
+// ---------------------- Funciones ----------------------
+
+// 📍 Obtener negocio por slug
+export async function getNegocioPorSlug(slug: string) {
+  const q = query(collection(db, "Negocios"), where("slug", "==", slug));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() };
+}
+
+// 📍 Guardar ubicación
 export async function guardarUbicacionNegocio(
   slug: string,
   ubicacion: { lat: number; lng: number; direccion: string }
 ) {
-  try {
-    // 🔍 Buscar negocio con ese slug
-    const negocioDocs = await getDocs(
-      query(collection(db, "Negocios"), where("slug", "==", slug))
-    );
-
-    if (negocioDocs.empty) {
-      throw new Error("❌ No se encontró negocio con ese slug");
-    }
-
-    // ✅ Tomar el ID real del documento
-    const negocioId = negocioDocs.docs[0].id;
-    const negocioRef = doc(db, "Negocios", negocioId);
-
-    // 📝 Guardar ubicación en Firestore
-    await updateDoc(negocioRef, { ubicacion });
-
-    console.log("✅ Ubicación guardada en Firestore");
-  } catch (err) {
-    console.error("❌ Error al guardar ubicación:", err);
-    throw err;
-  }
+  const negocioDocs = await getDocs(
+    query(collection(db, "Negocios"), where("slug", "==", slug))
+  );
+  if (negocioDocs.empty) throw new Error("❌ No se encontró negocio con ese slug");
+  const negocioId = negocioDocs.docs[0].id;
+  await updateDoc(doc(db, "Negocios", negocioId), { ubicacion });
+  console.log("✅ Ubicación guardada en Firestore");
 }
-
 
 // 🔐 Login con Google
 export async function loginConGoogle() {
@@ -123,7 +93,7 @@ export async function loginConGoogle() {
   await signInWithPopup(auth, provider);
 }
 
-// 🧠 Detecta usuario y carga negocio + servicios
+// 🧠 Detectar usuario (dueño / cliente)
 export async function detectarUsuario(
   slug: string,
   callback: (
@@ -137,18 +107,15 @@ export async function detectarUsuario(
 
   onAuthStateChanged(auth, async (user) => {
     try {
-      // 1️⃣ Buscar negocio por slug
       const negocioDocs = await getDocs(
         query(collection(db, "Negocios"), where("slug", "==", slug))
       );
 
       if (negocioDocs.empty) {
-        // 🚫 Slug inválido → no hay negocio
         callback("listo", "cliente", user, null);
         return;
       }
 
-      // 2️⃣ Si existe negocio → armar objeto
       const negocioSnap = negocioDocs.docs[0];
       const negocioId = negocioSnap.id;
       const negocioData = negocioSnap.data();
@@ -159,6 +126,21 @@ export async function detectarUsuario(
         (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
       );
 
+      // 🔹 Mapeo de empleados actualizado
+      const empleadosData = (negocioData.empleadosData || []).map((e: any) => ({
+        id: e.id || "",
+        nombre: e.nombre || "",
+        email: e.email || "",
+        rol: e.rol || "empleado",
+        admin: e.admin || false,
+        adminEmail: e.adminEmail || "",
+        fotoPerfil: e.fotoPerfil || e.foto || "",
+        foto: e.fotoPerfil || e.foto || "", // 👈 siempre devolver ambos
+        nombreArchivo: e.nombreArchivo || "",
+        trabajos: e.trabajos || [],
+        calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
+      }));
+
       const negocio: Negocio = {
         id: negocioId,
         nombre: negocioData.nombre || "",
@@ -168,15 +150,7 @@ export async function detectarUsuario(
         bannerUrl: negocioData.bannerUrl,
         plantilla: negocioData.plantilla,
         tipoPremium: negocioData.tipoPremium || "gratis",
-        empleadosData: (negocioData.empleadosData || []).map((e: any) => ({
-  id: e.id || "",
-  nombre: e.nombre || "",
-  foto: e.fotoPerfil || e.foto || "",   // 👈 siempre prioriza fotoPerfil
-  especialidad: e.especialidad || "",
-  calendario: e.calendario || {},
-  trabajos: e.trabajos || [],
-})),
-
+        empleadosData,
         servicios,
         fotoPerfil: negocioData.fotoPerfil || "",
         configuracionAgenda: negocioData.configuracionAgenda || {},
@@ -184,7 +158,6 @@ export async function detectarUsuario(
         ubicacion: negocioData.ubicacion || null,
       };
 
-      // 3️⃣ Decidir estado según usuario
       if (!user) {
         callback("no-sesion", "cliente", null, negocio);
         return;
@@ -199,8 +172,7 @@ export async function detectarUsuario(
   });
 }
 
-
-// 👥 Obtener empleados (una sola vez)
+// 👥 Obtener empleados una vez
 export async function getEmpleados(slug: string): Promise<Empleado[]> {
   const negocioDocs = await getDocs(
     query(collection(db, "Negocios"), where("slug", "==", slug))
@@ -209,41 +181,38 @@ export async function getEmpleados(slug: string): Promise<Empleado[]> {
 
   const negocioData = negocioDocs.docs[0].data();
 
-// ⚡ Si existe array empleadosData, lo uso
-if (Array.isArray(negocioData.empleadosData) && negocioData.empleadosData.length > 0) {
-return negocioData.empleadosData.map((e: any) => ({
-  id: e.id || "",
-  nombre: e.nombre || "",
-  foto: e.fotoPerfil || e.foto || "",   // 👈
-  especialidad: e.especialidad || "",
-  calendario: e.calendario || {},
-  trabajos: e.trabajos || [],
-}));
+  if (Array.isArray(negocioData.empleadosData) && negocioData.empleadosData.length > 0) {
+    return negocioData.empleadosData.map((e: any) => ({
+      id: e.id || "",
+      nombre: e.nombre || "",
+      email: e.email || "",
+      rol: e.rol || "empleado",
+      admin: e.admin || false,
+      adminEmail: e.adminEmail || "",
+      fotoPerfil: e.fotoPerfil || e.foto || "",
+      foto: e.fotoPerfil || e.foto || "", // 👈 agregado
+      nombreArchivo: e.nombreArchivo || "",
+      trabajos: e.trabajos || [],
+      calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
+    }));
+  }
 
-}
-
-
-  // ⚡ Si no hay empleadosData, construyo uno con los campos del negocio
+  // Fallback: sin empleados guardados
   return [
     {
       id: negocioDocs.docs[0].id,
       nombre: negocioData.nombre || "Empleado",
-      foto: negocioData.foto || negocioData.fotoPerfil || "",
-      especialidad: negocioData.plantilla || "",
-      calendario: negocioData.configuracionAgenda || {},
-    },
-  ];
-
-
-
-  // ⚡ Si no hay empleadosData, construyo uno con los campos del negocio
-  return [
-    {
-      id: negocioDocs.docs[0].id,
-      nombre: negocioData.nombre || "Empleado",
-      foto: negocioData.foto || negocioData.fotoPerfil || "",
-      especialidad: negocioData.plantilla || "",
-      calendario: negocioData.configuracionAgenda || {},
+      fotoPerfil: negocioData.foto || negocioData.fotoPerfil || "",
+      foto: negocioData.foto || negocioData.fotoPerfil || "", // 👈 agregado
+      rol: "empleado",
+      admin: false,
+      adminEmail: "",
+      trabajos: [],
+      calendario: negocioData.configuracionAgenda || {
+        inicio: "",
+        fin: "",
+        diasLibres: [],
+      },
     },
   ];
 }
@@ -264,7 +233,6 @@ export async function escucharEmpleados(
   const negocioId = negocioDocs.docs[0].id;
   const negocioRef = doc(db, "Negocios", negocioId);
 
-  // 🔹 Escuchar TODO el documento (así también vemos cuando se actualiza empleadosData)
   const unsubscribe = onSnapshot(negocioRef, (snap) => {
     if (!snap.exists()) {
       callback([]);
@@ -273,28 +241,37 @@ export async function escucharEmpleados(
 
     const data = snap.data();
 
-    // ⚡ Si tiene array empleadosData -> usarlo
     if (Array.isArray(data.empleadosData) && data.empleadosData.length > 0) {
-const empleados = data.empleadosData.map((e: any, idx: number) => ({
-  id: e.id || idx.toString(),
-  nombre: e.nombre || "Empleado",
-  foto: e.fotoPerfil || e.foto || "",   // 👈
-  especialidad: e.especialidad || "",
-  calendario: e.calendario || {},
-  trabajos: e.trabajos || [],
-}));
-
-
+      const empleados = data.empleadosData.map((e: any, idx: number) => ({
+        id: e.id || idx.toString(),
+        nombre: e.nombre || "Empleado",
+        email: e.email || "",
+        rol: e.rol || "empleado",
+        admin: e.admin || false,
+        adminEmail: e.adminEmail || "",
+        fotoPerfil: e.fotoPerfil || e.foto || "",
+        foto: e.fotoPerfil || e.foto || "", // 👈 agregado
+        nombreArchivo: e.nombreArchivo || "",
+        trabajos: e.trabajos || [],
+        calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
+      }));
       callback(empleados);
     } else {
-      // ⚡ Si no tiene array empleadosData -> usar fallback con datos básicos
       callback([
         {
           id: negocioId,
           nombre: data.nombre || "Empleado",
-          foto: data.foto || data.fotoPerfil || "",
-          especialidad: data.plantilla || "",
-          calendario: data.configuracionAgenda || {},
+          fotoPerfil: data.foto || data.fotoPerfil || "",
+          foto: data.foto || data.fotoPerfil || "", // 👈 agregado
+          rol: "empleado",
+          admin: false,
+          adminEmail: "",
+          trabajos: [],
+          calendario: data.configuracionAgenda || {
+            inicio: "",
+            fin: "",
+            diasLibres: [],
+          },
         },
       ]);
     }
