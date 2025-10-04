@@ -30,7 +30,7 @@ import {
 import CalendarioUI from "../ui/calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
 import AgendaNegocio from "./agendaNegocio";
-
+import ShareIcon from "../../../assets/share.svg?url";
 
 // 🌍 Leaflet
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -712,6 +712,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 </div>
 
 <div className="mt-6 flex items-center justify-center gap-4">
+  {/* Instagram */}
   <a
     href={redes?.instagram || "#"}
     target={redes?.instagram ? "_blank" : "_self"}
@@ -725,6 +726,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     <Instagram className="w-4 h-4 text-white" />
   </a>
 
+  {/* Facebook */}
   <a
     href={redes?.facebook || "#"}
     target={redes?.facebook ? "_blank" : "_self"}
@@ -738,6 +740,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     <Facebook className="w-4 h-4 text-white" />
   </a>
 
+  {/* Teléfono / WhatsApp */}
   <a
     href={
       redes?.telefono
@@ -756,6 +759,19 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   >
     <Phone className="w-4 h-4 text-white" />
   </a>
+
+  {/* Compartir (copia URL del slug) */}
+  <button
+    onClick={async () => {
+      const url = `https://agendateonline.com/agenda/${negocio.slug}`;
+      await navigator.clipboard.writeText(url);
+      alert("✅ Link copiado al portapapeles");
+    }}
+    className="w-8 h-8 flex items-center justify-center rounded-full transition bg-neutral-700 hover:bg-indigo-600"
+    title="Compartir agenda"
+  >
+    <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
+  </button>
 </div>
 
   {/* Descripción editable */}
