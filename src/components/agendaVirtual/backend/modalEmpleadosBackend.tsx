@@ -68,9 +68,27 @@ export async function obtenerEmpleados(uid: string) {
   return await obtenerConfigNegocio(uid);
 }
 
-// 📌 Guardar configuración completa (incluye empleados)
+// 📌 Guardar configuración completa (incluye empleados + adminUids)
 export async function guardarEmpleados(uid: string, config: any) {
-  await guardarConfigNegocio(uid, config);
+  try {
+    const negocioRef = doc(db, "Negocios", uid);
+
+    // 🧩 Construir array de adminUids con los correos de empleados admins
+    const adminUids = (config.empleadosData || [])
+      .filter((emp: any) => emp.rol === "admin" && emp.adminEmail)
+      .map((emp: any) => emp.adminEmail.toLowerCase().trim());
+
+    // 🧠 Guardamos configuración + adminUids en Firestore
+    await updateDoc(negocioRef, {
+      ...config,
+      adminUids: adminUids,
+    });
+
+    console.log("✅ Empleados y adminUids actualizados correctamente");
+  } catch (err) {
+    console.error("❌ Error guardando empleados:", err);
+    throw err;
+  }
 }
 
 // 📌 Agregar un nuevo empleado a la config local
