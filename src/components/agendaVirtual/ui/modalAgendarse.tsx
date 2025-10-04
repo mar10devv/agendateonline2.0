@@ -263,6 +263,10 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 
   return (
   <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
+  <div
+    className="relative flex flex-col h-[450px] overflow-y-auto px-4 pb-6 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent"
+    style={{ WebkitOverflowScrolling: "touch" }} // 👈 scroll suave en mobile
+  >
     {cargandoCheck && (
       <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
     )}
@@ -305,37 +309,27 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
             <button
               onClick={async () => {
                 if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-try {
-  const refUser = docFromPath(bloqueo.docPath!);
-
-  // 1️⃣ Obtener datos del turno para saber negocioId
-  const snap = await getDoc(refUser);
-  if (!snap.exists()) throw new Error("Turno no encontrado en usuario");
-  const data = snap.data() as TurnoData & { negocioId: string };
-
-  // 2️⃣ Borrar turno en usuario
-  await deleteDoc(refUser);
-
-  // 3️⃣ Borrar turno en negocio usando el MISMO id
-  if (data.negocioId) {
-    const turnoId = refUser.id; // mismo ID en ambas colecciones
-    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", turnoId);
-    await deleteDoc(refNeg);
-  }
-
-  // ✅ Resetear estados
-  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
-  setPaso(1);
-  setServicio(null);
-  setEmpleado(null);
-  setTurno(null);
-
-  alert("Tu turno fue cancelado y el horario quedó libre.");
-} catch (err) {
-  console.error("Error cancelando turno:", err);
-  alert("Hubo un error al cancelar el turno.");
-}
-
+                try {
+                  const refUser = docFromPath(bloqueo.docPath!);
+                  const snap = await getDoc(refUser);
+                  if (!snap.exists()) throw new Error("Turno no encontrado en usuario");
+                  const data = snap.data() as TurnoData & { negocioId: string };
+                  await deleteDoc(refUser);
+                  if (data.negocioId) {
+                    const turnoId = refUser.id;
+                    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", turnoId);
+                    await deleteDoc(refNeg);
+                  }
+                  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
+                  setPaso(1);
+                  setServicio(null);
+                  setEmpleado(null);
+                  setTurno(null);
+                  alert("Tu turno fue cancelado y el horario quedó libre.");
+                } catch (err) {
+                  console.error("Error cancelando turno:", err);
+                  alert("Hubo un error al cancelar el turno.");
+                }
               }}
               className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
             >
@@ -399,7 +393,9 @@ try {
         {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
       </>
     )}
-  </ModalBase>
+  </div>
+</ModalBase>
+
 );
 
 }
