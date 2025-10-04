@@ -432,25 +432,31 @@ const handleEliminarTurno = async (
 
   return (
     <div className="bg-neutral-900 text-white p-5 rounded-2xl">
-      {/* Header + selector de empleado */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="text-xl font-semibold">Mi Agenda</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-300">Seleccionar agenda de:</span>
-          <select
-            className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
-            value={empleadoSel?.nombre || ""}
-            onChange={(e) => {
-              const emp = negocio.empleadosData?.find((x) => x.nombre === e.target.value) || null;
-              setEmpleadoSel(emp);
-            }}
-          >
-            {(negocio.empleadosData || []).map((e, i) => (
-              <option key={i} value={e.nombre}>{e.nombre}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {/* Header */}
+<div className="mb-2">
+  <h2 className="text-xl font-semibold">Mi Agenda</h2>
+</div>
+
+{/* Selector de empleado */}
+<div className="flex items-center gap-2 mb-4">
+  <span className="text-sm text-gray-300">Seleccionar agenda de:</span>
+  <select
+    className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
+    value={empleadoSel?.nombre || ""}
+    onChange={(e) => {
+      const emp =
+        negocio.empleadosData?.find((x) => x.nombre === e.target.value) || null;
+      setEmpleadoSel(emp);
+    }}
+  >
+    {(negocio.empleadosData || []).map((e, i) => (
+      <option key={i} value={e.nombre}>
+        {e.nombre}
+      </option>
+    ))}
+  </select>
+</div>
+
 
       {/* Calendario + Slots */}
 <div className="flex flex-col gap-6 lg:max-w-3xl mx-auto">
@@ -480,7 +486,7 @@ const handleEliminarTurno = async (
           </div>
 
 
-        {/* dias tachados */}
+        {/* días tachados */}
 <div className="grid grid-cols-7 gap-y-1 text-sm">
   {dias.map((d, idx) =>
     d ? (
@@ -489,12 +495,12 @@ const handleEliminarTurno = async (
         onClick={() => {
           if (diaSel && esMismoDia(diaSel, d)) {
             // 🔎 Revisar turnos del día seleccionado
-            const turnosDia = turnos.filter(t =>
+            const turnosDia = turnos.filter((t) =>
               esMismoDia(toDateSafe(t.inicioTs as any), d)
             );
             // ✅ true si hay turnos y todos son bloqueados
             const todosBloqueados =
-              turnosDia.length > 0 && turnosDia.every(t => t.bloqueado);
+              turnosDia.length > 0 && turnosDia.every((t) => t.bloqueado);
 
             setModalBloquearDia({
               visible: true,
@@ -507,10 +513,10 @@ const handleEliminarTurno = async (
         }}
         className={`w-10 h-8 flex items-center justify-center rounded-lg transition
           ${
-            d < hoy
-              ? "text-gray-500 line-through" // día pasado = gris + tachado
-              : esMismoDia(d, hoy)
-              ? "bg-white text-black font-bold" // hoy
+            esMismoDia(d, hoy)
+              ? "bg-white text-black font-bold" // 👈 día actual
+              : d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+              ? "text-gray-500 line-through" // días pasados
               : diaSel && esMismoDia(diaSel, d)
               ? "bg-indigo-600 text-white font-bold" // seleccionado
               : "hover:bg-neutral-700"
@@ -523,6 +529,7 @@ const handleEliminarTurno = async (
     )
   )}
 </div>
+
         </div>
 
         {/* Panel derecho */}
