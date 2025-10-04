@@ -4,6 +4,7 @@ import { obtenerDireccion } from "../../../lib/geocoding";
 import { useRef } from "react";
 import ModalEmpleadosUI from "./modalEmpleadosUI";
 import ModalAgregarServicios from "../modalAgregarServicios";
+import ModalShare from "./share";
 import { 
   doc, 
   updateDoc, 
@@ -191,7 +192,7 @@ const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false);
 // 👇 Estado único para ModalCalendarioCliente
 const [modalClienteAbierto, setModalClienteAbierto] = useState(false);
 const [redes, setRedes] = useState<Negocio["redes"]>(negocio.redes || {});
-
+const [modalShareAbierto, setModalShareAbierto] = useState(false);
 const handleGuardarUbicacion = () => {
   if (!navigator.geolocation) {
     console.error("⚠️ Tu navegador no soporta geolocalización.");
@@ -857,18 +858,22 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     <Phone className="w-4 h-4 text-white" />
   </a>
 
-  {/* Compartir (copia URL del slug) */}
-  <button
-    onClick={async () => {
-      const url = `https://agendateonline.com/agenda/${negocio.slug}`;
-      await navigator.clipboard.writeText(url);
-      alert("✅ Link copiado al portapapeles");
-    }}
-    className="w-8 h-8 flex items-center justify-center rounded-full transition bg-neutral-700 hover:bg-indigo-600"
-    title="Compartir agenda"
-  >
-    <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
-  </button>
+  {/* Compartir (abre modal con link copiado) */}
+<button
+  onClick={() => setModalShareAbierto(true)}
+  className="w-8 h-8 flex items-center justify-center rounded-full transition bg-neutral-700 hover:bg-indigo-600"
+  title="Compartir agenda"
+>
+  <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
+</button>
+
+{/* Modal compartir */}
+<ModalShare
+  abierto={modalShareAbierto}
+  onCerrar={() => setModalShareAbierto(false)}
+  slug={negocio.slug}
+/>
+
 </div>
 
   {/* Descripción editable */}

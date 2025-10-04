@@ -101,6 +101,7 @@ const combinarFechaHora = (fecha: Date, hhmm: string) => {
   d.setHours(h || 0, m || 0, 0, 0);
   return d;
 };
+
 const calcularInicioFinDesdeDoc = (t: any): { inicio: Date; fin: Date } | null => {
   const ini = t.inicioTs ? toDateSafe(t.inicioTs) : null;
   const fin = t.finTs ? toDateSafe(t.finTs) : null;
@@ -141,6 +142,13 @@ const [modalEliminar, setModalEliminar] = useState<{
   motivo?: string;
   estado?: "idle" | "loading" | "success" | "error";
 }>({ visible: false, turno: null, motivo: "", estado: "idle" });
+
+const [modalBloquearDia, setModalBloquearDia] = useState<{
+  visible: boolean;
+  fecha?: Date | null;
+  desbloquear?: boolean;
+  estado?: "idle" | "loading" | "success" | "error";
+}>({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
 
 
   // ⛔️ NO abrir horarios automáticamente
@@ -471,28 +479,50 @@ const handleEliminarTurno = async (
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-y-1 text-sm">
-            {dias.map((d, idx) =>
-              d ? (
-                <button
-                  key={idx}
-                  onClick={() => setDiaSel(d)}
-                  className={`w-10 h-8 flex items-center justify-center rounded-lg transition
-                    ${
-                      esMismoDia(d, hoy)
-                        ? "bg-white text-black font-bold"
-                        : diaSel && esMismoDia(d, diaSel)
-                        ? "bg-indigo-600 text-white font-bold"
-                        : "hover:bg-neutral-700"
-                    }`}
-                >
-                  {d.getDate()}
-                </button>
-              ) : (
-                <div key={idx} className="w-10 h-8" />
-              )
-            )}
-          </div>
+
+        {/* dias tachados */}
+<div className="grid grid-cols-7 gap-y-1 text-sm">
+  {dias.map((d, idx) =>
+    d ? (
+      <button
+        key={idx}
+        onClick={() => {
+          if (diaSel && esMismoDia(diaSel, d)) {
+            // 🔎 Revisar turnos del día seleccionado
+            const turnosDia = turnos.filter(t =>
+              esMismoDia(toDateSafe(t.inicioTs as any), d)
+            );
+            // ✅ true si hay turnos y todos son bloqueados
+            const todosBloqueados =
+              turnosDia.length > 0 && turnosDia.every(t => t.bloqueado);
+
+            setModalBloquearDia({
+              visible: true,
+              fecha: d,
+              desbloquear: todosBloqueados,
+            });
+          } else {
+            setDiaSel(d);
+          }
+        }}
+        className={`w-10 h-8 flex items-center justify-center rounded-lg transition
+          ${
+            d < hoy
+              ? "text-gray-500 line-through" // día pasado = gris + tachado
+              : esMismoDia(d, hoy)
+              ? "bg-white text-black font-bold" // hoy
+              : diaSel && esMismoDia(diaSel, d)
+              ? "bg-indigo-600 text-white font-bold" // seleccionado
+              : "hover:bg-neutral-700"
+          }`}
+      >
+        {d.getDate()}
+      </button>
+    ) : (
+      <div key={idx} className="w-10 h-8" />
+    )
+  )}
+</div>
         </div>
 
         {/* Panel derecho */}
@@ -791,7 +821,128 @@ const handleEliminarTurno = async (
   </div>
 )}
 
+{/* Modal bloquear/liberar día */}
+{modalBloquearDia.visible && modalBloquearDia.fecha && (
+  <div className="fixed inset-0 z-[10002] flex items-center justify-center p-2 sm:p-6">
+    <div
+      className="absolute inset-0 bg-black/60"
+      onClick={() => {
+        if (modalBloquearDia.estado === "loading") return; // no cerrar mientras carga
+        setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
+      }}
+    />
+    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+      <h3 className="text-lg font-semibold mb-4">
+        {modalBloquearDia.desbloquear ? "Liberar día completo" : "Bloquear día completo"}
+      </h3>
 
+      <p className="text-sm mb-4">
+        {modalBloquearDia.desbloquear ? (
+          <>¿Seguro que deseas <b>liberar</b> el día{" "}
+          {modalBloquearDia.fecha.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}?
+          <br/>Todos los turnos bloqueados volverán a estar disponibles.</>
+        ) : (
+          <>¿Seguro que deseas <b>bloquear</b> el día{" "}
+          {modalBloquearDia.fecha.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}?
+          <br/>Todos los turnos quedarán inhabilitados.</>
+        )}
+      </p>
+
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" })}
+          disabled={modalBloquearDia.estado === "loading"}
+          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-60"
+        >
+          Cancelar
+        </button>
+
+        <button
+          onClick={async () => {
+            if (modalBloquearDia.estado === "loading") return;
+
+            setModalBloquearDia(s => ({ ...s, estado: "loading" }));
+
+            try {
+              if (modalBloquearDia.desbloquear) {
+                // 🔓 liberar
+                const turnosDia = turnos.filter(
+                  t =>
+                    esMismoDia(toDateSafe(t.inicioTs as any), modalBloquearDia.fecha!) &&
+                    t.bloqueado
+                );
+                for (const t of turnosDia) {
+                  await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", t.id));
+                }
+              } else {
+                // 🚫 bloquear
+                const fecha = modalBloquearDia.fecha!;
+                const cal = empleadoSel?.calendario || {};
+                const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
+                const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
+                const inicioJ = (hi || 0) * 60 + (mi || 0);
+                const finJ = (hf || 0) * 60 + (mf || 0);
+                const paso = 30;
+
+                const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+
+                for (let m = inicioJ; m < finJ; m += paso) {
+                  const hora = minToHHMM(m);
+                  const inicio = combinarFechaHora(fecha, hora);
+                  const fin = new Date(inicio.getTime() + 30 * 60000);
+
+                  await addDoc(refNeg, {
+                    negocioId: negocio.id,
+                    negocioNombre: negocio.nombre,
+                    empleadoId: empleadoSel?.id || null,
+                    empleadoNombre: empleadoSel?.nombre,
+                    fecha: fecha.toISOString().split("T")[0],
+                    hora,
+                    inicioTs: inicio,
+                    finTs: fin,
+                    bloqueado: true,
+                    creadoEn: new Date(),
+                    creadoPor: "negocio-bloqueo-dia",
+                  });
+                }
+              }
+
+              // ✅ éxito
+              setModalBloquearDia(s => ({ ...s, estado: "success" }));
+              setTimeout(() => {
+                setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
+              }, 1200);
+            } catch (e) {
+              console.error("❌ Error bloqueando/liberando día:", e);
+              setModalBloquearDia(s => ({ ...s, estado: "error" }));
+            }
+          }}
+          disabled={modalBloquearDia.estado === "loading"}
+          className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
+            ${
+              modalBloquearDia.estado === "success"
+                ? "bg-emerald-600"
+                : modalBloquearDia.estado === "loading"
+                ? "bg-indigo-600 cursor-wait"
+                : modalBloquearDia.estado === "error"
+                ? "bg-red-700"
+                : modalBloquearDia.desbloquear
+                ? "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-red-600 hover:bg-red-700"
+            }`}
+        >
+          {modalBloquearDia.estado === "loading"
+            ? modalBloquearDia.desbloquear ? "Liberando..." : "Bloqueando..."
+            : modalBloquearDia.estado === "success"
+            ? modalBloquearDia.desbloquear ? "Se ha liberado" : "Se ha bloqueado"
+            : modalBloquearDia.estado === "error"
+            ? "Error. Reintentar"
+            : modalBloquearDia.desbloquear ? "Liberar día" : "Bloquear día"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 
       {/* Modal opciones de turno */}
