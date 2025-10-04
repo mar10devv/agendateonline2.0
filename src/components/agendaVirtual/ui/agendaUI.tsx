@@ -430,7 +430,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
             {/* Servicios */}
 <div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg relative">
   {/* 🔧 Botón Configuración */}
-  {modo === "dueño" && (
+  {(modo === "dueño" || modo === "admin") && (
     <button
       onClick={() => setModalServiciosAbierto(true)}
       className="absolute top-4 right-4"
@@ -456,26 +456,25 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
       breakpoints={{
         320: { slidesPerView: 2.5 },   // 📱 Mobile
         640: { slidesPerView: 3.5 },   // 📲 Tablet
-        1024: { slidesPerView: 4 },  // 💻 PC
+        1024: { slidesPerView: 4 },    // 💻 PC
       }}
     >
       {servicios.map((s, idx) => (
         <SwiperSlide key={s.id || idx} className="flex justify-center">
           <div className="flex flex-col justify-center items-center 
                 w-32 h-auto min-h-[96px] bg-neutral-900 rounded-xl p-2 text-center">
-  <p className="font-medium text-white text-sm text-center whitespace-normal break-words leading-tight">
-    {s.servicio}
-  </p>
-  <span className="text-sm text-gray-400">${s.precio}</span>
-  <span className="text-xs text-gray-500">{s.duracion} min</span>
-</div>
-
+            <p className="font-medium text-white text-sm text-center whitespace-normal break-words leading-tight">
+              {s.servicio}
+            </p>
+            <span className="text-sm text-gray-400">${s.precio}</span>
+            <span className="text-xs text-gray-500">{s.duracion} min</span>
+          </div>
         </SwiperSlide>
       ))}
     </Swiper>
   ) : (
     <div className="w-full flex justify-start mt-2">
-      {modo === "dueño" ? (
+      {(modo === "dueño" || modo === "admin") ? (
         <button
           onClick={() => setModalServiciosAbierto(true)}
           className="w-32 h-24 flex items-center justify-center 
@@ -490,8 +489,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     </div>
   )}
 
-  {/* Modal para agregar servicios */}
-  {modo === "dueño" && (
+  {/* ✅ Modal para agregar servicios (dueño o admin) */}
+  {(modo === "dueño" || modo === "admin") && (
     <ModalAgregarServicios
       abierto={modalServiciosAbierto}
       onCerrar={() => setModalServiciosAbierto(false)}
@@ -499,6 +498,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     />
   )}
 </div>
+
 
 <ModalPerfil
   abierto={modalPerfilAbierto}
@@ -560,10 +560,13 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 
       {/* Modal empleados → siempre abre el del negocio actual */}
       <ModalEmpleadosUI
-        abierto={modalAbierto}
-        onCerrar={() => setModalAbierto(false)}
-        negocioId={negocio.id}   // 👈 este es el que manda
-      />
+  abierto={modalAbierto}
+  onCerrar={() => setModalAbierto(false)}
+  negocioId={negocio.id}
+  modo={modo}              // 👈 ahora sabe si soy dueño o admin
+  userUid={usuario?.email} // 👈 para validar contra adminEmail o id
+/>
+
     </>
   )}
 
@@ -593,8 +596,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     )}
   </div>
 </div>
-
-
 
            {/* Calendario + Botón Agendarse */}
 {(modo === "dueño" || modo === "admin") && (
@@ -637,13 +638,15 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 {/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
 <div className="order-4 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4">
   <h2 className="text-lg font-semibold mb-4">
-    {modo === "dueño" ? "Mi ubicación" : `Ubicación de ${nombreNegocio}`}
+    {(modo === "dueño" || modo === "admin")
+      ? "Mi ubicación"
+      : `Ubicación de ${nombreNegocio}`}
   </h2>
 
   {/* Si no hay ubicación */}
   {!ubicacion && (
     <>
-      {modo === "dueño" ? (
+      {(modo === "dueño" || modo === "admin") ? (
         <button
           onClick={handleGuardarUbicacion}
           disabled={estadoUbicacion === "cargando"}
@@ -687,9 +690,9 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
           <Marker
             position={[ubicacion.lat, ubicacion.lng]}
             icon={customIcon}
-            draggable={modo === "dueño"}
+            draggable={modo === "dueño" || modo === "admin"}
             eventHandlers={
-              modo === "dueño"
+              (modo === "dueño" || modo === "admin")
                 ? {
                     dragend: async (e) => {
                       const newPos = e.target.getLatLng();
@@ -712,15 +715,15 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
                 : {}
             }
           >
-            {modo === "dueño" && (
+            {(modo === "dueño" || modo === "admin") && (
               <Popup>Mueve el pin si la ubicación no es correcta</Popup>
             )}
           </Marker>
         </MapContainer>
       </div>
 
-      {/* Botón solo para dueño */}
-      {modo === "dueño" && (
+      {/* Botón solo para dueño o admin */}
+      {(modo === "dueño" || modo === "admin") && (
         <div className="flex justify-end w-full">
           <button
             onClick={handleGuardarUbicacion}
@@ -747,6 +750,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     </div>
   )}
 </div>
+
 
 
 {/* Modal Agendarse */}
@@ -981,83 +985,85 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   )}
 
   {/* Mapa y botón actualizar */}
-  {ubicacion && (
-    <div className="w-full flex flex-col gap-4">
-      <div className="h-64 rounded-md overflow-hidden border">
-        <MapContainer
-          key={`${ubicacion.lat}-${ubicacion.lng}`}
-          center={[ubicacion.lat, ubicacion.lng]}
-          zoom={16}
-          style={{ width: "100%", height: "100%" }}
+{ubicacion && (
+  <div className="w-full flex flex-col gap-4">
+    <div className="h-64 rounded-md overflow-hidden border">
+      <MapContainer
+        key={`${ubicacion.lat}-${ubicacion.lng}`}
+        center={[ubicacion.lat, ubicacion.lng]}
+        zoom={16}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+        />
+        <Marker
+          position={[ubicacion.lat, ubicacion.lng]}
+          icon={customIcon}
+          draggable={modo === "dueño" || modo === "admin"}
+          eventHandlers={
+            (modo === "dueño" || modo === "admin")
+              ? {
+                  dragend: async (e) => {
+                    const newPos = e.target.getLatLng();
+                    const direccion = await obtenerDireccion(
+                      newPos.lat,
+                      newPos.lng
+                    );
+                    const nuevaUbicacion = {
+                      lat: newPos.lat,
+                      lng: newPos.lng,
+                      direccion,
+                    };
+                    await guardarUbicacionNegocio(
+                      negocio.slug,
+                      nuevaUbicacion
+                    );
+                    setUbicacion(nuevaUbicacion);
+                  },
+                }
+              : {}
+          }
         >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap contributors'
-          />
-          <Marker
-            position={[ubicacion.lat, ubicacion.lng]}
-            icon={customIcon}
-            draggable={modo === "dueño"}
-            eventHandlers={
-              modo === "dueño"
-                ? {
-                    dragend: async (e) => {
-                      const newPos = e.target.getLatLng();
-                      const direccion = await obtenerDireccion(
-                        newPos.lat,
-                        newPos.lng
-                      );
-                      const nuevaUbicacion = {
-                        lat: newPos.lat,
-                        lng: newPos.lng,
-                        direccion,
-                      };
-                      await guardarUbicacionNegocio(
-                        negocio.slug,
-                        nuevaUbicacion
-                      );
-                      setUbicacion(nuevaUbicacion);
-                    },
-                  }
-                : {}
-            }
-          >
-            {modo === "dueño" && (
-              <Popup>Mueve el pin si la ubicación no es correcta</Popup>
-            )}
-          </Marker>
-        </MapContainer>
-      </div>
-
-      {modo === "dueño" && (
-        <div className="flex justify-end w-full">
-          <button
-            onClick={handleGuardarUbicacion}
-            disabled={estadoUbicacion === "cargando"}
-            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition ${
-              estadoUbicacion === "cargando"
-                ? "bg-gray-600 text-white"
-                : estadoUbicacion === "exito"
-                ? "bg-green-600 text-white"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
-            }`}
-          >
-            {estadoUbicacion === "cargando" && (
-              <>
-                <LoaderSpinner size={14} color="white" />
-                Buscando...
-              </>
-            )}
-            {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
-            {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
-          </button>
-        </div>
-      )}
+          {(modo === "dueño" || modo === "admin") && (
+            <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+          )}
+        </Marker>
+      </MapContainer>
     </div>
-  )}
+
+    {/* Botón actualizar ubicación */}
+    {(modo === "dueño" || modo === "admin") && (
+      <div className="flex justify-end w-full">
+        <button
+          onClick={handleGuardarUbicacion}
+          disabled={estadoUbicacion === "cargando"}
+          className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition ${
+            estadoUbicacion === "cargando"
+              ? "bg-gray-600 text-white"
+              : estadoUbicacion === "exito"
+              ? "bg-green-600 text-white"
+              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+          }`}
+        >
+          {estadoUbicacion === "cargando" && (
+            <>
+              <LoaderSpinner size={14} color="white" />
+              Buscando...
+            </>
+          )}
+          {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
+          {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+        </button>
+      </div>
+    )}
+  </div>
+)}
 </div>
 </div>
 {/* 🔹 Fin Mapa */}
+
                </div>
       </div>
 

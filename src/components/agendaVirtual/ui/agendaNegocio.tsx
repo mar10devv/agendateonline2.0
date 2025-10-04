@@ -436,7 +436,7 @@ const handleEliminarTurno = async (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-xl font-semibold">Mi Agenda</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-300">Seleccionar empleado:</span>
+          <span className="text-sm text-gray-300">Seleccionar agenda de:</span>
           <select
             className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
             value={empleadoSel?.nombre || ""}

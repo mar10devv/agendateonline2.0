@@ -1,3 +1,4 @@
+// src/components/agendaVirtual/agendaVirtual.tsx
 import { useEffect, useState } from "react";
 import {
   detectarUsuario,
@@ -5,15 +6,15 @@ import {
   getEmpleados,
   getTurnos,
   type Turno,
-  type Empleado,
   type Negocio,
 } from "./backend/agenda-backend";
-import { getCache, setCache } from "../../lib/cacheAgenda"; // 👈 usamos cache
+import type { Empleado } from "./backend/modalEmpleadosBackend"; // ✅ importamos el tipo correcto
+import { getCache, setCache } from "../../lib/cacheAgenda"; 
 import AgendaVirtualUI from "./ui/agendaUI";
 import LoaderAgenda from "../ui/loaderAgenda";
 
 type Estado = "cargando" | "no-sesion" | "listo";
-type Modo = "dueño" | "cliente" | "admin"; // 👈 ahora soporta admin
+type Modo = "dueño" | "cliente" | "admin";
 
 type Props = {
   slug: string;
@@ -67,7 +68,6 @@ export default function AgendaVirtual({ slug }: Props) {
           if (user.uid === negocio.id) {
             setModo("dueño");
           } else {
-            // Buscar si es admin
             const esAdmin = emps.find(
               (e) => e.admin === true && e.adminEmail === user.email
             );
@@ -131,7 +131,7 @@ export default function AgendaVirtual({ slug }: Props) {
       empleados={empleados}
       turnos={turnos}
       negocio={negocio}
-      modo={modo} // 👈 ahora puede ser "dueño" | "admin" | "cliente"
+      modo={modo}
       plan={negocio.tipoPremium ?? "gratis"}
     />
   );
