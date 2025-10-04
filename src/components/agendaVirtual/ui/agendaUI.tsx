@@ -572,62 +572,159 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     )}
   </div>
 </div>
-            {/* Calendario + Botón Agendarse */}
-<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col relative">
+           {/* Calendario + Botón Agendarse */}
+{modo === "dueño" && (
+  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden">
+    <AgendaNegocio
+      negocio={{
+        id: negocio.id,
+        nombre: negocio.nombre,
+        empleadosData: empleadosState || empleados || [],
+        slug: negocio.slug,
+      }}
+    />
+  </div>
+)}
+
+<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative">
   {modo === "dueño" ? (
-    // 🔹 Vista de AGENDA PARA NEGOCIO
-    <div className="order-3">
+    <div className="order-3 w-full">
       <AgendaNegocio
         negocio={{
           id: negocio.id,
           nombre: negocio.nombre,
           empleadosData: empleadosState || empleados || [],
-          slug: negocio.slug, 
+          slug: negocio.slug,
         }}
       />
     </div>
   ) : (
-    <>
-      {/* 🔹 Mobile → mapa */}
-      <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden">
-        <h2 className="text-lg font-semibold mb-4">Ubicación</h2>
-        {ubicacion ? (
-          <a
-            href={`https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full h-64 rounded-md overflow-hidden border"
-          >
-            <MapContainer
-              key={`${ubicacion.lat}-${ubicacion.lng}`}
-              center={[ubicacion.lat, ubicacion.lng]}
-              zoom={16}
-              className="w-full h-full pointer-events-none" // 👈 Desactiva interacción para que el click vaya al <a>
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; OpenStreetMap contributors'
-              />
-              <Marker position={[ubicacion.lat, ubicacion.lng]} icon={customIcon} />
-            </MapContainer>
-          </a>
-        ) : (
-          <p className="text-gray-400 text-sm">Ubicación no disponible.</p>
-        )}
-      </div>
-
-      {/* 🔹 Desktop → botón reservar turno */}
-      <div className="hidden md:flex w-full justify-center">
-        <button
-          onClick={() => setModalAgendarseAbierto(true)}
-          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
-        >
-          📅 Reservar turno
-        </button>
-      </div>
-    </>
+    <div className="w-full justify-center flex">
+      <button
+        onClick={() => setModalAgendarseAbierto(true)}
+        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
+      >
+        📅 Reservar turno
+      </button>
+    </div>
   )}
 </div>
+
+
+{/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
+<div className="order-4 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4">
+  <h2 className="text-lg font-semibold mb-4">
+    {modo === "dueño" ? "Mi ubicación" : `Ubicación de ${nombreNegocio}`}
+  </h2>
+
+  {/* Si no hay ubicación */}
+  {!ubicacion && (
+    <>
+      {modo === "dueño" ? (
+        <button
+          onClick={handleGuardarUbicacion}
+          disabled={estadoUbicacion === "cargando"}
+          className={`px-4 py-2 rounded-md flex items-center justify-center gap-2 transition ${
+            estadoUbicacion === "cargando"
+              ? "bg-gray-600 text-white"
+              : estadoUbicacion === "exito"
+              ? "bg-green-600 text-white"
+              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+          }`}
+        >
+          {estadoUbicacion === "cargando" && (
+            <>
+              <LoaderSpinner size={20} color="white" />
+              Cargando nueva ubicación...
+            </>
+          )}
+          {estadoUbicacion === "exito" && "✅ Se ha cambiado la ubicación"}
+          {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
+        </button>
+      ) : (
+        <p className="text-gray-400 text-sm">Ubicación no disponible.</p>
+      )}
+    </>
+  )}
+
+  {/* Si hay ubicación */}
+  {ubicacion && (
+    <div className="w-full flex flex-col gap-4">
+      <div className="h-64 rounded-md overflow-hidden border">
+        <MapContainer
+          key={`${ubicacion.lat}-${ubicacion.lng}`}
+          center={[ubicacion.lat, ubicacion.lng]}
+          zoom={16}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          <Marker
+            position={[ubicacion.lat, ubicacion.lng]}
+            icon={customIcon}
+            draggable={modo === "dueño"}
+            eventHandlers={
+              modo === "dueño"
+                ? {
+                    dragend: async (e) => {
+                      const newPos = e.target.getLatLng();
+                      const direccion = await obtenerDireccion(
+                        newPos.lat,
+                        newPos.lng
+                      );
+                      const nuevaUbicacion = {
+                        lat: newPos.lat,
+                        lng: newPos.lng,
+                        direccion,
+                      };
+                      await guardarUbicacionNegocio(
+                        negocio.slug,
+                        nuevaUbicacion
+                      );
+                      setUbicacion(nuevaUbicacion);
+                    },
+                  }
+                : {}
+            }
+          >
+            {modo === "dueño" && (
+              <Popup>Mueve el pin si la ubicación no es correcta</Popup>
+            )}
+          </Marker>
+        </MapContainer>
+      </div>
+
+      {/* Botón solo para dueño */}
+      {modo === "dueño" && (
+        <div className="flex justify-end w-full">
+          <button
+            onClick={handleGuardarUbicacion}
+            disabled={estadoUbicacion === "cargando"}
+            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition ${
+              estadoUbicacion === "cargando"
+                ? "bg-gray-600 text-white"
+                : estadoUbicacion === "exito"
+                ? "bg-green-600 text-white"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
+          >
+            {estadoUbicacion === "cargando" && (
+              <>
+                <LoaderSpinner size={14} color="white" />
+                Cargando nueva ubicación...
+              </>
+            )}
+            {estadoUbicacion === "exito" && "✅ Se ha cambiado la ubicación"}
+            {estadoUbicacion === "idle" && "📍 Actualizar mi ubicación"}
+          </button>
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
 
 {/* Modal Agendarse */}
 {modalAgendarseAbierto && (
