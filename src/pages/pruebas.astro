@@ -1,0 +1,22 @@
+---
+import Pruebass from "./pruebas";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banco de pruebas</title>
+  </head>
+
+  <body class="bg-neutral-900 text-white flex flex-col items-center justify-center min-h-screen">
+    <h1 class="text-3xl font-bold mb-8">🧪 Banco de pruebas</h1>
+
+    <!-- ✅ Renderiza el componente React -->
+    <Pruebass client:only="react" />
+
+    <p class="text-sm mt-10 text-gray-400">
+      Editá este archivo en <code>src/pages/pruebas.astro</code> o <code>src/components/ui/pruebas.tsx</code>.
+    </p>
+  </body>
+</html>

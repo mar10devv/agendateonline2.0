@@ -1,10 +1,10 @@
-// src/components/agendaVirtual/ui/modalPerfil.tsx
 import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import { subirLogoNegocio, actualizarNombreYSlug } from "../backend/agenda-backend";
-import { compressImageFileToWebP } from "../../../lib/imageUtils"; // ✅ import para comprimir
+import { compressImageFileToWebP } from "../../../lib/imageUtils";
 import ModalTema from "./modalTema";
+import InputAnimado from "../../ui/InputAnimado"; // ✅ import del input animado
 
 type Props = {
   abierto: boolean;
@@ -50,6 +50,9 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   const [tamanioArchivo, setTamanioArchivo] = useState(0);
   const [modalTemaAbierto, setModalTemaAbierto] = useState(false);
 
+  // 🔹 Estado del botón “Guardar cambios”
+  const [estadoBoton, setEstadoBoton] = useState<"normal" | "guardando" | "exito" | "error">("normal");
+
   // 🔄 Sincronizar con negocio cada vez que abre el modal
   useEffect(() => {
     if (negocio) {
@@ -66,7 +69,7 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
 
   if (!abierto) return null;
 
-  // 📸 Manejar carga del logo con compresión previa
+  // 📸 Manejar carga del logo
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -78,12 +81,7 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
 
     try {
       setSubiendo(true);
-
-      // 🧩 1️⃣ Comprimir antes de subir (a WebP)
       const fileComprimido = await compressImageFileToWebP(file);
-      console.log("📦 Imagen comprimida antes de subir:", fileComprimido);
-
-      // 🧩 2️⃣ Subir imagen comprimida a ImgBB
       const url = await subirLogoNegocio(fileComprimido);
       if (url) {
         setLogo(url);
@@ -98,15 +96,16 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
     }
   };
 
+  // 💾 Guardar cambios con estados del botón
   const handleGuardar = async () => {
     let nuevoSlug = negocio.slug;
     try {
-      // 👉 Si el nombre cambió → actualiza nombre + slug
+      setEstadoBoton("guardando");
+
       if (nombre !== negocio.nombre) {
         nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
       }
 
-      // 👉 Guardar otros cambios
       await onGuardar({
         perfilLogo: logo,
         descripcion,
@@ -118,14 +117,19 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
       });
 
       console.log("✅ Perfil actualizado correctamente");
+      setEstadoBoton("exito");
+      setTimeout(() => setEstadoBoton("normal"), 3000);
+
       onCerrar();
 
-      // 👉 Redirigir SOLO si el slug cambió
       if (nuevoSlug !== negocio.slug) {
         window.location.href = `/agenda/${nuevoSlug}`;
       }
     } catch (err: any) {
       console.error("❌ Error en handleGuardar:", err);
+      setEstadoBoton("error");
+      setTimeout(() => setEstadoBoton("normal"), 3000);
+
       if (err.message?.includes("Ya existe")) {
         alert("❌ Ya existe un negocio con ese nombre/slug");
       } else {
@@ -178,59 +182,17 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
           />
         </div>
 
-        {/* Nombre */}
-        <input
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre del negocio"
-          className="w-full rounded p-2 text-white text-center transition-colors duration-300 outline-none"
-          style={{ backgroundColor: "var(--color-primario)" }}
-        />
-
-        {/* Descripción */}
-        <textarea
-          maxLength={200}
-          rows={4}
-          placeholder="Escribe una descripción (máx 200 caracteres)"
-          className="w-full text-sm rounded-lg p-3 text-white resize-none outline-none transition-colors duration-300"
-          style={{ backgroundColor: "var(--color-primario)" }}
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-        />
-
-        {/* Redes */}
-        <div className="flex flex-col gap-3 w-full">
-          <input
-            type="text"
-            placeholder="Link de Instagram"
-            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-            style={{ backgroundColor: "var(--color-primario)" }}
-            value={instagram}
-            onChange={(e) => setInstagram(e.target.value)}
-          />
-
-          <input
-            type="text"
-            placeholder="Link de Facebook"
-            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-            style={{ backgroundColor: "var(--color-primario)" }}
-            value={facebook}
-            onChange={(e) => setFacebook(e.target.value)}
-          />
-
-          <input
-            type="text"
-            placeholder="Número de teléfono o WhatsApp"
-            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-            style={{ backgroundColor: "var(--color-primario)" }}
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-          />
+        {/* ✅ Campos con InputAnimado */}
+        <div className="flex flex-col gap-5 w-full px-4">
+          <InputAnimado label="Nombre del negocio" id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          <InputAnimado label="Descripción" id="descripcion" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          <InputAnimado label="Instagram" id="instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+          <InputAnimado label="Facebook" id="facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+          <InputAnimado label="WhatsApp" id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
         </div>
 
-        {/* Botones */}
-        <div className="flex gap-3 justify-center">
+        {/* 🔘 Botones */}
+        <div className="flex gap-3 justify-center mt-4">
           <button
             onClick={() => setModalTemaAbierto(true)}
             className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded font-medium transition"
@@ -238,11 +200,29 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
             Cambiar tema
           </button>
 
+          {/* Botón dinámico de Guardar */}
           <button
             onClick={handleGuardar}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
+            disabled={estadoBoton === "guardando"}
+            className={`px-4 py-2 rounded font-medium transition text-white flex items-center justify-center gap-2
+              ${
+                estadoBoton === "guardando"
+                  ? "bg-gray-500 cursor-not-allowed"
+                  : estadoBoton === "exito"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : estadoBoton === "error"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
           >
-            Guardar cambios
+            {estadoBoton === "guardando" && <LoaderSpinner size={18} />}
+            {estadoBoton === "guardando"
+              ? "Guardando cambios..."
+              : estadoBoton === "exito"
+              ? "✅ Se guardó correctamente"
+              : estadoBoton === "error"
+              ? "❌ Se produjo un error"
+              : "Guardar cambios"}
           </button>
         </div>
       </div>
