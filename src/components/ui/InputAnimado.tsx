@@ -4,7 +4,7 @@ import styled from "styled-components";
 type InputAnimadoProps = {
   label: string;
   id?: string;
-  value?: string;
+  value?: string | number; // ✅ ahora acepta números también
   onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 };
 
@@ -16,7 +16,7 @@ const InputAnimado: React.FC<InputAnimadoProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // 🔹 Autoajustar altura en textarea
+  // 🔹 Autoajustar altura del textarea (solo si aplica)
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -120,7 +120,7 @@ const StyledWrapper = styled.div`
     transform: translateY(-28px); /* 🔹 sube el label */
   }
 
-  /* 🔹 Cuando hay contenido largo, desplaza suavemente */
+  /* 🔹 Cuando hay contenido largo, mantiene el label arriba */
   .form-control textarea:not(:placeholder-shown) + label span {
     transform: translateY(-28px);
   }
