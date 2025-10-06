@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import { subirLogoNegocio, actualizarNombreYSlug } from "../backend/agenda-backend";
+import ModalTema from "./modalTema";
 
 type Props = {
   abierto: boolean;
@@ -45,6 +46,8 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   const [nombre, setNombre] = useState("");
   const [nombreArchivo, setNombreArchivo] = useState("");
   const [tamanioArchivo, setTamanioArchivo] = useState(0);
+  const [modalTemaAbierto, setModalTemaAbierto] = useState(false);
+
 
   // 🔄 Sincronizar con negocio cada vez que abre el modal
   useEffect(() => {
@@ -138,9 +141,11 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
         {/* 📸 Logo */}
         <div className="relative w-28 h-28">
           {subiendo ? (
-            <div className="w-28 h-28 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-white">
-              <LoaderSpinner />
-            </div>
+            <div className="w-28 h-28 rounded-full flex items-center justify-center border-4 border-white transition-colors duration-300"
+     style={{ backgroundColor: "var(--color-fondo)" }}>
+  <LoaderSpinner />
+</div>
+
           ) : logo ? (
             <img
               src={logo}
@@ -169,56 +174,78 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
         </div>
 
         {/* Nombre */}
-        <input
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre del negocio"
-          className="w-full bg-neutral-800 rounded p-2 text-white text-center"
-        />
+       <input
+  type="text"
+  value={nombre}
+  onChange={(e) => setNombre(e.target.value)}
+  placeholder="Nombre del negocio"
+  className="w-full rounded p-2 text-white text-center transition-colors duration-300 outline-none"
+  style={{ backgroundColor: "var(--color-primario)" }}
+/>
+
 
         {/* Descripción */}
         <textarea
-          maxLength={200}
-          rows={4}
-          placeholder="Escribe una descripción (máx 200 caracteres)"
-          className="w-full text-sm bg-neutral-800 rounded-lg p-3 text-white resize-none outline-none"
-          value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-        />
+  maxLength={200}
+  rows={4}
+  placeholder="Escribe una descripción (máx 200 caracteres)"
+  className="w-full text-sm rounded-lg p-3 text-white resize-none outline-none transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-primario)" }}
+  value={descripcion}
+  onChange={(e) => setDescripcion(e.target.value)}
+/>
+
 
         {/* Redes */}
-        <div className="flex flex-col gap-3 w-full">
-          <input
-            type="text"
-            placeholder="Link de Instagram"
-            className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={instagram}
-            onChange={(e) => setInstagram(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Link de Facebook"
-            className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={facebook}
-            onChange={(e) => setFacebook(e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Número de teléfono o WhatsApp"
-            className="flex-1 bg-neutral-800 p-2 rounded text-white text-sm outline-none"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-          />
-        </div>
+<div className="flex flex-col gap-3 w-full">
+  <input
+    type="text"
+    placeholder="Link de Instagram"
+    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+    style={{ backgroundColor: "var(--color-primario)" }}
+    value={instagram}
+    onChange={(e) => setInstagram(e.target.value)}
+  />
 
-        <button
-          onClick={handleGuardar}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
-        >
-          Guardar cambios
-        </button>
+  <input
+    type="text"
+    placeholder="Link de Facebook"
+    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+    style={{ backgroundColor: "var(--color-primario)" }}
+    value={facebook}
+    onChange={(e) => setFacebook(e.target.value)}
+  />
+
+  <input
+    type="text"
+    placeholder="Número de teléfono o WhatsApp"
+    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+    style={{ backgroundColor: "var(--color-primario)" }}
+    value={telefono}
+    onChange={(e) => setTelefono(e.target.value)}
+  />
+</div>
+
+        <div className="flex gap-3 justify-center">
+  <button
+    onClick={() => setModalTemaAbierto(true)}
+    className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded font-medium transition"
+  >
+    Cambiar tema
+  </button>
+
+  <button
+    onClick={handleGuardar}
+    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
+  >
+    Guardar cambios
+  </button>
+</div>
       </div>
+      <ModalTema
+  abierto={modalTemaAbierto}
+  onCerrar={() => setModalTemaAbierto(false)}
+/>
     </ModalGenerico>
   );
 }

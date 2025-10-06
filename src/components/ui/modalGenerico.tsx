@@ -53,24 +53,30 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
 
   if (!visible) return null;
 
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-md">
-      <div
-        className={`bg-neutral-900 text-white rounded-xl shadow-2xl w-[90%] ${maxWidth} p-6 relative ${animClass}`}
+return (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-md">
+    <div
+      className={`text-white rounded-xl shadow-2xl w-[90%] ${maxWidth} p-6 relative transition-colors duration-300 ${animClass}`}
+      style={{ backgroundColor: "var(--color-fondo)" }}
+    >
+      {/* Botón cerrar */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-gray-300 hover:text-red-400 transition"
       >
-        {/* Botón cerrar */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-red-500"
-        >
-          ✖
-        </button>
+        ✖
+      </button>
 
-        {titulo && <h2 className="text-lg font-semibold mb-4 text-center">{titulo}</h2>}
-        <div>{children}</div>
-      </div>
+      {titulo && (
+        <h2 className="text-lg font-semibold mb-4 text-center">
+          {titulo}
+        </h2>
+      )}
+      <div>{children}</div>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default ModalGenerico;

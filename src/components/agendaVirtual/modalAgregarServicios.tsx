@@ -143,7 +143,7 @@ export default function ModalAgregarServicios({
     }
   };
 
-  if (!abierto) return null;
+    if (!abierto) return null;
 
   return (
     <ModalBase
@@ -152,10 +152,13 @@ export default function ModalAgregarServicios({
       titulo="Servicios del negocio"
       maxWidth="max-w-3xl"
     >
-      <div className="flex flex-col h-[600px]">
+      <div
+        className="flex flex-col h-[600px] rounded-2xl p-4 transition-colors duration-300"
+        style={{ backgroundColor: "var(--color-fondo)", color: "#fff" }}
+      >
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {cargando ? (
-            <p className="text-gray-400">Cargando servicios...</p>
+            <p className="text-gray-300">Cargando servicios...</p>
           ) : servicios.length === 0 ? (
             <p className="text-gray-400 text-sm">
               No hay servicios cargados aún.
@@ -163,7 +166,7 @@ export default function ModalAgregarServicios({
           ) : (
             <>
               {/* Cabecera */}
-              <div className="grid grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] gap-2 px-2 text-gray-300 text-sm font-medium">
+              <div className="grid grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] gap-2 px-2 text-gray-200 text-sm font-medium">
                 <span>Nombre</span>
                 <span>Precio</span>
                 <span>H</span>
@@ -174,7 +177,8 @@ export default function ModalAgregarServicios({
               {servicios.map((serv, i) => (
                 <div
                   key={serv.id || i}
-                  className="grid grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] gap-2 items-center bg-neutral-800 p-3 rounded-lg"
+                  className="grid grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] gap-2 items-center rounded-lg p-3 transition-colors duration-300"
+                  style={{ backgroundColor: "var(--color-primario)" }}
                 >
                   {/* Nombre */}
                   <input
@@ -182,7 +186,7 @@ export default function ModalAgregarServicios({
                     placeholder="Nombre"
                     value={serv.servicio}
                     onChange={(e) => handleChange(i, "servicio", e.target.value)}
-                    className="px-2 py-1 bg-neutral-900 border border-gray-700 rounded text-white"
+                    className="px-2 py-1 bg-black/30 border border-white/20 rounded text-white outline-none"
                   />
 
                   {/* Precio */}
@@ -192,13 +196,9 @@ export default function ModalAgregarServicios({
                     value={serv.precio === 0 ? "" : serv.precio}
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (val === "") {
-                        handleChange(i, "precio", "");
-                      } else {
-                        handleChange(i, "precio", Number(val));
-                      }
+                      handleChange(i, "precio", val === "" ? "" : Number(val));
                     }}
-                    className="px-2 py-1 bg-neutral-900 border border-gray-700 rounded text-white text-center"
+                    className="px-2 py-1 bg-black/30 border border-white/20 rounded text-white text-center outline-none"
                   />
 
                   {/* Horas */}
@@ -210,7 +210,7 @@ export default function ModalAgregarServicios({
                       handleDuracionChange(i, "horas", horas);
                       handleDuracionChange(i, "minutos", minutos);
                     }}
-                    className="px-2 py-1 bg-neutral-900 border border-gray-700 rounded text-white text-center"
+                    className="px-2 py-1 bg-black/30 border border-white/20 rounded text-white text-center outline-none"
                   >
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((h) => (
                       <option key={h} value={h}>
@@ -232,15 +232,15 @@ export default function ModalAgregarServicios({
                       handleDuracionChange(i, "minutos", minutos);
                       handleDuracionChange(i, "horas", horas);
                     }}
-                    className="px-2 py-1 bg-neutral-900 border border-gray-700 rounded text-white text-center"
+                    className="px-2 py-1 bg-black/30 border border-white/20 rounded text-white text-center outline-none"
                   />
 
                   {/* Botón eliminar */}
                   <button
                     onClick={() => handleEliminar(i)}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                    className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
                   >
-                    X
+                    ✕
                   </button>
                 </div>
               ))}
@@ -252,7 +252,11 @@ export default function ModalAgregarServicios({
         <div className="mt-4">
           <button
             onClick={handleAgregar}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700"
+            className="w-full sm:w-auto px-4 py-2 rounded-lg shadow font-medium transition"
+            style={{
+              backgroundColor: "var(--color-primario)",
+              color: "#fff",
+            }}
           >
             ➕ Añadir servicio
           </button>
@@ -262,13 +266,16 @@ export default function ModalAgregarServicios({
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onCerrar}
-            className="px-5 py-2 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600"
+            className="px-5 py-2 rounded-lg bg-black/40 text-gray-200 hover:bg-black/60 transition"
           >
             Cancelar
           </button>
           <button
             onClick={handleGuardar}
-            className="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+            className="px-6 py-2 rounded-lg text-white font-medium transition"
+            style={{
+              backgroundColor: "var(--color-primario)",
+            }}
           >
             Guardar cambios
           </button>

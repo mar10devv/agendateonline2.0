@@ -4,6 +4,9 @@ import { obtenerDireccion } from "../../../lib/geocoding";
 import { useRef } from "react";
 import ModalEmpleadosUI from "./modalEmpleadosUI";
 import ModalAgregarServicios from "../modalAgregarServicios";
+import { inicializarTema } from "../../../lib/temaColores";
+import SelectorTema from "../ui/SelectorTema";
+
 import ModalShare from "./share";
 import { 
   doc, 
@@ -331,6 +334,7 @@ const handleGuardarDescripcion = async () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-neutral-900 text-white text-center p-6">
         🚫 Tu negocio está en plan <b>Gratis</b>.
+    
         <br />
         Actualizá a Premium Lite o Premium Gold para activar tu agenda.
       </div>
@@ -393,13 +397,25 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     unsubscribeNegocio();
   };
 }, [negocio.slug, modalAbierto]);
-
+useEffect(() => {
+  inicializarTema();
+}, []);
 
   return (
-    <div className="w-full min-h-screen bg-neutral-900 text-white">
-  {/* Banner */}
-  <div className="hidden md:flex justify-center">
-  <div className="w-full max-w-7xl h-96 relative rounded-b-2xl overflow-hidden">
+    <div className="w-full min-h-screen bg-[var(--color-fondo)] text-white transition-colors duration-300">
+
+{/* Banner */}
+<div className="hidden md:flex justify-center">
+  <div
+    className="w-full max-w-7xl h-96 relative rounded-b-2xl overflow-hidden transition-colors duration-300"
+    style={{
+      backgroundColor:
+        negocio.bannerUrl || logo || negocio.perfilLogo
+          ? "transparent"
+          : "var(--color-primario)",
+    }}
+  >
+    {negocio.bannerUrl || logo || negocio.perfilLogo ? (
       <img
         src={
           logo
@@ -413,8 +429,14 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
         alt={nombreNegocio}
         className="w-full h-full object-cover"
       />
-    </div>
+    ) : (
+      <div className="w-full h-full flex items-center justify-center text-white text-2xl font-semibold">
+        {nombreNegocio}
+      </div>
+    )}
   </div>
+</div>
+
 
 
       
@@ -428,7 +450,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
             <div className="flex flex-col gap-6 order-2 md:order-1">
 
             {/* Servicios */}
-<div className="order-1 bg-neutral-800 rounded-2xl p-6 shadow-lg relative">
+<div className="order-1 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg relative transition-colors duration-300">
+
   {/* 🔧 Botón Configuración */}
   {(modo === "dueño" || modo === "admin") && (
     <button
@@ -461,8 +484,14 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     >
       {servicios.map((s, idx) => (
         <SwiperSlide key={s.id || idx} className="flex justify-center">
-          <div className="flex flex-col justify-center items-center 
-                w-32 h-auto min-h-[96px] bg-neutral-900 rounded-xl p-2 text-center">
+          <div
+  className="flex flex-col justify-center items-center 
+  w-32 h-auto min-h-[96px] rounded-xl p-2 text-center transition-colors duration-300"
+  style={{
+    backgroundColor: "var(--color-primario-oscuro, #171717)", // negro por defecto
+  }}
+>
+
             <p className="font-medium text-white text-sm text-center whitespace-normal break-words leading-tight">
               {s.servicio}
             </p>
@@ -498,8 +527,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     />
   )}
 </div>
-
-
 <ModalPerfil
   abierto={modalPerfilAbierto}
   onCerrar={() => setModalPerfilAbierto(false)}
@@ -541,7 +568,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   }}
 />
             {/* Empleados */}
-<div className="order-2 bg-neutral-800 rounded-2xl p-6 relative shadow-lg">
+<div className="order-2 bg-[var(--color-primario)] rounded-2xl p-6 relative shadow-lg transition-colors duration-300">
+
   <h2 className="text-lg font-semibold mb-4">Empleados</h2>
 
   {/* 👑 Dueño y Admin pueden abrir el modal de empleados de ESTE negocio */}
@@ -599,7 +627,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 
            {/* Calendario + Botón Agendarse */}
 {(modo === "dueño" || modo === "admin") && (
-  <div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden">
+  <div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden transition-colors duration-300">
+
     <AgendaNegocio
       negocio={{
         id: negocio.id,
@@ -611,7 +640,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   </div>
 )}
 
-<div className="order-3 bg-neutral-800 rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative">
+<div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative transition-colors duration-300">
+
   {(modo === "dueño" || modo === "admin") ? (
     <div className="order-3 w-full">
       <AgendaNegocio
@@ -636,7 +666,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 </div>
 
 {/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
-<div className="order-4 bg-neutral-800 rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4">
+<div className="order-4 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4 transition-colors duration-300">
+
   <h2 className="text-lg font-semibold mb-4">
     {(modo === "dueño" || modo === "admin")
       ? "Mi ubicación"
@@ -751,8 +782,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
   )}
 </div>
 
-
-
 {/* Modal Agendarse */}
 {modalAgendarseAbierto && (
   <ModalAgendarse
@@ -776,7 +805,8 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 <div className="flex flex-col gap-6 md:order-2 md:pr-6">
       
       {/* Columna derecha -> Perfil */}
-<div className="order-1 md:order-2 bg-neutral-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0">
+<div className="order-1 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0 transition-colors duration-300">
+
   {/* ⚙️ Tuerca */}
 {modo === "dueño" && (
   <button
@@ -959,7 +989,7 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 {/* 🔹 Fin Perfil */}
 
 {/* Columna derecha -> Mapa */}
-<div className="hidden md:flex order-5 md:order-2 bg-neutral-800 rounded-2xl p-6 flex-col items-center text-center shadow-lg relative">
+<div className="hidden md:flex order-5 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex-col items-center text-center shadow-lg relative transition-colors duration-300">
   {/* Botón inicial si no hay ubicación */}
   {modo === "dueño" && !ubicacion && (
     <button

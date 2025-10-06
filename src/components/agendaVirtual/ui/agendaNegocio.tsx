@@ -431,7 +431,10 @@ const handleEliminarTurno = async (
 
 
   return (
-    <div className="bg-neutral-900 text-white p-5 rounded-2xl">
+<div
+  className="text-white p-5 rounded-2xl transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-fondo)" }}
+>
       {/* Header */}
 <div className="mb-2">
   <h2 className="text-xl font-semibold">Mi Agenda</h2>
@@ -439,9 +442,18 @@ const handleEliminarTurno = async (
 
 {/* Selector de empleado */}
 <div className="flex items-center gap-2 mb-4">
-  <span className="text-sm text-gray-300">Seleccionar agenda de:</span>
+  <span
+    className="text-sm font-medium transition-colors duration-300"
+    style={{ color: "var(--color-texto, #fff)" }}
+  >
+    Seleccionar agenda de:
+  </span>
   <select
-    className="bg-neutral-800 rounded-lg px-3 py-2 text-sm outline-none"
+    className="rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-300"
+    style={{
+      backgroundColor: "var(--color-primario)",
+      color: "#fff",
+    }}
     value={empleadoSel?.nombre || ""}
     onChange={(e) => {
       const emp =
@@ -458,11 +470,15 @@ const handleEliminarTurno = async (
 </div>
 
 
+
       {/* Calendario + Slots */}
 <div className="flex flex-col gap-6 lg:max-w-3xl mx-auto">
 
         {/* Calendario mensual */}
-        <div className="bg-neutral-800 rounded-2xl p-4">
+<div
+  className="rounded-2xl p-4 transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-primario)" }}
+>
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={irMesAnterior}
@@ -533,20 +549,36 @@ const handleEliminarTurno = async (
         </div>
 
         {/* Panel derecho */}
-        <div className="bg-neutral-800 rounded-2xl p-4">
+<div
+  className="rounded-2xl p-4 transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-primario)" }}
+>
           {!diaSel ? (
             <div className="text-sm text-gray-400">Selecciona un día del calendario para ver los turnos.</div>
           ) : (
             <>
               {/* Encabezado + contador */}
-              <div className="flex items-center justify-between mb-3 sticky top-0 bg-neutral-800 z-10">
-                <div className="text-sm text-gray-300">
-                  {empleadoSel?.nombre} • {diaSel.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {reservasDelDia.length} turno{reservasDelDia.length === 1 ? "" : "s"}
-                </div>
-              </div>
+<div
+  className="flex items-center justify-between mb-3 sticky top-0 rounded-lg px-3 py-2 transition-colors duration-300"
+  style={{
+    backgroundColor: "var(--color-primario)",
+    color: "#fff",
+  }}
+>
+  <div className="text-sm font-medium">
+    {empleadoSel?.nombre} •{" "}
+    {diaSel.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+    })}
+  </div>
+  <div className="text-xs opacity-90">
+    {reservasDelDia.length} turno
+    {reservasDelDia.length === 1 ? "" : "s"}
+  </div>
+</div>
+
 
               {/* Quién se agendó o bloqueó */}
 {reservasDelDia.length > 0 && (
@@ -648,7 +680,10 @@ const handleEliminarTurno = async (
         setClienteExtra(null);
       }}
     />
-    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+<div
+  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-fondo)" }}
+>
       <h3 className="text-lg font-semibold mb-4">Detalle del turno</h3>
 
       <div className="space-y-2 text-sm">
@@ -709,7 +744,10 @@ const handleEliminarTurno = async (
         setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" });
       }}
     />
-    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+<div
+  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-fondo)" }}
+>
       <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
 
       <p className="text-sm mb-4">
@@ -838,7 +876,10 @@ const handleEliminarTurno = async (
         setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
       }}
     />
-    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+<div
+  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-fondo)" }}
+>
       <h3 className="text-lg font-semibold mb-4">
         {modalBloquearDia.desbloquear ? "Liberar día completo" : "Bloquear día completo"}
       </h3>
@@ -1017,7 +1058,10 @@ const handleEliminarTurno = async (
         <div className="fixed inset-0 z-[10000]">
           <div className="absolute inset-0 bg-black/60" onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} />
           <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
-            <div className="w-full max-w-[680px] sm:rounded-2xl bg-neutral-900 border border-neutral-700 shadow-2xl overflow-hidden">
+<div
+  className="w-full max-w-[680px] sm:rounded-2xl border border-neutral-700 shadow-2xl overflow-hidden transition-colors duration-300"
+  style={{ backgroundColor: "var(--color-fondo)" }}
+>
               <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
                 <h4 className="text-base sm:text-lg font-semibold">Asignar turno manualmente</h4>
                 <button onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} className="text-gray-300 hover:text-white text-xl">×</button>

@@ -167,3 +167,21 @@
   background: white !important;
   opacity: 1;
 }
+
+:root {
+  --color-fondo: #171717;    /* Fondo oscuro (neutral-900) */
+  --color-primario: #262626; /* Contenedores (neutral-800) */
+}
+
+body {
+  background-color: var(--color-fondo);
+  color: #fff;
+}
+
+.bg-primario {
+  background-color: var(--color-primario);
+}
+
+.bg-fondo {
+  background-color: var(--color-fondo);
+}
