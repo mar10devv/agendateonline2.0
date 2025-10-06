@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
-import { aplicarTema, inicializarTema, temas } from "../../../lib/temaColores";
+import { aplicarTema, temas } from "../../../lib/temaColores";
+import { db } from "../../../lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 
 type Props = {
   abierto: boolean;
   onCerrar: () => void;
+  negocioId: string; // ✅ necesario para guardar el color en Firestore
 };
 
-export default function ModalTema({ abierto, onCerrar }: Props) {
+export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   const [temaSeleccionado, setTemaSeleccionado] = useState<string>("gris");
 
+  // 🔹 Carga el tema guardado en localStorage
   useEffect(() => {
     const guardado = localStorage.getItem("temaSeleccionado");
     if (guardado && temas[guardado as keyof typeof temas]) {
@@ -17,8 +21,27 @@ export default function ModalTema({ abierto, onCerrar }: Props) {
     }
   }, []);
 
-  const manejarGuardar = () => {
+  // 🔹 Guardar tema local + Firestore
+  const manejarGuardar = async () => {
     aplicarTema(temaSeleccionado as keyof typeof temas);
+
+    try {
+      const tema = temas[temaSeleccionado as keyof typeof temas];
+      const negocioRef = doc(db, "Negocios", negocioId);
+
+      await updateDoc(negocioRef, {
+        tema: {
+          colorPrimario: tema.primario,
+          colorFondo: tema.fondo,
+          colorPrimarioOscuro: tema.oscuro,
+        },
+      });
+
+      console.log("✅ Tema guardado en Firestore:", temaSeleccionado);
+    } catch (err) {
+      console.error("❌ Error al guardar el tema:", err);
+    }
+
     onCerrar();
   };
 

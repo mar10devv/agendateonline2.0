@@ -101,6 +101,12 @@ type Negocio = {
     facebook?: string;
     telefono?: string;  // puede ser WhatsApp o número normal
   };
+    tema?: {
+    colorPrimario: string;
+    colorFondo: string;
+    colorPrimarioOscuro: string;
+  };
+
 };
 
 type Props = {
@@ -384,10 +390,39 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     }
 
     if (data.redes) {
-      setRedes(data.redes); // ✅ ahora redes también
+      setRedes(data.redes);
+    }
+
+    // 🎨 Aplicar tema guardado en Firestore
+    const tema = data.tema;
+    if (tema && tema.colorPrimario) {
+      requestAnimationFrame(() => {
+        document.documentElement.style.setProperty(
+          "--color-primario",
+          tema.colorPrimario || "#262626"
+        );
+        document.documentElement.style.setProperty(
+          "--color-fondo",
+          tema.colorFondo || "#171717"
+        );
+        document.documentElement.style.setProperty(
+          "--color-primario-oscuro",
+          tema.colorPrimarioOscuro || "#0a0a0a"
+        );
+      });
+    } else {
+      // 👇 Si no hay tema guardado, aplicar gris por defecto
+      document.documentElement.style.setProperty("--color-primario", "#262626");
+      document.documentElement.style.setProperty("--color-fondo", "#171717");
+      document.documentElement.style.setProperty(
+        "--color-primario-oscuro",
+        "#0a0a0a"
+      );
     }
   }
 });
+
+
 
 
   // 🔹 Limpieza de listeners
@@ -437,17 +472,12 @@ useEffect(() => {
   </div>
 </div>
 
-
-
-      
-
       {/* Contenido */}
 <div className="relative md:-mt-16 px-4 pb-10">
 <div className="w-full max-w-6xl mx-auto flex flex-col gap-6 md:grid md:grid-cols-[60%_40%] md:items-stretch">
 
-
       {/* Columna izquierda -> servicios y empleados */}
-            <div className="flex flex-col gap-6 order-2 md:order-1">
+<div className="flex flex-col gap-6 order-2 md:order-1">
 
             {/* Servicios */}
 <div className="order-1 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg relative transition-colors duration-300">
@@ -808,129 +838,127 @@ useEffect(() => {
 <div className="order-1 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0 transition-colors duration-300">
 
   {/* ⚙️ Tuerca */}
-{modo === "dueño" && (
-  <button
-    onClick={() => setModalPerfilAbierto(true)}
-    className="absolute top-4 right-4"
-  >
-    <img
-      src={ConfigIcon}
-      alt="Configurar negocio"
-      className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-    />
-  </button>
-)}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalPerfilAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar negocio"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+  )}
 
   {/* Logo */}
-<div className="mt-8 relative w-24 h-24">
-  {subiendo ? (
-    // 🔥 Loader mientras se sube
-    <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-white">
-      <LoaderSpinner />
-    </div>
-  ) : logo ? (
-    <img
-      src={logo}
-      alt="Logo negocio"
-      className="w-24 h-24 rounded-full object-cover border-4 border-white"
-    />
-  ) : (
-    <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
-      {nombreNegocio.charAt(0)}
-    </div>
-  )}
-
-  {modo === "dueño" && (
-    <>
-      <label
-        htmlFor="upload-logo"
-        className="absolute bottom-2 right-2 bg-neutral-700 text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg"
-      >
-        +
-      </label>
-      <input
-        id="upload-logo"
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange}
+  <div className="mt-8 relative w-24 h-24">
+    {subiendo ? (
+      <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-white">
+        <LoaderSpinner />
+      </div>
+    ) : logo ? (
+      <img
+        src={logo}
+        alt="Logo negocio"
+        className="w-24 h-24 rounded-full object-cover border-4 border-white"
       />
-    </>
-  )}
-</div>
+    ) : (
+      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+        {nombreNegocio.charAt(0)}
+      </div>
+    )}
 
-{/* Nombre y slug */}
-<div className="mt-4">
-  <p className="text-lg font-semibold">{nombreNegocio}</p>
+    {modo === "dueño" && (
+      <>
+        <label
+          htmlFor="upload-logo"
+          className="absolute bottom-2 right-2 bg-[var(--color-primario)] text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg transition-colors duration-300 hover:opacity-80"
+        >
+          +
+        </label>
+        <input
+          id="upload-logo"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </>
+    )}
+  </div>
 
-</div>
+  {/* Nombre y slug */}
+  <div className="mt-4">
+    <p className="text-lg font-semibold">{nombreNegocio}</p>
+  </div>
 
-<div className="mt-6 flex items-center justify-center gap-4">
-  {/* Instagram */}
-  <a
-    href={redes?.instagram || "#"}
-    target={redes?.instagram ? "_blank" : "_self"}
-    rel="noopener noreferrer"
-    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
-      redes?.instagram
-        ? "bg-neutral-700 hover:bg-pink-600"
-        : "bg-neutral-800 opacity-40 cursor-not-allowed"
-    }`}
-  >
-    <Instagram className="w-4 h-4 text-white" />
-  </a>
+  {/* Redes sociales */}
+  <div className="mt-6 flex items-center justify-center gap-4">
+    {/* Instagram */}
+    <a
+      href={redes?.instagram || "#"}
+      target={redes?.instagram ? "_blank" : "_self"}
+      rel="noopener noreferrer"
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+        redes?.instagram
+          ? "bg-[var(--color-primario)] hover:opacity-80"
+          : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
+      }`}
+    >
+      <Instagram className="w-4 h-4 text-white" />
+    </a>
 
-  {/* Facebook */}
-  <a
-    href={redes?.facebook || "#"}
-    target={redes?.facebook ? "_blank" : "_self"}
-    rel="noopener noreferrer"
-    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
-      redes?.facebook
-        ? "bg-neutral-700 hover:bg-blue-600"
-        : "bg-neutral-800 opacity-40 cursor-not-allowed"
-    }`}
-  >
-    <Facebook className="w-4 h-4 text-white" />
-  </a>
+    {/* Facebook */}
+    <a
+      href={redes?.facebook || "#"}
+      target={redes?.facebook ? "_blank" : "_self"}
+      rel="noopener noreferrer"
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+        redes?.facebook
+          ? "bg-[var(--color-primario)] hover:opacity-80"
+          : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
+      }`}
+    >
+      <Facebook className="w-4 h-4 text-white" />
+    </a>
 
-  {/* Teléfono / WhatsApp */}
-  <a
-    href={
-      redes?.telefono
-        ? redes.telefono.startsWith("+")
-          ? `https://wa.me/${redes.telefono.replace(/\D/g, "")}`
-          : `tel:${redes.telefono}`
-        : "#"
-    }
-    target={redes?.telefono ? "_blank" : "_self"}
-    rel="noopener noreferrer"
-    className={`w-8 h-8 flex items-center justify-center rounded-full transition ${
-      redes?.telefono
-        ? "bg-neutral-700 hover:bg-green-600"
-        : "bg-neutral-800 opacity-40 cursor-not-allowed"
-    }`}
-  >
-    <Phone className="w-4 h-4 text-white" />
-  </a>
+    {/* Teléfono / WhatsApp */}
+    <a
+      href={
+        redes?.telefono
+          ? redes.telefono.startsWith("+")
+            ? `https://wa.me/${redes.telefono.replace(/\D/g, "")}`
+            : `tel:${redes.telefono}`
+          : "#"
+      }
+      target={redes?.telefono ? "_blank" : "_self"}
+      rel="noopener noreferrer"
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+        redes?.telefono
+          ? "bg-[var(--color-primario)] hover:opacity-80"
+          : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
+      }`}
+    >
+      <Phone className="w-4 h-4 text-white" />
+    </a>
 
-  {/* Compartir (abre modal con link copiado) */}
-<button
-  onClick={() => setModalShareAbierto(true)}
-  className="w-8 h-8 flex items-center justify-center rounded-full transition bg-neutral-700 hover:bg-indigo-600"
-  title="Compartir agenda"
->
-  <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
-</button>
+    {/* Compartir (abre modal con link copiado) */}
+    <button
+      onClick={() => setModalShareAbierto(true)}
+      className="w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 bg-[var(--color-primario)] hover:opacity-80"
+      title="Compartir agenda"
+    >
+      <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
+    </button>
 
-{/* Modal compartir */}
-<ModalShare
-  abierto={modalShareAbierto}
-  onCerrar={() => setModalShareAbierto(false)}
-  slug={negocio.slug}
-/>
-
-</div>
+    {/* Modal compartir */}
+    <ModalShare
+      abierto={modalShareAbierto}
+      onCerrar={() => setModalShareAbierto(false)}
+      slug={negocio.slug}
+    />
+  </div>
 
   {/* Descripción editable */}
   <div className="mt-6 w-full px-2">
@@ -946,7 +974,7 @@ useEffect(() => {
           placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
           className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
             editandoDescripcion
-              ? "bg-neutral-700 rounded p-2"
+              ? "bg-[var(--color-primario-oscuro)] rounded p-2"
               : "bg-transparent"
           }`}
           value={nuevaDescripcion}
@@ -966,9 +994,7 @@ useEffect(() => {
         {editandoDescripcion && (
           <button
             onClick={handleGuardarDescripcion}
-            disabled={
-              nuevaDescripcion.trim() === (negocio.descripcion || "")
-            }
+            disabled={nuevaDescripcion.trim() === (negocio.descripcion || "")}
             className={`px-4 py-2 rounded font-medium transition ${
               nuevaDescripcion.trim() === (negocio.descripcion || "")
                 ? "bg-gray-600 text-gray-300 cursor-not-allowed"
@@ -987,6 +1013,7 @@ useEffect(() => {
   </div>
 </div>
 {/* 🔹 Fin Perfil */}
+
 
 {/* Columna derecha -> Mapa */}
 <div className="hidden md:flex order-5 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex-col items-center text-center shadow-lg relative transition-colors duration-300">

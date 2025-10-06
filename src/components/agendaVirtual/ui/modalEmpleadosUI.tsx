@@ -148,9 +148,11 @@ export default function ModalEmpleadosUI({
 
                   return (
                     <div
-                      key={index}
-                      className="relative border border-gray-700 rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center bg-neutral-800"
-                    >
+  key={index}
+  className="relative rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center 
+             bg-[var(--color-primario)] shadow-lg transition-colors duration-300"
+>
+
                       {/* ❌ Eliminar: permitido para dueño y admin, excepto el dueño mismo */}
                       {(soyDueno || soyAdmin) && !esDueno && (
                         <button
@@ -205,7 +207,7 @@ export default function ModalEmpleadosUI({
                             handleChangeEmpleado(index, "nombre", e.target.value)
                           }
                           disabled={false} // 👈 dueño también puede editar su nombre
-                          className="w-full px-4 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
+className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray-700 rounded-md text-white transition-colors duration-300"
                         />
 
                         {/* Badges */}

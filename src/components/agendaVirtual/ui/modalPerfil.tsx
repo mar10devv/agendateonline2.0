@@ -245,7 +245,9 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
       <ModalTema
   abierto={modalTemaAbierto}
   onCerrar={() => setModalTemaAbierto(false)}
+  negocioId={negocio.id}
 />
+
     </ModalGenerico>
   );
 }
