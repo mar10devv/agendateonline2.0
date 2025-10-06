@@ -377,103 +377,104 @@ if (tieneNegocio === null) {
 }
 
   return (
-    <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-lg">
-      {/* Paso 1 */}
-{paso === 1 && (
-  <div className="space-y-4">
-    {/* Nombre */}
-    <input
-      type="text"
-      value={nombre}
-      onChange={(e) => setNombre(e.target.value)}
-      placeholder="Nombre del negocio"
-      className="w-full p-2 border rounded"
-    />
-    {!nombreValido && nombre.length > 0 && (
-      <p className="text-red-600 text-sm">Debe tener al menos 3 caracteres</p>
+  <div className="w-full max-w-2xl bg-white p-6 rounded-lg shadow-lg text-black">
+    {/* Paso 1 */}
+    {paso === 1 && (
+      <div className="space-y-4">
+        {/* Nombre */}
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Nombre del negocio"
+          className="w-full p-2 border rounded text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {!nombreValido && nombre.length > 0 && (
+          <p className="text-red-600 text-sm">Debe tener al menos 3 caracteres</p>
+        )}
+
+        {/* Email */}
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Correo electrónico"
+          className="w-full p-2 border rounded text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {!emailValido && email.length > 0 && (
+          <p className="text-red-600 text-sm">Correo inválido</p>
+        )}
+
+        {/* Teléfono */}
+        <input
+          type="tel"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          placeholder="Número de teléfono"
+          className="w-full p-2 border rounded text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {!telefonoValido && telefono.length > 0 && (
+          <p className="text-red-600 text-sm">Debe tener entre 8 y 15 dígitos</p>
+        )}
+
+        {/* Categoría */}
+        <select
+          value={tipoNegocio}
+          onChange={(e) => {
+            setTipoNegocio(e.target.value);
+            setSubSeccion("");
+          }}
+          className="w-full p-2 border rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Selecciona tipo de negocio</option>
+          {CATEGORIAS.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Sub-sección */}
+        {tipoNegocio && (
+          <select
+            value={subSeccion}
+            onChange={(e) => setSubSeccion(e.target.value)}
+            className="w-full p-2 border rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Selecciona sub-sección</option>
+            {CATEGORIAS.find((c) => c.id === tipoNegocio)?.subs.map((sub) => (
+              <option key={sub} value={sub}>
+                {sub}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Botón siguiente */}
+        <button
+          onClick={handleNext}
+          disabled={!(
+            nombreValido &&
+            emailValido &&
+            telefonoValido &&
+            tipoNegocio &&
+            subSeccion
+          )}
+          className={`w-full py-2 rounded text-white transition ${
+            nombreValido &&
+            emailValido &&
+            telefonoValido &&
+            tipoNegocio &&
+            subSeccion
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
+        >
+          Siguiente
+        </button>
+      </div>
     )}
 
-    {/* Email */}
-    <input
-      type="email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-      placeholder="Correo electrónico"
-      className="w-full p-2 border rounded"
-    />
-    {!emailValido && email.length > 0 && (
-      <p className="text-red-600 text-sm">Correo inválido</p>
-    )}
-
-    {/* Teléfono */}
-    <input
-      type="tel"
-      value={telefono}
-      onChange={(e) => setTelefono(e.target.value)}
-      placeholder="Número de teléfono"
-      className="w-full p-2 border rounded"
-    />
-    {!telefonoValido && telefono.length > 0 && (
-      <p className="text-red-600 text-sm">Debe tener entre 8 y 15 dígitos</p>
-    )}
-
-    {/* Categoría */}
-    <select
-      value={tipoNegocio}
-      onChange={(e) => {
-        setTipoNegocio(e.target.value);
-        setSubSeccion(""); // reset al cambiar categoría
-      }}
-      className="w-full p-2 border rounded"
-    >
-      <option value="">Selecciona tipo de negocio</option>
-      {CATEGORIAS.map((cat) => (
-        <option key={cat.id} value={cat.id}>
-          {cat.label}
-        </option>
-      ))}
-    </select>
-
-    {/* Sub-sección */}
-    {tipoNegocio && (
-      <select
-        value={subSeccion}
-        onChange={(e) => setSubSeccion(e.target.value)}
-        className="w-full p-2 border rounded"
-      >
-        <option value="">Selecciona sub-sección</option>
-        {CATEGORIAS.find((c) => c.id === tipoNegocio)?.subs.map((sub) => (
-          <option key={sub} value={sub}>
-            {sub}
-          </option>
-        ))}
-      </select>
-    )}
-
-    {/* Botón siguiente */}
-    <button
-      onClick={handleNext}
-      disabled={!(
-        nombreValido &&
-        emailValido &&
-        telefonoValido &&
-        tipoNegocio &&
-        subSeccion
-      )}
-      className={`w-full py-2 rounded text-white transition ${
-        nombreValido &&
-        emailValido &&
-        telefonoValido &&
-        tipoNegocio &&
-        subSeccion
-          ? "bg-blue-600 hover:bg-blue-700"
-          : "bg-gray-400 cursor-not-allowed"
-      }`}
-    >
-      Siguiente
-    </button>
-  </div>
-)}
 
       {/* Paso 2 */}
 {paso === 2 && (
