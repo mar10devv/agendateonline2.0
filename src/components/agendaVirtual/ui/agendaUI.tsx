@@ -392,6 +392,33 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
     if (data.redes) {
       setRedes(data.redes);
     }
+    // 🧩 Actualizar logo si cambió en Firestore
+if (data.perfilLogo && data.perfilLogo !== logo) {
+  console.log("🔄 Actualizando logo desde Firestore...");
+  setLogo(data.perfilLogo);
+
+  // 🧹 Limpiar y actualizar cache local del cliente
+  (async () => {
+    try {
+      const cacheModule = await import("../../../lib/cacheAgenda");
+      if ("clearCache" in cacheModule && "setCache" in cacheModule) {
+        const { clearCache, setCache } = cacheModule as {
+          clearCache: (slug: string, key: string) => void;
+          setCache: <T>(slug: string, key: string, value: T) => void;
+        };
+
+        clearCache(data.slug, "logo");
+        setCache(data.slug, "logo", data.perfilLogo);
+        console.log("✅ Cache del logo actualizado correctamente");
+      } else {
+        console.warn("⚠️ Módulo cacheAgenda no tiene clearCache o setCache");
+      }
+    } catch (err) {
+      console.error("❌ Error actualizando cache de logo:", err);
+    }
+  })();
+}
+
 
     // 🎨 Aplicar tema guardado en Firestore
     const tema = data.tema;

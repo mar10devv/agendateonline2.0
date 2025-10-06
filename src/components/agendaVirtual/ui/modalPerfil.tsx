@@ -1,7 +1,9 @@
+// src/components/agendaVirtual/ui/modalPerfil.tsx
 import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import { subirLogoNegocio, actualizarNombreYSlug } from "../backend/agenda-backend";
+import { compressImageFileToWebP } from "../../../lib/imageUtils"; // ✅ import para comprimir
 import ModalTema from "./modalTema";
 
 type Props = {
@@ -48,7 +50,6 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   const [tamanioArchivo, setTamanioArchivo] = useState(0);
   const [modalTemaAbierto, setModalTemaAbierto] = useState(false);
 
-
   // 🔄 Sincronizar con negocio cada vez que abre el modal
   useEffect(() => {
     if (negocio) {
@@ -65,6 +66,7 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
 
   if (!abierto) return null;
 
+  // 📸 Manejar carga del logo con compresión previa
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -76,11 +78,17 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
 
     try {
       setSubiendo(true);
-      const url = await subirLogoNegocio(file);
+
+      // 🧩 1️⃣ Comprimir antes de subir (a WebP)
+      const fileComprimido = await compressImageFileToWebP(file);
+      console.log("📦 Imagen comprimida antes de subir:", fileComprimido);
+
+      // 🧩 2️⃣ Subir imagen comprimida a ImgBB
+      const url = await subirLogoNegocio(fileComprimido);
       if (url) {
         setLogo(url);
-        setNombreArchivo(file.name);
-        setTamanioArchivo(file.size);
+        setNombreArchivo(fileComprimido.name);
+        setTamanioArchivo(fileComprimido.size);
       }
     } catch (err) {
       console.error("❌ Error al subir logo:", err);
@@ -91,44 +99,40 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
   };
 
   const handleGuardar = async () => {
-  let nuevoSlug = negocio.slug;
-  try {
-    // 👉 Si el nombre cambió → actualiza nombre + slug
-    if (nombre !== negocio.nombre) {
-      nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
+    let nuevoSlug = negocio.slug;
+    try {
+      // 👉 Si el nombre cambió → actualiza nombre + slug
+      if (nombre !== negocio.nombre) {
+        nuevoSlug = await actualizarNombreYSlug(negocio.slug, nombre);
+      }
+
+      // 👉 Guardar otros cambios
+      await onGuardar({
+        perfilLogo: logo,
+        descripcion,
+        redes: { instagram, facebook, telefono },
+        nombre,
+        slug: nuevoSlug,
+        nombreArchivoLogo: nombreArchivo,
+        tamanioArchivoLogo: tamanioArchivo,
+      });
+
+      console.log("✅ Perfil actualizado correctamente");
+      onCerrar();
+
+      // 👉 Redirigir SOLO si el slug cambió
+      if (nuevoSlug !== negocio.slug) {
+        window.location.href = `/agenda/${nuevoSlug}`;
+      }
+    } catch (err: any) {
+      console.error("❌ Error en handleGuardar:", err);
+      if (err.message?.includes("Ya existe")) {
+        alert("❌ Ya existe un negocio con ese nombre/slug");
+      } else {
+        alert("❌ No se pudo guardar los cambios, intenta nuevamente");
+      }
     }
-
-    // 👉 Guardar otros cambios
-    await onGuardar({
-      perfilLogo: logo,
-      descripcion,
-      redes: { instagram, facebook, telefono },
-      nombre,
-      slug: nuevoSlug,
-      nombreArchivoLogo: nombreArchivo,
-      tamanioArchivoLogo: tamanioArchivo,
-    });
-
-    // 👉 Mostrar éxito (puede ser un toast o cerrar modal)
-    console.log("✅ Perfil actualizado correctamente");
-    onCerrar();
-
-    // 👉 Redirigir SOLO si el slug cambió
-    if (nuevoSlug !== negocio.slug) {
-      window.location.href = `/agenda/${nuevoSlug}`;
-    }
-  } catch (err: any) {
-    console.error("❌ Error en handleGuardar:", err);
-
-    // Diferenciar errores
-    if (err.message?.includes("Ya existe")) {
-      alert("❌ Ya existe un negocio con ese nombre/slug");
-    } else {
-      alert("❌ No se pudo guardar los cambios, intenta nuevamente");
-    }
-  }
-};
-
+  };
 
   return (
     <ModalGenerico
@@ -141,11 +145,12 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
         {/* 📸 Logo */}
         <div className="relative w-28 h-28">
           {subiendo ? (
-            <div className="w-28 h-28 rounded-full flex items-center justify-center border-4 border-white transition-colors duration-300"
-     style={{ backgroundColor: "var(--color-fondo)" }}>
-  <LoaderSpinner />
-</div>
-
+            <div
+              className="w-28 h-28 rounded-full flex items-center justify-center border-4 border-white transition-colors duration-300"
+              style={{ backgroundColor: "var(--color-fondo)" }}
+            >
+              <LoaderSpinner />
+            </div>
           ) : logo ? (
             <img
               src={logo}
@@ -174,80 +179,79 @@ export default function ModalPerfil({ abierto, onCerrar, negocio, onGuardar }: P
         </div>
 
         {/* Nombre */}
-       <input
-  type="text"
-  value={nombre}
-  onChange={(e) => setNombre(e.target.value)}
-  placeholder="Nombre del negocio"
-  className="w-full rounded p-2 text-white text-center transition-colors duration-300 outline-none"
-  style={{ backgroundColor: "var(--color-primario)" }}
-/>
-
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Nombre del negocio"
+          className="w-full rounded p-2 text-white text-center transition-colors duration-300 outline-none"
+          style={{ backgroundColor: "var(--color-primario)" }}
+        />
 
         {/* Descripción */}
         <textarea
-  maxLength={200}
-  rows={4}
-  placeholder="Escribe una descripción (máx 200 caracteres)"
-  className="w-full text-sm rounded-lg p-3 text-white resize-none outline-none transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-primario)" }}
-  value={descripcion}
-  onChange={(e) => setDescripcion(e.target.value)}
-/>
-
+          maxLength={200}
+          rows={4}
+          placeholder="Escribe una descripción (máx 200 caracteres)"
+          className="w-full text-sm rounded-lg p-3 text-white resize-none outline-none transition-colors duration-300"
+          style={{ backgroundColor: "var(--color-primario)" }}
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+        />
 
         {/* Redes */}
-<div className="flex flex-col gap-3 w-full">
-  <input
-    type="text"
-    placeholder="Link de Instagram"
-    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-    style={{ backgroundColor: "var(--color-primario)" }}
-    value={instagram}
-    onChange={(e) => setInstagram(e.target.value)}
-  />
+        <div className="flex flex-col gap-3 w-full">
+          <input
+            type="text"
+            placeholder="Link de Instagram"
+            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+            style={{ backgroundColor: "var(--color-primario)" }}
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+          />
 
-  <input
-    type="text"
-    placeholder="Link de Facebook"
-    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-    style={{ backgroundColor: "var(--color-primario)" }}
-    value={facebook}
-    onChange={(e) => setFacebook(e.target.value)}
-  />
+          <input
+            type="text"
+            placeholder="Link de Facebook"
+            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+            style={{ backgroundColor: "var(--color-primario)" }}
+            value={facebook}
+            onChange={(e) => setFacebook(e.target.value)}
+          />
 
-  <input
-    type="text"
-    placeholder="Número de teléfono o WhatsApp"
-    className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
-    style={{ backgroundColor: "var(--color-primario)" }}
-    value={telefono}
-    onChange={(e) => setTelefono(e.target.value)}
-  />
-</div>
+          <input
+            type="text"
+            placeholder="Número de teléfono o WhatsApp"
+            className="flex-1 rounded p-2 text-white text-sm outline-none transition-colors duration-300"
+            style={{ backgroundColor: "var(--color-primario)" }}
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+          />
+        </div>
 
+        {/* Botones */}
         <div className="flex gap-3 justify-center">
-  <button
-    onClick={() => setModalTemaAbierto(true)}
-    className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded font-medium transition"
-  >
-    Cambiar tema
-  </button>
+          <button
+            onClick={() => setModalTemaAbierto(true)}
+            className="bg-neutral-700 hover:bg-neutral-600 text-white px-4 py-2 rounded font-medium transition"
+          >
+            Cambiar tema
+          </button>
 
-  <button
-    onClick={handleGuardar}
-    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
-  >
-    Guardar cambios
-  </button>
-</div>
+          <button
+            onClick={handleGuardar}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-medium transition"
+          >
+            Guardar cambios
+          </button>
+        </div>
       </div>
-      <ModalTema
-  abierto={modalTemaAbierto}
-  onCerrar={() => setModalTemaAbierto(false)}
-  negocioId={negocio.id}
-/>
 
+      <ModalTema
+        abierto={modalTemaAbierto}
+        onCerrar={() => setModalTemaAbierto(false)}
+        negocioId={negocio.id}
+      />
     </ModalGenerico>
   );
 }
