@@ -1,8 +1,7 @@
-// src/pages/pruebas.tsx
 import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { app } from "../lib/firebase"; // 👈 usa tu instancia de Firebase ya inicializada
+import { app } from "../lib/firebase"; // ✅ tu instancia inicializada
 
 export default function Pruebas() {
   const [negocioId, setNegocioId] = useState<string | null>(null);
@@ -11,23 +10,31 @@ export default function Pruebas() {
 
   const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID;
   const SITE_URL = import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE_URL;
-
   const db = getFirestore(app);
 
-  // 🔹 Detectar usuario logueado (dueño del negocio)
+  // 🔹 Detectar usuario logueado o usar negocio de prueba
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      let uid = user?.uid || "hycp0nS5NycAYP32NfNf3wI6fhg2"; // 👈 negocio de prueba si no hay login
+      const uid = user?.uid || "hycp0nS5NycAYP32NfNf3wI6fhg2"; // negocio de prueba
       setNegocioId(uid);
 
       try {
         const ref = doc(db, "Negocios", uid);
         const snap = await getDoc(ref);
+
         if (snap.exists()) {
+          const data = snap.data();
+          // busca en configuracionAgenda o directamente en raíz
           const conectado =
-            snap.data()?.configuracionAgenda?.mercadoPago?.conectado || false;
+            data?.configuracionAgenda?.mercadoPago?.conectado ??
+            data?.mercadoPago?.conectado ??
+            false;
           setConectado(conectado);
+          console.log("📦 Estado de Mercado Pago:", conectado);
+        } else {
+          console.warn("⚠️ Negocio no encontrado:", uid);
+          setConectado(false);
         }
       } catch (err) {
         console.error("Error al leer negocio:", err);
@@ -39,7 +46,19 @@ export default function Pruebas() {
     return () => unsubscribe();
   }, []);
 
-  // 🔹 Vincular cuenta (abre OAuth)
+  // 🔹 Escuchar mensajes del popup (cuando se vincula exitosamente)
+  useEffect(() => {
+    const handler = async (event: MessageEvent) => {
+      if (event.data?.type === "MP_CONNECTED" && event.data.negocioId) {
+        console.log("✅ Vinculación confirmada desde popup:", event.data);
+        setConectado(true);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // 🔹 Abrir flujo OAuth
   const handleVincular = () => {
     if (!CLIENT_ID || !SITE_URL) {
       alert("⚠️ Faltan variables de entorno de Mercado Pago");
@@ -59,7 +78,7 @@ export default function Pruebas() {
     window.open(url, "_blank", "width=600,height=700");
   };
 
-  // 🔹 Desvincular cuenta (borra tokens)
+  // 🔹 Desvincular cuenta
   const handleDesvincular = async () => {
     if (!negocioId) return;
     try {
