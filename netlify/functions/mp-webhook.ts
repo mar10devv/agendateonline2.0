@@ -11,7 +11,6 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Tipo de pago esperado de MP
 type MpPago = {
   id: string;
   status: "approved" | "pending" | "rejected" | string;
@@ -32,44 +31,78 @@ export const handler: Handler = async (event) => {
 
     const paymentId = body.data.id;
 
-    // Usar un Access Token de la app principal para leer el pago
-    const APP_TOKEN = process.env.MP_APP_TOKEN || "";
-    const resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${APP_TOKEN}` },
+    // 1️⃣ Intentamos leer los metadatos para saber a qué negocio pertenece
+    // (algunas veces Mercado Pago no los envía en el primer webhook → doble verificación)
+    let negocioId: string | undefined;
+    let turnoId: string | undefined;
+    let pago: MpPago | null = null;
+
+    // Primero consultamos con token global por si aún no sabemos el negocio
+    const appToken = process.env.MP_APP_TOKEN || "";
+    let resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${appToken}` },
     });
 
-    const pago = (await resp.json()) as MpPago;
+    pago = (await resp.json()) as MpPago;
+    negocioId = pago.metadata?.negocioId;
+    turnoId = pago.metadata?.turnoId;
+
+    // 2️⃣ Si hay negocioId, buscamos su token OAuth
+    let accessToken = appToken;
+    if (negocioId) {
+      const negocioSnap = await db.collection("Negocios").doc(negocioId).get();
+      const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
+      const tokenVendedor = negocioData?.configuracionAgenda?.mercadoPago?.accessToken;
+
+      if (tokenVendedor) {
+        accessToken = tokenVendedor;
+        // volvemos a consultar con el token del vendedor
+        resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        pago = (await resp.json()) as MpPago;
+      }
+    }
 
     if (!pago || !pago.id) {
+      console.error("❌ Pago no encontrado o inválido:", pago);
       return { statusCode: 404, body: "❌ Pago no encontrado en MP" };
     }
 
     const estado = pago.status;
-    const negocioId = pago.metadata?.negocioId;
-    const turnoId = pago.metadata?.turnoId;
+    negocioId = pago.metadata?.negocioId;
+    turnoId = pago.metadata?.turnoId;
 
     if (!negocioId || !turnoId) {
       console.error("⚠️ Pago sin metadata suficiente:", pago);
       return { statusCode: 400, body: "❌ Falta negocioId o turnoId en metadata" };
     }
 
-    if (estado === "approved") {
-      await db
-        .collection("Negocios")
-        .doc(negocioId)
-        .collection("Turnos")
-        .doc(turnoId)
-        .update({
-          estado: "confirmado",
-          pago: {
-            id: pago.id,
-            monto: pago.transaction_amount,
-            status: pago.status,
-            fecha: admin.firestore.FieldValue.serverTimestamp(),
-          },
-        });
+    // 3️⃣ Procesar solo pagos aprobados o en proceso de acreditación
+    if (estado === "approved" || estado === "in_process") {
+      const negocioRef = db.collection("Negocios").doc(negocioId);
+      const turnoRef = negocioRef.collection("Turnos").doc(turnoId);
 
-      console.log(`✅ Turno ${turnoId} confirmado en negocio ${negocioId}`);
+      // 🔹 Actualizar estado del turno
+      await turnoRef.update({
+        estado: estado === "approved" ? "confirmado" : "pendiente_pago",
+        pago: {
+          id: pago.id,
+          monto: pago.transaction_amount,
+          status: pago.status,
+          fecha: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+
+      // (Opcional) registrar el pago en subcolección Pagos
+      await negocioRef.collection("Pagos").doc(pago.id.toString()).set({
+        turnoId,
+        monto: pago.transaction_amount,
+        status: pago.status,
+        fecha: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✅ Pago ${pago.id} procesado (${estado}) para negocio ${negocioId}`);
     }
 
     return { statusCode: 200, body: "OK" };

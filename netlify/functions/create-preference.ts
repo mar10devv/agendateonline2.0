@@ -13,7 +13,6 @@ const db = admin.firestore();
 
 export const handler: Handler = async (event) => {
   try {
-    // Datos que vienen del frontend
     const body = JSON.parse(event.body || "{}");
     const { servicioId, servicio, descripcion, precio, emailCliente, negocioId, turnoId } = body;
 
@@ -21,12 +20,12 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: "❌ Falta negocioId" };
     }
 
-    // 🔎 Buscar el token del negocio en Firestore
+    // 🔎 Buscar token y configuración del negocio
     const negocioRef = db.collection("Negocios").doc(negocioId);
     const negocioSnap = await negocioRef.get();
     const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
 
-    // Si el negocio tiene su propio token, lo usamos. Si no, usamos el global.
+    // ✅ Usar el token del negocio (OAuth) o el global
     const accessToken =
       negocioData?.configuracionAgenda?.mercadoPago?.accessToken ||
       process.env.MP_ACCESS_TOKEN;
@@ -35,7 +34,14 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: "❌ No hay Access Token configurado" };
     }
 
-    // 🔹 Crear preferencia
+    // 🧮 Calcular monto de seña y comisión del marketplace
+    const porcentajeSeña = 0.2; // 20 % del valor del servicio
+    const montoSeña = Math.round((precio || 100) * porcentajeSeña);
+
+    const porcentajeComisionMarketplace = 0.1; // 10 % de la seña (ejemplo)
+    const marketplaceFee = Math.round(montoSeña * porcentajeComisionMarketplace);
+
+    // 🔹 Crear preferencia Checkout Pro
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -46,12 +52,12 @@ export const handler: Handler = async (event) => {
         items: [
           {
             id: servicioId || "servicio_generico",
-            title: servicio || "Pago de prueba",
+            title: servicio || "Pago de reserva",
             description: descripcion || "Reserva de turno en AgéndateOnline",
             category_id: "services",
             quantity: 1,
-            currency_id: "UYU", // UYU para Uruguay, ARS para Argentina
-            unit_price: precio || 100,
+            currency_id: negocioData?.moneda || "UYU",
+            unit_price: montoSeña,
           },
         ],
         payer: {
@@ -69,11 +75,13 @@ export const handler: Handler = async (event) => {
           pending: `${process.env.SITE_URL}/pago-pendiente`,
         },
         auto_return: "approved",
+
+        // ✅ Componente esencial del Marketplace
+        marketplace_fee: marketplaceFee,
       }),
     });
 
     console.log("📡 Status Mercado Pago:", response.status, response.statusText);
-
     const data: any = await response.json();
     console.log("📦 Respuesta de Mercado Pago:", JSON.stringify(data, null, 2));
 
@@ -86,6 +94,16 @@ export const handler: Handler = async (event) => {
         }),
       };
     }
+
+    // (Opcional) Guardar registro de la preferencia creada
+    await negocioRef.collection("Pagos").doc(turnoId || Date.now().toString()).set({
+      servicio,
+      montoSeña,
+      marketplaceFee,
+      preferenceId: data.id,
+      initPoint: data.init_point,
+      creado: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     return {
       statusCode: 200,

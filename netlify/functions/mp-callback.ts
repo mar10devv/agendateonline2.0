@@ -20,8 +20,7 @@ export const handler: Handler = async (event) => {
   try {
     const params = new URLSearchParams(event.rawQuery || "");
     const code = params.get("code");
-const negocioId = params.get("state");
-
+    const negocioId = params.get("state"); // viene desde la URL de autorización
 
     if (!code || !negocioId) {
       return {
@@ -43,7 +42,7 @@ const negocioId = params.get("state");
       };
     }
 
-    // 🔹 Intercambio del code por access_token
+    // 🔹 Intercambiar el code por access_token del vendedor (OAuth)
     const tokenResp = await fetch("https://api.mercadopago.com/oauth/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -52,7 +51,8 @@ const negocioId = params.get("state");
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
         code,
-        redirect_uri: `${BASE_URL}/.netlify/functions/mp-callback?negocioId=${negocioId}`,
+        // ⚠️ Debe coincidir EXACTAMENTE con el redirect_uri configurado en MP Developers
+        redirect_uri: `${BASE_URL}/.netlify/functions/mp-callback`,
       }),
     });
 
@@ -63,30 +63,39 @@ const negocioId = params.get("state");
         <html><body>
           <h3>❌ Error conectando con Mercado Pago</h3>
           <pre>${JSON.stringify(data, null, 2)}</pre>
-          <p>Cerrá la ventana y volvé a intentar.</p>
+          <p>Cerrá esta ventana y volvé a intentar desde tu panel de negocio.</p>
         </body></html>
       `;
       return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: bodyHtml };
     }
 
-    // 🔹 Guardar tokens en Firestore (para que create-preference.ts pueda usarlos)
+    // 🔹 Guardar tokens del vendedor en Firestore
     await negocioRef.update({
       "configuracionAgenda.mercadoPago": {
         conectado: true,
         userId: data.user_id,
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
+        publicKey: data.public_key || null, // ✅ nuevo
         liveMode: data.live_mode,
         actualizado: admin.firestore.FieldValue.serverTimestamp(),
       },
     });
 
-    // ✅ Devolver HTML de éxito (notifica al opener y cierra ventana)
+    // ✅ Devolver HTML de éxito (notifica al opener y cierra la ventana)
     const html = `
       <!doctype html>
       <html>
-      <head><meta charset="utf-8" /></head>
+      <head>
+        <meta charset="utf-8" />
+        <title>Cuenta vinculada</title>
+        <style>
+          body { font-family: sans-serif; color: #222; text-align: center; padding: 40px; }
+        </style>
+      </head>
       <body>
+        <h2>✅ Cuenta de Mercado Pago conectada correctamente</h2>
+        <p>Podés cerrar esta ventana.</p>
         <script>
           (function() {
             try {
@@ -95,13 +104,10 @@ const negocioId = params.get("state");
                   { type: 'MP_CONNECTED', negocioId: ${JSON.stringify(negocioId)} },
                   window.location.origin
                 );
-                document.body.innerText = "✅ Cuenta de Mercado Pago conectada correctamente. Esta ventana se cerrará.";
-                setTimeout(() => { window.close(); }, 800);
-              } else {
-                document.body.innerHTML = "<p>✅ Cuenta conectada. Podés cerrar esta ventana.</p>";
+                setTimeout(() => { window.close(); }, 1000);
               }
             } catch (err) {
-              document.body.innerText = 'Error al procesar la respuesta: ' + err;
+              console.error('Error al procesar la respuesta:', err);
             }
           })();
         </script>
@@ -111,6 +117,7 @@ const negocioId = params.get("state");
 
     return { statusCode: 200, headers: { "Content-Type": "text/html" }, body: html };
   } catch (err: any) {
+    console.error("❌ Error interno en mp-callback:", err);
     const html = `<html><body><h3>❌ Error interno</h3><pre>${String(err)}</pre></body></html>`;
     return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: html };
   }
