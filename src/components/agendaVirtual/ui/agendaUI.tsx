@@ -682,10 +682,26 @@ useEffect(() => {
   </div>
 </div>
 
-           {/* Calendario + Botón Agendarse */}
+           {/* 🗓️ Calendario + Botón Agendarse */}
+
+
 {(modo === "dueño" || modo === "admin") && (
   <div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden transition-colors duration-300">
+    {/* ⚙️ Tuerca Configuración (solo dueño) */}
+    {modo === "dueño" && (
+      <button
+        onClick={() => setModalCalendarioAbierto(true)}
+        className="absolute top-4 right-4"
+      >
+        <img
+          src={ConfigIcon}
+          alt="Configurar calendario"
+          className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+        />
+      </button>
+    )}
 
+    {/* Agenda del negocio (solo dueño o admin) */}
     <AgendaNegocio
       negocio={{
         id: negocio.id,
@@ -697,19 +713,31 @@ useEffect(() => {
   </div>
 )}
 
+
 <div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative transition-colors duration-300">
+  {/* ⚙️ Tuerca Configuración (solo dueño) */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalCalendarioAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <img
+        src={ConfigIcon}
+        alt="Configurar calendario"
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
+      />
+    </button>
+  )}
 
   {(modo === "dueño" || modo === "admin") ? (
-    <div className="order-3 w-full">
-      <AgendaNegocio
-        negocio={{
-          id: negocio.id,
-          nombre: negocio.nombre,
-          empleadosData: empleadosState || empleados || [],
-          slug: negocio.slug,
-        }}
-      />
-    </div>
+    <AgendaNegocio
+      negocio={{
+        id: negocio.id,
+        nombre: negocio.nombre,
+        empleadosData: empleadosState || empleados || [],
+        slug: negocio.slug,
+      }}
+    />
   ) : modo === "cliente" ? (
     <div className="w-full justify-center flex">
       <button
@@ -721,6 +749,16 @@ useEffect(() => {
     </div>
   ) : null}
 </div>
+
+
+{modo === "dueño" && (
+  <ModalCalendario
+    abierto={modalCalendarioAbierto}
+    onCerrar={() => setModalCalendarioAbierto(false)}
+    negocioId={negocio.id}
+  />
+)}
+
 
 {/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
 <div className="order-4 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4 transition-colors duration-300">
