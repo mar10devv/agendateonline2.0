@@ -725,7 +725,7 @@ function PasoConfirmacion({
     try {
       setPagando(true);
 
-      const res = await fetch("/.netlify/functions/mp-crear-preferencia", {
+      const res = await fetch("/.netlify/functions/create-preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
