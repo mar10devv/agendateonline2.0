@@ -1,3 +1,4 @@
+// src/components/agendaVirtual/modalCalendario.tsx
 import React, { useEffect, useState } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import { db } from "../../../lib/firebase";
@@ -14,11 +15,35 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const [modoPago, setModoPago] = useState<"libre" | "senia">("libre");
   const [porcentajeSenia, setPorcentajeSenia] = useState<number>(25);
   const [mercadoPagoConectado, setMercadoPagoConectado] = useState(false);
+  const [mpUserData, setMpUserData] = useState<any>(null);
   const [guardando, setGuardando] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID;
   const SITE_URL = import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE_URL;
+
+  // 🔹 Obtener datos del usuario desde la API de Mercado Pago
+  const obtenerDatosMP = async (accessToken: string) => {
+    try {
+      const res = await fetch("https://api.mercadopago.com/users/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (data?.id) {
+        setMpUserData({
+          nombre: data.first_name,
+          apellido: data.last_name,
+          email: data.email,
+          id: data.id,
+          foto:
+            data.picture ||
+            "https://static.mercadopago.com/images/user-placeholder.png",
+        });
+      }
+    } catch (err) {
+      console.error("⚠️ Error obteniendo datos de Mercado Pago:", err);
+    }
+  };
 
   // 🔹 Cargar configuración desde Firestore
   useEffect(() => {
@@ -30,11 +55,17 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
         const snap = await getDoc(ref);
         if (snap.exists()) {
           const data = snap.data() as any;
-          setModoPago(data?.configuracionAgenda?.modoPago || "libre");
-          setPorcentajeSenia(data?.configuracionAgenda?.porcentajeSenia || 25);
-          setMercadoPagoConectado(
-            data?.configuracionAgenda?.mercadoPago?.conectado || false
-          );
+          const conf = data?.configuracionAgenda;
+          setModoPago(conf?.modoPago || "libre");
+          setPorcentajeSenia(conf?.porcentajeSenia || 25);
+
+          const mpData = conf?.mercadoPago;
+          setMercadoPagoConectado(mpData?.conectado || false);
+
+          // ✅ Si hay accessToken, obtener datos del usuario
+          if (mpData?.accessToken) {
+            obtenerDatosMP(mpData.accessToken);
+          }
         }
       } catch (err) {
         console.error("❌ Error cargando configuración:", err);
@@ -42,6 +73,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
         setLoading(false);
       }
     };
+
     cargarConfig();
   }, [abierto, negocioId]);
 
@@ -69,12 +101,12 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
         "configuracionAgenda.mercadoPago.conectado":
           modoPago === "senia" ? mercadoPagoConectado : false,
       });
-      setGuardando(false);
       alert("✅ Configuración guardada correctamente.");
       onCerrar();
     } catch (err) {
       console.error("❌ Error guardando configuración:", err);
       alert("❌ No se pudo guardar la configuración.");
+    } finally {
       setGuardando(false);
     }
   };
@@ -91,18 +123,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
       redirectUri
     )}`;
 
-    const popup = window.open(authUrl, "mpLogin", "width=700,height=800");
-
-    const listener = (event: MessageEvent) => {
-      if (event.data?.type === "MP_CONNECTED" && event.data.negocioId === negocioId) {
-        setMercadoPagoConectado(true);
-        if (popup && !popup.closed) popup.close();
-        alert("✅ Cuenta de Mercado Pago conectada correctamente.");
-        window.removeEventListener("message", listener);
-      }
-    };
-
-    window.addEventListener("message", listener);
+    window.open(authUrl, "mpLogin", "width=700,height=800");
   };
 
   // 🔹 Desvincular Mercado Pago
@@ -121,6 +142,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
         },
       });
       setMercadoPagoConectado(false);
+      setMpUserData(null);
       alert("✅ Cuenta de Mercado Pago desvinculada correctamente.");
     } catch (err) {
       console.error("❌ Error al desvincular cuenta:", err);
@@ -128,7 +150,6 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
     }
   };
 
-  // 💰 Ejemplo visual
   const ejemploPrecio = 1000;
   const ejemploSenia = (ejemploPrecio * porcentajeSenia) / 100;
 
@@ -142,7 +163,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
         </div>
       ) : (
         <div className="flex flex-col gap-6 p-4 text-gray-200">
-          {/* 🔹 Toggle seña */}
+          {/* Toggle seña */}
           <div className="flex items-center justify-between bg-neutral-800 rounded-lg p-3">
             <span className="text-sm">
               ¿Desea cobrar una seña para que el cliente agende turno?
@@ -166,12 +187,12 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
             </button>
           </div>
 
-          {/* 🔹 Solo visible si el modo de pago es "seña" */}
+          {/* Solo visible si el modo de pago es "seña" */}
           {modoPago === "senia" && (
             <div className="space-y-6">
               {/* Slider porcentaje */}
               <div className="space-y-2">
-                <div className="text-sm">Escoge el porcentaje que deseas cobrar de seña:</div>
+                <div className="text-sm">Escoge el porcentaje de seña:</div>
                 <input
                   type="range"
                   min={1}
@@ -181,25 +202,19 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
                   className="w-full accent-emerald-500"
                 />
                 <div className="text-sm text-gray-400">
-                  Se cobrará un <b>{porcentajeSenia}%</b> del precio total al agendar.
+                  Se cobrará un <b>{porcentajeSenia}%</b> del precio total.
                 </div>
 
                 <div className="bg-neutral-900/60 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-gray-300 mb-1">💡 Ejemplo práctico:</p>
+                  <p className="font-medium text-gray-300 mb-1">💡 Ejemplo:</p>
                   <p className="text-gray-400">
-                    Si un servicio cuesta{" "}
-                    <span className="font-semibold text-white">${ejemploPrecio}</span>{" "}
-                    y la seña es del{" "}
-                    <span className="font-semibold text-white">{porcentajeSenia}%</span>,
-                    el cliente pagará{" "}
+                    Si el servicio cuesta{" "}
+                    <b className="text-white">${ejemploPrecio}</b> y la seña es del{" "}
+                    <b className="text-white">{porcentajeSenia}%</b>, el cliente pagará{" "}
                     <span className="text-emerald-400 font-semibold">
                       ${ejemploSenia.toFixed(2)}
                     </span>{" "}
-                    al agendar, y abonará el resto{" "}
-                    <span className="text-yellow-400 font-semibold">
-                      ${ejemploPrecio - ejemploSenia}
-                    </span>{" "}
-                    en el local.
+                    al agendar.
                   </p>
                 </div>
               </div>
@@ -207,7 +222,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
               {/* Mercado Pago */}
               <div className="pt-4 border-t border-neutral-700">
                 <p className="text-sm mb-2">
-                  Vinculá tu cuenta de <b>Mercado Pago</b> para cobrar las señas automáticamente:
+                  Vinculá tu cuenta de <b>Mercado Pago</b>:
                 </p>
 
                 <button
@@ -223,7 +238,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
                   }`}
                 >
                   {mercadoPagoConectado
-                    ? "🔌 Desvincular mi cuenta"
+                    ? "🔌 Desvincular cuenta"
                     : "💳 Vincular con Mercado Pago"}
                 </button>
 
@@ -236,6 +251,26 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
                     ? "Cuenta vinculada correctamente ✅"
                     : "Aún no hay cuenta vinculada"}
                 </p>
+
+                {/* 👤 Datos del usuario de Mercado Pago */}
+                {mercadoPagoConectado && mpUserData && (
+                  <div className="mt-4 bg-neutral-900/70 rounded-xl p-4 flex items-center gap-4 border border-neutral-700">
+                    <img
+                      src={mpUserData.foto}
+                      alt="Foto MP"
+                      className="w-12 h-12 rounded-full object-cover border border-gray-600"
+                    />
+                    <div className="text-sm">
+                      <div className="font-semibold text-white">
+                        {mpUserData.nombre} {mpUserData.apellido}
+                      </div>
+                      <div className="text-gray-400">{mpUserData.email}</div>
+                      <div className="text-gray-500 text-xs mt-1">
+                        ID: {mpUserData.id}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
