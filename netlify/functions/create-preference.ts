@@ -1,14 +1,18 @@
-// netlify/functions/create-preference.ts
 import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
 
-// ✅ Inicializar Firebase Admin una sola vez
+// ✅ Inicializar Firebase Admin con credenciales del entorno (Netlify)
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    }),
   });
 }
+
 const db = admin.firestore();
 
 export const handler: Handler = async (event) => {
@@ -34,6 +38,11 @@ export const handler: Handler = async (event) => {
     const negocioRef = db.collection("Negocios").doc(negocioId);
     const negocioSnap = await negocioRef.get();
     const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
+
+    if (!negocioData) {
+      console.error("❌ Negocio no encontrado:", negocioId);
+      return { statusCode: 404, body: "❌ Negocio no encontrado" };
+    }
 
     console.log("📄 Datos negocio:", negocioData?.nombre || "Sin nombre");
 
@@ -143,7 +152,10 @@ export const handler: Handler = async (event) => {
     console.error("❌ Error en create-preference:", err);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({
+        error: err.message,
+        stack: err.stack,
+      }),
     };
   }
 };
