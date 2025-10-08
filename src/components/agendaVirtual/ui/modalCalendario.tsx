@@ -22,13 +22,13 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID;
   const SITE_URL = import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE_URL;
 
-  // 🔹 Obtener datos del usuario desde la API de Mercado Pago
-  const obtenerDatosMP = async (accessToken: string) => {
+  // 🔹 Obtener datos del usuario desde la función Netlify (sin CORS)
+  const obtenerDatosMP = async () => {
     try {
-      const res = await fetch("https://api.mercadopago.com/users/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await fetch(`/.netlify/functions/mp-user-info?negocioId=${negocioId}`);
+      if (!res.ok) throw new Error("Respuesta no válida del servidor");
       const data = await res.json();
+
       if (data?.id) {
         setMpUserData({
           nombre: data.first_name,
@@ -64,7 +64,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
 
           // ✅ Si hay accessToken, obtener datos del usuario
           if (mpData?.accessToken) {
-            obtenerDatosMP(mpData.accessToken);
+            obtenerDatosMP();
           }
         }
       } catch (err) {
@@ -82,6 +82,7 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "MP_CONNECTED" && event.data.negocioId === negocioId) {
         setMercadoPagoConectado(true);
+        obtenerDatosMP(); // 👈 actualizar datos al instante
       }
     };
     window.addEventListener("message", handler);
