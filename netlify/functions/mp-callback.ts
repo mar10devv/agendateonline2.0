@@ -3,7 +3,7 @@ import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
 
-// 🔹 Inicializar Firebase Admin (compatible con Netlify)
+// ✅ Inicializar Firebase Admin (compatible con Netlify)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -17,7 +17,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// 🔹 Configuración Mercado Pago
+// ✅ Configuración Mercado Pago
 const CLIENT_ID = process.env.MP_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
 const BASE_URL = process.env.SITE_URL || "https://agendateonline.com";
@@ -26,7 +26,7 @@ export const handler: Handler = async (event) => {
   try {
     const params = new URLSearchParams(event.rawQuery || "");
     const code = params.get("code");
-    const negocioId = params.get("state"); // viene desde la URL de autorización
+    const negocioId = params.get("state"); // viene desde el botón (state dinámico)
 
     if (!code || !negocioId) {
       return {
@@ -42,9 +42,9 @@ export const handler: Handler = async (event) => {
 
     if (!negocioSnap.exists) {
       return {
-        statusCode: 400,
+        statusCode: 404,
         headers: { "Content-Type": "text/html" },
-        body: `<html><body>❌ Negocio no encontrado</body></html>`,
+        body: `<html><body>❌ Negocio no encontrado (${negocioId})</body></html>`,
       };
     }
 
@@ -65,32 +65,35 @@ export const handler: Handler = async (event) => {
     const data: any = await tokenResp.json();
 
     if (!data.access_token) {
-      const bodyHtml = `
-        <html><body>
-          <h3>❌ Error conectando con Mercado Pago</h3>
-          <pre>${JSON.stringify(data, null, 2)}</pre>
-          <p>Cerrá esta ventana y volvé a intentar desde tu panel de negocio.</p>
-        </body></html>
-      `;
+      console.error("❌ Error al obtener tokens:", data);
       return {
         statusCode: 500,
         headers: { "Content-Type": "text/html" },
-        body: bodyHtml,
+        body: `
+          <html><body>
+            <h3>❌ Error conectando con Mercado Pago</h3>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+            <p>Cerrá esta ventana y volvé a intentar desde tu panel de negocio.</p>
+          </body></html>
+        `,
       };
     }
 
-    // 🔹 Guardar tokens del vendedor en Firestore
+    // ✅ Guardar tokens del vendedor en Firestore
     await negocioRef.update({
       "configuracionAgenda.mercadoPago": {
         conectado: true,
         userId: data.user_id,
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
-        publicKey: data.public_key || null, // ✅ nuevo
         liveMode: data.live_mode,
+        scope: data.scope || null,
+        publicKey: data.public_key || null,
         actualizado: admin.firestore.FieldValue.serverTimestamp(),
       },
     });
+
+    console.log(`✅ Mercado Pago vinculado correctamente para negocio ${negocioId}`);
 
     // ✅ Devolver HTML de éxito (notifica al opener y cierra la ventana)
     const html = `
@@ -112,7 +115,7 @@ export const handler: Handler = async (event) => {
               if (window.opener && !window.opener.closed) {
                 window.opener.postMessage(
                   { type: 'MP_CONNECTED', negocioId: ${JSON.stringify(negocioId)} },
-                  window.location.origin
+                  '*'
                 );
                 setTimeout(() => { window.close(); }, 1000);
               }
@@ -132,9 +135,7 @@ export const handler: Handler = async (event) => {
     };
   } catch (err: any) {
     console.error("❌ Error interno en mp-callback:", err);
-    const html = `<html><body><h3>❌ Error interno</h3><pre>${String(
-      err
-    )}</pre></body></html>`;
+    const html = `<html><body><h3>❌ Error interno</h3><pre>${String(err)}</pre></body></html>`;
     return {
       statusCode: 500,
       headers: { "Content-Type": "text/html" },
