@@ -3,18 +3,24 @@ import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
 
-// 🔹 Inicializar Firebase Admin (para Firestore)
+// 🔹 Inicializar Firebase Admin (compatible con Netlify)
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // ⚠️ Corrige los saltos de línea de la clave privada
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    }),
   });
 }
+
 const db = admin.firestore();
 
 // 🔹 Configuración Mercado Pago
 const CLIENT_ID = process.env.MP_CLIENT_ID || "";
 const CLIENT_SECRET = process.env.MP_CLIENT_SECRET || "";
-const BASE_URL = process.env.SITE_URL || "";
+const BASE_URL = process.env.SITE_URL || "https://agendateonline.com";
 
 export const handler: Handler = async (event) => {
   try {
@@ -66,7 +72,11 @@ export const handler: Handler = async (event) => {
           <p>Cerrá esta ventana y volvé a intentar desde tu panel de negocio.</p>
         </body></html>
       `;
-      return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: bodyHtml };
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "text/html" },
+        body: bodyHtml,
+      };
     }
 
     // 🔹 Guardar tokens del vendedor en Firestore
@@ -115,10 +125,20 @@ export const handler: Handler = async (event) => {
       </html>
     `;
 
-    return { statusCode: 200, headers: { "Content-Type": "text/html" }, body: html };
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "text/html" },
+      body: html,
+    };
   } catch (err: any) {
     console.error("❌ Error interno en mp-callback:", err);
-    const html = `<html><body><h3>❌ Error interno</h3><pre>${String(err)}</pre></body></html>`;
-    return { statusCode: 500, headers: { "Content-Type": "text/html" }, body: html };
+    const html = `<html><body><h3>❌ Error interno</h3><pre>${String(
+      err
+    )}</pre></body></html>`;
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "text/html" },
+      body: html,
+    };
   }
 };
