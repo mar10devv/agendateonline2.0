@@ -22,28 +22,31 @@ export default function ModalCalendario({ abierto, onCerrar, negocioId }: Props)
   const CLIENT_ID = import.meta.env.PUBLIC_MP_CLIENT_ID;
   const SITE_URL = import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE_URL;
 
-  // 🔹 Obtener datos del usuario desde la función Netlify (sin CORS)
-  const obtenerDatosMP = async () => {
-    try {
-      const res = await fetch(`/.netlify/functions/mp-user-info?negocioId=${negocioId}`);
-      if (!res.ok) throw new Error("Respuesta no válida del servidor");
-      const data = await res.json();
+// 🔹 Obtener datos del usuario desde la función Netlify (sin CORS)
+const obtenerDatosMP = async () => {
+  try {
+    const res = await fetch(`/.netlify/functions/mp-user-info?negocioId=${negocioId}`);
+    if (!res.ok) throw new Error("Respuesta no válida del servidor");
 
-      if (data?.id) {
-        setMpUserData({
-          nombre: data.first_name,
-          apellido: data.last_name,
-          email: data.email,
-          id: data.id,
-          foto:
-            data.picture ||
-            "https://static.mercadopago.com/images/user-placeholder.png",
-        });
-      }
-    } catch (err) {
-      console.error("⚠️ Error obteniendo datos de Mercado Pago:", err);
+    const data = await res.json();
+
+    if (data?.id) {
+      setMpUserData({
+        nombre: data.nombre,
+        apellido: data.apellido,
+        email: data.email,
+        id: data.id,
+        foto:
+          data.logo ||
+          data.picture ||
+          "https://cdn-icons-png.flaticon.com/512/149/149071.png", // ✅ URL segura y activa
+      });
     }
-  };
+  } catch (err) {
+    console.error("⚠️ Error obteniendo datos de Mercado Pago:", err);
+  }
+};
+
 
   // 🔹 Cargar configuración desde Firestore
   useEffect(() => {
