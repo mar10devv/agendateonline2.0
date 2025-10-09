@@ -3,17 +3,21 @@ import type { Handler } from "@netlify/functions";
 import fetch from "node-fetch";
 import * as admin from "firebase-admin";
 
-// 🔹 Inicializar Firebase Admin
+// ✅ Inicializar Firebase Admin con variables de entorno
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    }),
   });
 }
 const db = admin.firestore();
 
 type MpPago = {
   id: string;
-  status: "approved" | "pending" | "rejected" | string;
+  status: "approved" | "pending" | "rejected" | "in_process" | string;
   transaction_amount: number;
   metadata?: {
     negocioId?: string;
@@ -24,6 +28,7 @@ type MpPago = {
 export const handler: Handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
+    console.log("📬 Webhook recibido:", JSON.stringify(body, null, 2));
 
     if (!body || !body.data?.id) {
       return { statusCode: 400, body: "❌ Webhook sin ID de pago" };
@@ -31,83 +36,84 @@ export const handler: Handler = async (event) => {
 
     const paymentId = body.data.id;
 
-    // 1️⃣ Intentamos leer los metadatos para saber a qué negocio pertenece
-    // (algunas veces Mercado Pago no los envía en el primer webhook → doble verificación)
-    let negocioId: string | undefined;
-    let turnoId: string | undefined;
-    let pago: MpPago | null = null;
-
-    // Primero consultamos con token global por si aún no sabemos el negocio
-    const appToken = process.env.MP_APP_TOKEN || "";
+    // 1️⃣ Intentamos leer los metadatos del pago con token global
+    const globalToken = process.env.MP_ACCESS_TOKEN || "";
     let resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${appToken}` },
+      headers: { Authorization: `Bearer ${globalToken}` },
     });
 
-    pago = (await resp.json()) as MpPago;
-    negocioId = pago.metadata?.negocioId;
-    turnoId = pago.metadata?.turnoId;
+    const pago = (await resp.json()) as MpPago;
+    console.log("💳 Detalle del pago:", pago);
 
-    // 2️⃣ Si hay negocioId, buscamos su token OAuth
-    let accessToken = appToken;
-    if (negocioId) {
-      const negocioSnap = await db.collection("Negocios").doc(negocioId).get();
-      const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
-      const tokenVendedor = negocioData?.configuracionAgenda?.mercadoPago?.accessToken;
+    let negocioId = pago.metadata?.negocioId;
+    let turnoId = pago.metadata?.turnoId;
 
-      if (tokenVendedor) {
-        accessToken = tokenVendedor;
-        // volvemos a consultar con el token del vendedor
-        resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        pago = (await resp.json()) as MpPago;
-      }
-    }
-
-    if (!pago || !pago.id) {
+    if (!pago.id) {
       console.error("❌ Pago no encontrado o inválido:", pago);
       return { statusCode: 404, body: "❌ Pago no encontrado en MP" };
     }
 
-    const estado = pago.status;
-    negocioId = pago.metadata?.negocioId;
-    turnoId = pago.metadata?.turnoId;
+    // 2️⃣ Buscar token de vendedor si existe
+    let accessToken = globalToken;
+    if (negocioId) {
+      const negocioSnap = await db.collection("Negocios").doc(negocioId).get();
+      const negocioData = negocioSnap.exists ? negocioSnap.data() : null;
+      const tokenVendedor = negocioData?.configuracionAgenda?.mercadoPago?.accessToken;
+      if (tokenVendedor) {
+        accessToken = tokenVendedor;
+      }
+    }
+
+    // 3️⃣ Reconsultar con token del vendedor para máxima precisión
+    resp = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const pagoFinal = (await resp.json()) as MpPago;
+
+    const estado = pagoFinal.status;
+    negocioId = pagoFinal.metadata?.negocioId;
+    turnoId = pagoFinal.metadata?.turnoId;
 
     if (!negocioId || !turnoId) {
-      console.error("⚠️ Pago sin metadata suficiente:", pago);
+      console.error("⚠️ Pago sin metadata suficiente:", pagoFinal);
       return { statusCode: 400, body: "❌ Falta negocioId o turnoId en metadata" };
     }
 
-    // 3️⃣ Procesar solo pagos aprobados o en proceso de acreditación
+    // 4️⃣ Procesar solo pagos aprobados o en acreditación
     if (estado === "approved" || estado === "in_process") {
       const negocioRef = db.collection("Negocios").doc(negocioId);
       const turnoRef = negocioRef.collection("Turnos").doc(turnoId);
 
-      // 🔹 Actualizar estado del turno
-      await turnoRef.update({
-        estado: estado === "approved" ? "confirmado" : "pendiente_pago",
-        pago: {
-          id: pago.id,
-          monto: pago.transaction_amount,
-          status: pago.status,
-          fecha: admin.firestore.FieldValue.serverTimestamp(),
+      // 🔹 Crear o actualizar turno
+      await turnoRef.set(
+        {
+          estado: estado === "approved" ? "confirmado" : "pendiente_pago",
+          pago: {
+            id: pagoFinal.id,
+            monto: pagoFinal.transaction_amount,
+            status: pagoFinal.status,
+            fecha: admin.firestore.FieldValue.serverTimestamp(),
+          },
         },
-      });
+        { merge: true }
+      );
 
-      // (Opcional) registrar el pago en subcolección Pagos
-      await negocioRef.collection("Pagos").doc(pago.id.toString()).set({
+      // 🔹 Registrar el pago en la subcolección Pagos
+      await negocioRef.collection("Pagos").doc(pagoFinal.id.toString()).set({
         turnoId,
-        monto: pago.transaction_amount,
-        status: pago.status,
+        monto: pagoFinal.transaction_amount,
+        status: pagoFinal.status,
         fecha: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`✅ Pago ${pago.id} procesado (${estado}) para negocio ${negocioId}`);
+      console.log(`✅ Pago ${pagoFinal.id} procesado (${estado}) para negocio ${negocioId}`);
+    } else {
+      console.log(`⏸ Pago ${paymentId} con estado ${estado}, no se confirma turno.`);
     }
 
     return { statusCode: 200, body: "OK" };
   } catch (err: any) {
-    console.error("❌ Error en webhook:", err);
-    return { statusCode: 500, body: "Error interno" };
+    console.error("❌ Error en mp-webhook:", err);
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };

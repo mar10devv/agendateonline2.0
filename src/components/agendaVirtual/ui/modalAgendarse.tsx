@@ -829,8 +829,6 @@ function PasoConfirmacion({
   );
 }
 
-
-
 // 🔹 Paso 5 – Final
 function PasoFinal({ negocio, onClose }: any) {
   return (
