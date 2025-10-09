@@ -628,11 +628,9 @@ function PasoConfirmacion({
   onConfirm,
   onBack,
 }: any) {
-  const [cargando, setCargando] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [esperandoPago, setEsperandoPago] = useState(false);
 
-  // 🔹 Detectar si el negocio requiere seña
   const requiereSenia =
     negocio?.configuracionAgenda?.modoPago === "senia" &&
     negocio?.configuracionAgenda?.mercadoPago?.conectado;
@@ -640,145 +638,69 @@ function PasoConfirmacion({
   const porcentajeSenia = negocio?.configuracionAgenda?.porcentajeSenia || 0;
   const montoSenia = Math.round((servicio.precio * porcentajeSenia) / 100);
 
-  // 🔹 Guardar turno en Firestore (sin confirmar aún)
-  const guardarTurno = async (estado = "pendiente_pago") => {
-    try {
-      setCargando(true);
-
-      const auth = getAuth();
-      const u = auth.currentUser;
-      let uInfo = {
-        uid: u?.uid ?? usuario?.uid ?? null,
-        email: u?.email ?? usuario?.email ?? null,
-        nombre: u?.displayName ?? usuario?.nombre ?? null,
-      };
-
-      // Buscar datos extra si faltan
-      if (uInfo.uid) {
-        const userDoc = await getDoc(doc(db, "Usuarios", uInfo.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (!uInfo.email && data.email) uInfo.email = data.email;
-          if (!uInfo.nombre && data.nombre) uInfo.nombre = data.nombre;
-        }
-      }
-
-      // 🕒 Calcular inicio y fin
-      const fechaStr = turno.fecha.toISOString().split("T")[0];
-      const inicio = combinarFechaHora(turno.fecha, turno.hora);
-      const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
-
-      const refNeg = doc(collection(db, "Negocios", negocio.id, "Turnos"));
-      const turnoId = refNeg.id;
-
-      const dataFinal = {
-        negocioId: negocio.id,
-        negocioNombre: negocio.nombre,
-        servicioId: servicio.id,
-        servicioNombre: servicio.servicio,
-        duracion: servicio.duracion,
-        empleadoId: empleado.id || null,
-        empleadoNombre: empleado.nombre,
-        fecha: fechaStr,
-        hora: turno.hora,
-        inicioTs: inicio,
-        finTs: fin,
-        clienteUid: uInfo.uid,
-        clienteEmail: uInfo.email,
-        clienteNombre: uInfo.nombre,
-        creadoEn: new Date(),
-        estado, // pendiente_pago o confirmado
-        porcentajeSenia,
-        montoSenia,
-      };
-
-      // Guardar turno en negocio
-      await setDoc(refNeg, dataFinal);
-      // Guardar turno en usuario
-      if (uInfo.uid)
-        await setDoc(doc(db, "Usuarios", uInfo.uid, "Turnos", turnoId), dataFinal);
-
-      // Si no requiere seña → confirmamos directamente
-      if (!requiereSenia) {
-        await fetch("/.netlify/functions/confirmar-turno", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ docPath: refNeg.path }),
-        });
-        onConfirm();
-      } else {
-        // Si requiere seña → mostramos "esperando confirmación"
-        setEsperandoPago(true);
-      }
-
-      return turnoId;
-    } catch (err) {
-      console.error("❌ Error guardando turno:", err);
-      alert("Hubo un error al guardar el turno. Intenta de nuevo.");
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  // 🔹 Iniciar pago con Mercado Pago
+  // 🔹 Iniciar pago con Mercado Pago (sin crear turno aún)
   const pagarSenia = async () => {
     try {
       setPagando(true);
-      // Primero guardamos el turno como pendiente
-      const turnoId = await guardarTurno("pendiente_pago");
 
+      // 🔸 Enviamos todos los datos a create-preference
       const res = await fetch("/.netlify/functions/create-preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           negocioId: negocio.id,
-          servicio: servicio.servicio,
           servicioId: servicio.id,
+          servicio: servicio.servicio,
+          descripcion: `${servicio.servicio} con ${empleado.nombre}`,
           precio: servicio.precio,
           emailCliente: usuario?.email,
-          turnoId,
+          empleadoId: empleado.id,
+          empleadoNombre: empleado.nombre,
+          fecha: turno.fecha,
+          hora: turno.hora,
+          clienteUid: usuario?.uid,
+          clienteNombre: usuario?.nombre,
         }),
       });
 
       const data = await res.json();
-
       if (data?.init_point) {
-        // ✅ Abrimos Mercado Pago en una nueva pestaña
+        // 🔹 Abrimos MP
         window.open(data.init_point, "_blank");
-        // No confirmamos el turno todavía — esperamos el webhook
+
+        // 🔹 Mostramos mensaje de espera
         setEsperandoPago(true);
       } else {
         throw new Error(data?.error || "No se pudo iniciar el pago.");
       }
     } catch (err) {
-      console.error("Error al pagar seña:", err);
-      alert("No se pudo procesar el pago. Intenta de nuevo.");
+      console.error("❌ Error iniciando pago:", err);
+      alert("No se pudo iniciar el pago. Intenta nuevamente.");
     } finally {
       setPagando(false);
     }
   };
 
-  // 🔹 Render
-  if (cargando) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8">
-        <Loader />
-        <p className="mt-4 text-sm text-gray-300">Guardando tu turno...</p>
-      </div>
-    );
-  }
-
+  // 🔹 Render cuando está esperando pago
   if (esperandoPago) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <Loader />
-        <p className="mt-4 text-sm text-yellow-300">
+        <p className="mt-4 text-yellow-300 font-medium">
           💳 Esperando confirmación del pago...
         </p>
         <p className="text-xs text-gray-400 mt-2 max-w-xs">
-          Puedes cerrar esta ventana. Tu turno quedará reservado y se confirmará
-          automáticamente cuando Mercado Pago apruebe tu pago.
+          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente
+          cuando Mercado Pago apruebe tu seña. Si no completas el pago, el
+          turno no se guardará.
         </p>
+
+        <button
+          onClick={() => setEsperandoPago(false)}
+          className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
+        >
+          Volver a intentar
+        </button>
       </div>
     );
   }
@@ -792,6 +714,7 @@ function PasoConfirmacion({
         <li>
           Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
         </li>
+
         {requiereSenia && (
           <li className="text-amber-400">
             💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
@@ -803,7 +726,7 @@ function PasoConfirmacion({
         <button
           onClick={onBack}
           className="px-4 py-2 rounded bg-gray-700 text-white"
-          disabled={cargando || pagando}
+          disabled={pagando}
         >
           Volver
         </button>
@@ -818,7 +741,7 @@ function PasoConfirmacion({
           </button>
         ) : (
           <button
-            onClick={() => guardarTurno("confirmado")}
+            onClick={onConfirm}
             className="px-4 py-2 rounded bg-green-600 text-white"
           >
             Confirmar turno
@@ -828,6 +751,7 @@ function PasoConfirmacion({
     </div>
   );
 }
+
 
 // 🔹 Paso 5 – Final
 function PasoFinal({ negocio, onClose }: any) {
