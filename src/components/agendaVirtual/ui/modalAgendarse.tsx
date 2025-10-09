@@ -629,9 +629,8 @@ function PasoConfirmacion({
   onBack,
 }: any) {
   const [pagando, setPagando] = useState(false);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [esperandoPago, setEsperandoPago] = useState(false);
 
-  // Detectar si el negocio requiere seña
   const requiereSenia =
     negocio?.configuracionAgenda?.modoPago === "senia" &&
     negocio?.configuracionAgenda?.mercadoPago?.conectado;
@@ -639,68 +638,73 @@ function PasoConfirmacion({
   const porcentajeSenia = negocio?.configuracionAgenda?.porcentajeSenia || 0;
   const montoSenia = Math.round((servicio.precio * porcentajeSenia) / 100);
 
-  // 🔹 Iniciar pago con QR (sin crear turno aún)
+  // 🔹 Iniciar pago con Mercado Pago (sin crear turno aún)
   const pagarSenia = async () => {
     try {
       setPagando(true);
 
-      const res = await fetch("/.netlify/functions/create-qr-order", {
+      // 🔸 Enviamos todos los datos a create-preference
+      const res = await fetch("/.netlify/functions/create-preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           negocioId: negocio.id,
-          monto: montoSenia,
+          servicioId: servicio.id,
+          servicio: servicio.servicio,
           descripcion: `${servicio.servicio} con ${empleado.nombre}`,
-          turnoId: turno.id || Date.now().toString(),
+          precio: servicio.precio,
+          emailCliente: usuario?.email,
+          empleadoId: empleado.id,
+          empleadoNombre: empleado.nombre,
+          fecha: turno.fecha,
+          hora: turno.hora,
+          clienteUid: usuario?.uid,
+          clienteNombre: usuario?.nombre,
         }),
       });
 
       const data = await res.json();
+      if (data?.init_point) {
+        // 🔹 Abrimos MP
+        window.open(data.init_point, "_blank");
 
-      if (data?.qrUrl) {
-        // ✅ Mostrar QR generado
-        setQrUrl(data.qrUrl);
+        // 🔹 Mostramos mensaje de espera
+        setEsperandoPago(true);
       } else {
-        throw new Error(data?.error || "No se pudo generar el QR.");
+        throw new Error(data?.error || "No se pudo iniciar el pago.");
       }
     } catch (err) {
-      console.error("❌ Error iniciando pago con QR:", err);
-      alert("No se pudo generar el QR. Intenta nuevamente.");
+      console.error("❌ Error iniciando pago:", err);
+      alert("No se pudo iniciar el pago. Intenta nuevamente.");
     } finally {
       setPagando(false);
     }
   };
 
-  // 🔹 Render cuando el QR ya está generado
-  if (qrUrl) {
+  // 🔹 Render cuando está esperando pago
+  if (esperandoPago) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <p className="text-yellow-300 font-medium mb-4">
-          Escaneá el código para pagar la seña 💳
+        <Loader />
+        <p className="mt-4 text-yellow-300 font-medium">
+          💳 Esperando confirmación del pago...
         </p>
-
-        <img
-          src={qrUrl}
-          alt="QR Mercado Pago"
-          className="w-48 h-48 rounded-lg shadow-lg border border-gray-700"
-        />
-
-        <p className="text-xs text-gray-400 mt-3 max-w-xs">
-          Una vez confirmado el pago, tu turno quedará registrado automáticamente.
-          Puedes cerrar esta ventana después de pagar.
+        <p className="text-xs text-gray-400 mt-2 max-w-xs">
+          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente
+          cuando Mercado Pago apruebe tu seña. Si no completas el pago, el
+          turno no se guardará.
         </p>
 
         <button
-          onClick={() => setQrUrl(null)}
-          className="mt-5 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
+          onClick={() => setEsperandoPago(false)}
+          className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
         >
-          Volver
+          Volver a intentar
         </button>
       </div>
     );
   }
 
-  // 🔹 Render normal
   return (
     <div>
       <p>Confirma tu turno:</p>
@@ -733,7 +737,7 @@ function PasoConfirmacion({
             className="px-4 py-2 rounded bg-blue-600 text-white"
             disabled={pagando}
           >
-            {pagando ? "Generando QR..." : "Pagar seña"}
+            {pagando ? "Procesando..." : "Pagar seña"}
           </button>
         ) : (
           <button
@@ -747,7 +751,6 @@ function PasoConfirmacion({
     </div>
   );
 }
-
 
 
 // 🔹 Paso 5 – Final
