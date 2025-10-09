@@ -630,6 +630,7 @@ function PasoConfirmacion({
 }: any) {
   const [cargando, setCargando] = useState(false);
   const [pagando, setPagando] = useState(false);
+  const [esperandoPago, setEsperandoPago] = useState(false);
 
   // 🔹 Detectar si el negocio requiere seña
   const requiereSenia =
@@ -637,10 +638,10 @@ function PasoConfirmacion({
     negocio?.configuracionAgenda?.mercadoPago?.conectado;
 
   const porcentajeSenia = negocio?.configuracionAgenda?.porcentajeSenia || 0;
-  const montoSenia = (servicio.precio * porcentajeSenia) / 100;
+  const montoSenia = Math.round((servicio.precio * porcentajeSenia) / 100);
 
-  // 🔹 Guardar turno en Firestore
-  const guardarTurno = async (pagoConfirmado = false) => {
+  // 🔹 Guardar turno en Firestore (sin confirmar aún)
+  const guardarTurno = async (estado = "pendiente_pago") => {
     try {
       setCargando(true);
 
@@ -649,10 +650,10 @@ function PasoConfirmacion({
       let uInfo = {
         uid: u?.uid ?? usuario?.uid ?? null,
         email: u?.email ?? usuario?.email ?? null,
-        nombre: u?.displayName ?? null,
+        nombre: u?.displayName ?? usuario?.nombre ?? null,
       };
 
-      // 🔎 Buscar datos extra en Firestore si faltan
+      // Buscar datos extra si faltan
       if (uInfo.uid) {
         const userDoc = await getDoc(doc(db, "Usuarios", uInfo.uid));
         if (userDoc.exists()) {
@@ -662,12 +663,11 @@ function PasoConfirmacion({
         }
       }
 
-      // 🕒 Calcular inicio y fin del turno
+      // 🕒 Calcular inicio y fin
       const fechaStr = turno.fecha.toISOString().split("T")[0];
       const inicio = combinarFechaHora(turno.fecha, turno.hora);
       const fin = new Date(inicio.getTime() + (servicio.duracion || 30) * 60000);
 
-      // 1️⃣ Generar ID único
       const refNeg = doc(collection(db, "Negocios", negocio.id, "Turnos"));
       const turnoId = refNeg.id;
 
@@ -683,35 +683,35 @@ function PasoConfirmacion({
         hora: turno.hora,
         inicioTs: inicio,
         finTs: fin,
-
         clienteUid: uInfo.uid,
         clienteEmail: uInfo.email,
         clienteNombre: uInfo.nombre,
         creadoEn: new Date(),
-
-        pagoConfirmado,
+        estado, // pendiente_pago o confirmado
         porcentajeSenia,
         montoSenia,
       };
 
-      // 2️⃣ Guardar en negocio
+      // Guardar turno en negocio
       await setDoc(refNeg, dataFinal);
-
-      // 3️⃣ Guardar en usuario con el mismo ID
-      if (uInfo.uid) {
+      // Guardar turno en usuario
+      if (uInfo.uid)
         await setDoc(doc(db, "Usuarios", uInfo.uid, "Turnos", turnoId), dataFinal);
-      }
 
-      // 4️⃣ Si el pago está confirmado o no requiere seña → enviar correo de confirmación
-      if (!requiereSenia || pagoConfirmado) {
+      // Si no requiere seña → confirmamos directamente
+      if (!requiereSenia) {
         await fetch("/.netlify/functions/confirmar-turno", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ docPath: refNeg.path }),
         });
+        onConfirm();
+      } else {
+        // Si requiere seña → mostramos "esperando confirmación"
+        setEsperandoPago(true);
       }
 
-      onConfirm();
+      return turnoId;
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
       alert("Hubo un error al guardar el turno. Intenta de nuevo.");
@@ -724,6 +724,8 @@ function PasoConfirmacion({
   const pagarSenia = async () => {
     try {
       setPagando(true);
+      // Primero guardamos el turno como pendiente
+      const turnoId = await guardarTurno("pendiente_pago");
 
       const res = await fetch("/.netlify/functions/create-preference", {
         method: "POST",
@@ -731,21 +733,22 @@ function PasoConfirmacion({
         body: JSON.stringify({
           negocioId: negocio.id,
           servicio: servicio.servicio,
-          monto: montoSenia,
-          clienteEmail: usuario?.email,
+          servicioId: servicio.id,
+          precio: servicio.precio,
+          emailCliente: usuario?.email,
+          turnoId,
         }),
       });
 
       const data = await res.json();
 
       if (data?.init_point) {
-        // 👇 Abrimos Mercado Pago en una nueva pestaña
+        // ✅ Abrimos Mercado Pago en una nueva pestaña
         window.open(data.init_point, "_blank");
-
-        // Simulamos la confirmación temporal del pago
-        await guardarTurno(true);
+        // No confirmamos el turno todavía — esperamos el webhook
+        setEsperandoPago(true);
       } else {
-        throw new Error("No se pudo iniciar el pago.");
+        throw new Error(data?.error || "No se pudo iniciar el pago.");
       }
     } catch (err) {
       console.error("Error al pagar seña:", err);
@@ -756,61 +759,76 @@ function PasoConfirmacion({
   };
 
   // 🔹 Render
+  if (cargando) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8">
+        <Loader />
+        <p className="mt-4 text-sm text-gray-300">Guardando tu turno...</p>
+      </div>
+    );
+  }
+
+  if (esperandoPago) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <Loader />
+        <p className="mt-4 text-sm text-yellow-300">
+          💳 Esperando confirmación del pago...
+        </p>
+        <p className="text-xs text-gray-400 mt-2 max-w-xs">
+          Puedes cerrar esta ventana. Tu turno quedará reservado y se confirmará
+          automáticamente cuando Mercado Pago apruebe tu pago.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
-      {cargando ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <Loader />
-          <p className="mt-4 text-sm text-gray-300">Guardando tu turno...</p>
-        </div>
-      ) : (
-        <>
-          <p>Confirma tu turno:</p>
-          <ul className="mb-4 text-sm">
-            <li>Servicio: {servicio?.servicio}</li>
-            <li>Empleado: {empleado?.nombre}</li>
-            <li>
-              Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
-            </li>
+      <p>Confirma tu turno:</p>
+      <ul className="mb-4 text-sm">
+        <li>Servicio: {servicio?.servicio}</li>
+        <li>Empleado: {empleado?.nombre}</li>
+        <li>
+          Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
+        </li>
+        {requiereSenia && (
+          <li className="text-amber-400">
+            💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
+          </li>
+        )}
+      </ul>
 
-            {requiereSenia && (
-              <li className="text-amber-400">
-                💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
-              </li>
-            )}
-          </ul>
+      <div className="flex justify-end gap-4">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 rounded bg-gray-700 text-white"
+          disabled={cargando || pagando}
+        >
+          Volver
+        </button>
 
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={onBack}
-              className="px-4 py-2 rounded bg-gray-700 text-white"
-              disabled={cargando || pagando}
-            >
-              Volver
-            </button>
-
-            {requiereSenia ? (
-              <button
-                onClick={pagarSenia}
-                className="px-4 py-2 rounded bg-blue-600 text-white"
-                disabled={pagando}
-              >
-                {pagando ? "Procesando..." : "Pagar seña"}
-              </button>
-            ) : (
-              <button
-                onClick={() => guardarTurno(true)}
-                className="px-4 py-2 rounded bg-green-600 text-white"
-              >
-                Confirmar turno
-              </button>
-            )}
-          </div>
-        </>
-      )}
+        {requiereSenia ? (
+          <button
+            onClick={pagarSenia}
+            className="px-4 py-2 rounded bg-blue-600 text-white"
+            disabled={pagando}
+          >
+            {pagando ? "Procesando..." : "Pagar seña"}
+          </button>
+        ) : (
+          <button
+            onClick={() => guardarTurno("confirmado")}
+            className="px-4 py-2 rounded bg-green-600 text-white"
+          >
+            Confirmar turno
+          </button>
+        )}
+      </div>
     </div>
   );
 }
+
 
 
 // 🔹 Paso 5 – Final
