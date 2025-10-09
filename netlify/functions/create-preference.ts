@@ -82,7 +82,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // 💸 Comisión del marketplace
+    // 💸 Comisión del marketplace (10%)
     const porcentajeComisionMarketplace = 0.1;
     const marketplaceFee = Math.round(montoSenia * porcentajeComisionMarketplace);
 
@@ -116,6 +116,15 @@ export const handler: Handler = async (event) => {
         failure: `${process.env.SITE_URL}/pago-fallido`,
         pending: `${process.env.SITE_URL}/pago-pendiente`,
       },
+
+      // 💳 Aceptar todos los métodos de pago
+      payment_methods: {
+        excluded_payment_types: [], // no excluir nada (permite crédito, débito, billetera)
+        excluded_payment_methods: [],
+        installments: 1, // solo una cuota
+        default_payment_method_id: null,
+      },
+
       auto_return: "approved",
       marketplace_fee: marketplaceFee,
     };
