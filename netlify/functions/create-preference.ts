@@ -47,9 +47,13 @@ export const handler: Handler = async (event) => {
     console.log("📄 Negocio:", negocioData?.nombre);
 
     // 🔹 Token de acceso Mercado Pago
+    // 🔸 Durante certificación usa MP_ACCESS_TOKEN_SANDBOX (Seller Test User)
+    // 🔸 En producción, usa MP_ACCESS_TOKEN_PROD o el token del negocio
     const accessToken =
+      process.env.MP_ACCESS_TOKEN_SANDBOX ||
       negocioData?.mercadoPago?.accessToken ||
       negocioData?.configuracionAgenda?.mercadoPago?.accessToken ||
+      process.env.MP_ACCESS_TOKEN_PROD ||
       process.env.MP_ACCESS_TOKEN;
 
     if (!accessToken) {
@@ -66,9 +70,7 @@ export const handler: Handler = async (event) => {
 
     const montoSenia = Math.round((total * porcentajeSenia) / 100);
 
-    console.log(
-      `💰 Total: $${total} | Seña: ${porcentajeSenia}% ($${montoSenia})`
-    );
+    console.log(`💰 Total: $${total} | Seña: ${porcentajeSenia}% ($${montoSenia})`);
 
     if (!montoSenia || montoSenia <= 0) {
       return {
@@ -101,7 +103,9 @@ export const handler: Handler = async (event) => {
           unit_price: montoSenia,
         },
       ],
-      payer: { email: emailCliente || "invitado@agendateonline.com" },
+      payer: {
+        email: emailCliente || "test_user_123456@testuser.com", // comprador de prueba
+      },
       metadata: {
         negocioId,
         turnoId,
@@ -119,19 +123,22 @@ export const handler: Handler = async (event) => {
 
       // 💳 Aceptar todos los métodos de pago
       payment_methods: {
-        excluded_payment_types: [], // no excluir nada (permite crédito, débito, billetera)
+        excluded_payment_types: [], // permite crédito, débito, billetera y efectivo
         excluded_payment_methods: [],
-        installments: 1, // solo una cuota
-        default_payment_method_id: null,
+        installments: 1,
       },
 
       auto_return: "approved",
       marketplace_fee: marketplaceFee,
+
+      // ⚙️ Datos adicionales requeridos para certificación
+      integrator_id: "dev_24c65fb163bf11ea96500242ac130004", // ID genérico de prueba oficial
+      statement_descriptor: "AGENDATEONLINE", // aparece en el resumen del pago
     };
 
-    console.log("📤 Enviando payload a Mercado Pago:", JSON.stringify(payload, null, 2));
+    console.log("📤 Payload enviado a Mercado Pago:", JSON.stringify(payload, null, 2));
 
-    // 🚀 Crear preferencia en Mercado Pago
+    // 🚀 Crear preferencia
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -167,7 +174,7 @@ export const handler: Handler = async (event) => {
       marketplaceFee,
       preferenceId: data.id,
       initPoint: data.init_point,
-      estado: "pendiente", // hasta que el webhook confirme
+      estado: "pendiente",
       creado: admin.firestore.FieldValue.serverTimestamp(),
     });
 
