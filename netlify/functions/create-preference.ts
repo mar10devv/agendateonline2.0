@@ -82,9 +82,11 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // 💸 Comisión del marketplace (10%)
-    const porcentajeComisionMarketplace = 0.1;
-    const marketplaceFee = Math.round(montoSenia * porcentajeComisionMarketplace);
+    // ----------------------------------------------------
+    // CAMBIO CLAVE: FORZAMOS LA COMISIÓN DEL MARKETPLACE A CERO
+    // 💸 Comisión del marketplace (0%)
+    const marketplaceFee = 0; 
+    // ----------------------------------------------------
 
     // 📦 Payload a Mercado Pago
     const payload = {
@@ -117,11 +119,7 @@ export const handler: Handler = async (event) => {
         pending: `${process.env.SITE_URL}/pago-pendiente`,
       },
 
-      // ----------------------------------------------------
-      // INICIO CORRECCIÓN: ELIMINANDO FILTRO DE PAYMENT_METHODS
-      // Se comenta el bloque para permitir todas las opciones 
-      // de pago habilitadas por el vendedor (Débito, Crédito, Efectivo)
-      // al no limitar a "installments: 1".
+      // Se mantiene el bloque comentado de payment_methods para evitar filtros
       /*
       payment_methods: {
         excluded_payment_types: [], 
@@ -130,14 +128,16 @@ export const handler: Handler = async (event) => {
         default_payment_method_id: null,
       },
       */
-      // ----------------------------------------------------
-
+      
       auto_return: "approved",
-      marketplace_fee: marketplaceFee,
+      marketplace_fee: marketplaceFee, // <<-- ¡AQUÍ SE USA EL CERO!
     };
 
     console.log("📤 Enviando payload a Mercado Pago:", JSON.stringify(payload, null, 2));
-
+    
+    // ... (El resto del código es igual) ...
+    // ... (La llamada a la API y el manejo de la respuesta son iguales) ...
+    
     // 🚀 Crear preferencia en Mercado Pago
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
@@ -157,6 +157,8 @@ export const handler: Handler = async (event) => {
     }
 
     const data = JSON.parse(rawText);
+    
+    // ... (El resto del código de guardado y respuesta es igual) ...
 
     if (!data.init_point) {
       return {
@@ -171,7 +173,7 @@ export const handler: Handler = async (event) => {
       total,
       porcentajeSenia,
       montoSenia,
-      marketplaceFee,
+      marketplaceFee: 0, // Registrar la comisión a 0
       preferenceId: data.id,
       initPoint: data.init_point,
       estado: "pendiente", // hasta que el webhook confirme
@@ -181,9 +183,9 @@ export const handler: Handler = async (event) => {
     console.log("✅ Preferencia creada correctamente:", data.init_point);
 
     return {
- statusCode: 200,
-body: JSON.stringify({
- init_point: data.init_point,
+      statusCode: 200,
+      body: JSON.stringify({
+        init_point: data.init_point,
         montoSenia,
         porcentajeSenia,
         total,
