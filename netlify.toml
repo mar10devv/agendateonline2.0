@@ -4,10 +4,12 @@
 
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 [[blobs]]
   name = "mp_tokens"
 
-# 🚀 Scheduler para recordatorios
-[functions."recordatorios"]
-  schedule = "*/15 * * * *"
+# 🚀 Scheduler: ejecuta la función recordatorios cada 15 minutos
+[[scheduled.functions]]
+  name = "recordatorios"
+  cron = "*/15 * * * *"
