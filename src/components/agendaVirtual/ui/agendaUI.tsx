@@ -461,10 +461,15 @@ if (data.perfilLogo && data.perfilLogo !== logo) {
 }, [negocio.slug, modalAbierto]);
 useEffect(() => {
   inicializarTema();
+  const tema = localStorage.getItem("temaSeleccionado") || "gris";
+  document.documentElement.setAttribute("data-tema", tema);
 }, []);
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-fondo)] text-white transition-colors duration-300">
+<div
+  data-tema={localStorage.getItem("temaSeleccionado") || "gris"}
+  className="w-full min-h-screen bg-[var(--color-fondo)] text-[var(--color-texto)] transition-colors duration-300"
+>
 
 {/* Banner */}
 <div className="hidden md:flex justify-center">
@@ -523,37 +528,42 @@ useEffect(() => {
     </button>
   )}
 
-  <h2 className="text-lg font-semibold mb-4">Servicios</h2>
+  <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
+    Servicios
+  </h2>
 
   {servicios && servicios.length > 0 ? (
     <Swiper
       modules={[Pagination, Autoplay]}
-      spaceBetween={8} // 👈 pequeño espacio entre cards
+      spaceBetween={8}
       pagination={{ clickable: true }}
       autoplay={{ delay: 2000, disableOnInteraction: false }}
-      loop={true} // 🔄 carrusel infinito
+      loop={true}
       className="!w-full !h-auto custom-swiper pb-10"
       breakpoints={{
-        320: { slidesPerView: 2.5 },   // 📱 Mobile
-        640: { slidesPerView: 3.5 },   // 📲 Tablet
-        1024: { slidesPerView: 4 },    // 💻 PC
+        320: { slidesPerView: 2.5 },
+        640: { slidesPerView: 3.5 },
+        1024: { slidesPerView: 4 },
       }}
     >
       {servicios.map((s, idx) => (
         <SwiperSlide key={s.id || idx} className="flex justify-center">
           <div
-  className="flex flex-col justify-center items-center 
-  w-32 h-auto min-h-[96px] rounded-xl p-2 text-center transition-colors duration-300"
-  style={{
-    backgroundColor: "var(--color-primario-oscuro, #171717)", // negro por defecto
-  }}
->
-
-            <p className="font-medium text-white text-sm text-center whitespace-normal break-words leading-tight">
+            className="flex flex-col justify-center items-center 
+                       w-32 h-auto min-h-[96px] rounded-xl p-2 text-center transition-colors duration-300"
+            style={{
+              backgroundColor: "var(--color-primario-oscuro, #171717)",
+            }}
+          >
+            <p className="font-medium text-[var(--color-texto)] text-sm text-center whitespace-normal break-words leading-tight">
               {s.servicio}
             </p>
-            <span className="text-sm text-gray-400">${s.precio}</span>
-            <span className="text-xs text-gray-500">{s.duracion} min</span>
+            <span className="text-sm text-[color:var(--color-texto)/0.7]">
+              ${s.precio}
+            </span>
+            <span className="text-xs text-[color:var(--color-texto)/0.6]">
+              {s.duracion} min
+            </span>
           </div>
         </SwiperSlide>
       ))}
@@ -564,13 +574,15 @@ useEffect(() => {
         <button
           onClick={() => setModalServiciosAbierto(true)}
           className="w-32 h-24 flex items-center justify-center 
-                     border-2 border-dashed border-gray-500 rounded-xl 
-                     hover:border-white transition"
+                     border-2 border-dashed border-[color:var(--color-texto)/0.4] rounded-xl 
+                     hover:border-[var(--color-texto)] transition"
         >
-          <span className="text-3xl text-gray-400">+</span>
+          <span className="text-3xl text-[color:var(--color-texto)/0.6]">+</span>
         </button>
       ) : (
-        <p className="text-gray-400 text-sm">No hay servicios cargados.</p>
+        <p className="text-[color:var(--color-texto)/0.7] text-sm">
+          No hay servicios cargados.
+        </p>
       )}
     </div>
   )}
@@ -584,6 +596,8 @@ useEffect(() => {
     />
   )}
 </div>
+
+{/* 🧩 Modal Perfil */}
 <ModalPerfil
   abierto={modalPerfilAbierto}
   onCerrar={() => setModalPerfilAbierto(false)}
@@ -594,7 +608,7 @@ useEffect(() => {
 
       // 👉 Si cambia el nombre, también actualizamos el slug
       if (data.nombre && data.nombre !== negocio.nombre) {
-        nuevoSlug = await actualizarNombreYSlug(negocio.id, data.nombre); // 🔹 ahora usa negocio.id
+        nuevoSlug = await actualizarNombreYSlug(negocio.id, data.nombre);
         setNombreNegocio(data.nombre);
 
         // 🔄 Redirigir si cambió el slug
@@ -604,7 +618,7 @@ useEffect(() => {
         }
       }
 
-      // 👉 Guardar otros campos usando negocio.id (no depende del slug)
+      // 👉 Guardar otros campos usando negocio.id
       const negocioRef = doc(db, "Negocios", negocio.id);
       await updateDoc(negocioRef, {
         perfilLogo: data.perfilLogo ?? negocio.perfilLogo ?? "",
@@ -624,10 +638,13 @@ useEffect(() => {
     }
   }}
 />
+
             {/* Empleados */}
 <div className="order-2 bg-[var(--color-primario)] rounded-2xl p-6 relative shadow-lg transition-colors duration-300">
 
-  <h2 className="text-lg font-semibold mb-4">Empleados</h2>
+  <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
+    Empleados
+  </h2>
 
   {/* 👑 Dueño y Admin pueden abrir el modal de empleados de ESTE negocio */}
   {(modo === "dueño" || modo === "admin") && (
@@ -645,13 +662,12 @@ useEffect(() => {
 
       {/* Modal empleados → siempre abre el del negocio actual */}
       <ModalEmpleadosUI
-  abierto={modalAbierto}
-  onCerrar={() => setModalAbierto(false)}
-  negocioId={negocio.id}
-  modo={modo}              // 👈 ahora sabe si soy dueño o admin
-  userUid={usuario?.email} // 👈 para validar contra adminEmail o id
-/>
-
+        abierto={modalAbierto}
+        onCerrar={() => setModalAbierto(false)}
+        negocioId={negocio.id}
+        modo={modo}
+        userUid={usuario?.email}
+      />
     </>
   )}
 
@@ -661,37 +677,45 @@ useEffect(() => {
         <button
           key={idx}
           onClick={() => setEmpleadoSeleccionado(e)}
-          className="relative w-24 h-24 rounded-full bg-neutral-900 hover:bg-neutral-700 transition flex items-center justify-center"
+          className="relative w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] hover:opacity-80 transition flex items-center justify-center"
         >
           {e.foto ? (
             <img
               src={e.foto}
-              alt={e.nombre || "Empleado"}
-              className="w-24 h-24 rounded-full object-cover border-4 border-white"
+              alt={e.nombre || 'Empleado'}
+              className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
             />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-white border-4 border-black text-xl">
+            <div
+              className="w-24 h-24 rounded-full flex items-center justify-center font-bold text-[var(--color-texto)] border-4 border-[color:var(--color-texto)/0.5] text-xl"
+              style={{
+                backgroundColor: "var(--color-primario-oscuro, #171717)",
+              }}
+            >
               {e.nombre ? e.nombre.charAt(0) : "?"}
             </div>
           )}
         </button>
       ))
     ) : (
-      <p className="text-gray-400 text-sm">No hay empleados cargados.</p>
+      <p className="text-[color:var(--color-texto)/0.7] text-sm">
+        No hay empleados cargados.
+      </p>
     )}
   </div>
 </div>
 
            {/* 🗓️ Calendario + Botón Agendarse */}
-
-
 {(modo === "dueño" || modo === "admin") && (
-  <div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden transition-colors duration-300">
+  <div
+    className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden transition-colors duration-300 text-[var(--color-texto)]"
+  >
     {/* ⚙️ Tuerca Configuración (solo dueño) */}
     {modo === "dueño" && (
       <button
         onClick={() => setModalCalendarioAbierto(true)}
         className="absolute top-4 right-4"
+        title="Configurar calendario"
       >
         <img
           src={ConfigIcon}
@@ -713,13 +737,15 @@ useEffect(() => {
   </div>
 )}
 
-
-<div className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative transition-colors duration-300">
+<div
+  className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative transition-colors duration-300 text-[var(--color-texto)]"
+>
   {/* ⚙️ Tuerca Configuración (solo dueño) */}
   {modo === "dueño" && (
     <button
       onClick={() => setModalCalendarioAbierto(true)}
       className="absolute top-4 right-4"
+      title="Configurar calendario"
     >
       <img
         src={ConfigIcon}
@@ -742,14 +768,13 @@ useEffect(() => {
     <div className="w-full justify-center flex">
       <button
         onClick={() => setModalAgendarseAbierto(true)}
-        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-medium transition"
+        className="px-6 py-3 rounded-xl font-medium transition-colors duration-300 bg-[var(--color-primario-oscuro)] hover:opacity-80 text-[var(--color-texto)]"
       >
         📅 Reservar turno
       </button>
     </div>
   ) : null}
 </div>
-
 
 {modo === "dueño" && (
   <ModalCalendario
@@ -761,9 +786,9 @@ useEffect(() => {
 
 
 {/* 🔹 Mobile → mapa debajo de AgendaNegocio */}
-<div className="order-4 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4 transition-colors duration-300">
+<div className="order-4 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col items-stretch relative md:hidden mt-4 transition-colors duration-300 text-[var(--color-texto)]">
 
-  <h2 className="text-lg font-semibold mb-4">
+  <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
     {(modo === "dueño" || modo === "admin")
       ? "Mi ubicación"
       : `Ubicación de ${nombreNegocio}`}
@@ -776,12 +801,12 @@ useEffect(() => {
         <button
           onClick={handleGuardarUbicacion}
           disabled={estadoUbicacion === "cargando"}
-          className={`px-4 py-2 rounded-md flex items-center justify-center gap-2 transition ${
+          className={`px-4 py-2 rounded-md flex items-center justify-center gap-2 font-medium transition-colors duration-300 ${
             estadoUbicacion === "cargando"
-              ? "bg-gray-600 text-white"
+              ? "bg-[color:var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
               : estadoUbicacion === "exito"
               ? "bg-green-600 text-white"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              : "bg-[color:var(--color-primario-oscuro)] hover:opacity-80 text-[var(--color-texto)]"
           }`}
         >
           {estadoUbicacion === "cargando" && (
@@ -794,7 +819,9 @@ useEffect(() => {
           {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
         </button>
       ) : (
-        <p className="text-gray-400 text-sm">Ubicación no disponible.</p>
+        <p className="text-[color:var(--color-texto)/0.7] text-sm">
+          Ubicación no disponible.
+        </p>
       )}
     </>
   )}
@@ -802,7 +829,7 @@ useEffect(() => {
   {/* Si hay ubicación */}
   {ubicacion && (
     <div className="w-full flex flex-col gap-4">
-      <div className="h-64 rounded-md overflow-hidden border">
+      <div className="h-64 rounded-md overflow-hidden border border-[color:var(--color-texto)/0.15]">
         <MapContainer
           key={`${ubicacion.lat}-${ubicacion.lng}`}
           center={[ubicacion.lat, ubicacion.lng]}
@@ -854,12 +881,12 @@ useEffect(() => {
           <button
             onClick={handleGuardarUbicacion}
             disabled={estadoUbicacion === "cargando"}
-            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 transition ${
+            className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-2 font-medium transition-colors duration-300 ${
               estadoUbicacion === "cargando"
-                ? "bg-gray-600 text-white"
+                ? "bg-[color:var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
                 : estadoUbicacion === "exito"
                 ? "bg-green-600 text-white"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-[color:var(--color-primario-oscuro)] hover:opacity-80 text-[var(--color-texto)]"
             }`}
           >
             {estadoUbicacion === "cargando" && (
@@ -876,6 +903,7 @@ useEffect(() => {
     </div>
   )}
 </div>
+
 
 {/* Modal Agendarse */}
 {modalAgendarseAbierto && (
@@ -900,13 +928,14 @@ useEffect(() => {
 <div className="flex flex-col gap-6 md:order-2 md:pr-6">
       
       {/* Columna derecha -> Perfil */}
-<div className="order-1 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0 transition-colors duration-300">
+<div className="order-1 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0 transition-colors duration-300 text-[var(--color-texto)]">
 
   {/* ⚙️ Tuerca */}
   {modo === "dueño" && (
     <button
       onClick={() => setModalPerfilAbierto(true)}
       className="absolute top-4 right-4"
+      title="Configurar negocio"
     >
       <img
         src={ConfigIcon}
@@ -919,17 +948,17 @@ useEffect(() => {
   {/* Logo */}
   <div className="mt-8 relative w-24 h-24">
     {subiendo ? (
-      <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-white">
+      <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center border-4 border-[var(--color-texto)]">
         <LoaderSpinner />
       </div>
     ) : logo ? (
       <img
         src={logo}
         alt="Logo negocio"
-        className="w-24 h-24 rounded-full object-cover border-4 border-white"
+        className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
       />
     ) : (
-      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold border-4 border-black">
+      <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center text-3xl font-bold border-4 border-[var(--color-texto)]">
         {nombreNegocio.charAt(0)}
       </div>
     )}
@@ -938,7 +967,7 @@ useEffect(() => {
       <>
         <label
           htmlFor="upload-logo"
-          className="absolute bottom-2 right-2 bg-[var(--color-primario)] text-white w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-white text-lg transition-colors duration-300 hover:opacity-80"
+          className="absolute bottom-2 right-2 bg-[var(--color-primario)] text-[var(--color-texto)] w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-[var(--color-texto)] text-lg transition-colors duration-300 hover:opacity-80"
         >
           +
         </label>
@@ -955,7 +984,7 @@ useEffect(() => {
 
   {/* Nombre y slug */}
   <div className="mt-4">
-    <p className="text-lg font-semibold">{nombreNegocio}</p>
+    <p className="text-lg font-semibold text-[var(--color-texto)]">{nombreNegocio}</p>
   </div>
 
   {/* Redes sociales */}
@@ -965,13 +994,13 @@ useEffect(() => {
       href={redes?.instagram || "#"}
       target={redes?.instagram ? "_blank" : "_self"}
       rel="noopener noreferrer"
-      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-[color:var(--color-texto)/0.2] transition-colors duration-300 ${
         redes?.instagram
           ? "bg-[var(--color-primario)] hover:opacity-80"
           : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
       }`}
     >
-      <Instagram className="w-4 h-4 text-white" />
+      <Instagram className="w-4 h-4 text-[var(--color-texto)]" />
     </a>
 
     {/* Facebook */}
@@ -979,13 +1008,13 @@ useEffect(() => {
       href={redes?.facebook || "#"}
       target={redes?.facebook ? "_blank" : "_self"}
       rel="noopener noreferrer"
-      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-[color:var(--color-texto)/0.2] transition-colors duration-300 ${
         redes?.facebook
           ? "bg-[var(--color-primario)] hover:opacity-80"
           : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
       }`}
     >
-      <Facebook className="w-4 h-4 text-white" />
+      <Facebook className="w-4 h-4 text-[var(--color-texto)]" />
     </a>
 
     {/* Teléfono / WhatsApp */}
@@ -999,19 +1028,19 @@ useEffect(() => {
       }
       target={redes?.telefono ? "_blank" : "_self"}
       rel="noopener noreferrer"
-      className={`w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 ${
+      className={`w-8 h-8 flex items-center justify-center rounded-full border border-[color:var(--color-texto)/0.2] transition-colors duration-300 ${
         redes?.telefono
           ? "bg-[var(--color-primario)] hover:opacity-80"
           : "bg-[var(--color-primario-oscuro)] opacity-40 cursor-not-allowed"
       }`}
     >
-      <Phone className="w-4 h-4 text-white" />
+      <Phone className="w-4 h-4 text-[var(--color-texto)]" />
     </a>
 
     {/* Compartir (abre modal con link copiado) */}
     <button
       onClick={() => setModalShareAbierto(true)}
-      className="w-8 h-8 flex items-center justify-center rounded-full border border-white/20 transition-colors duration-300 bg-[var(--color-primario)] hover:opacity-80"
+      className="w-8 h-8 flex items-center justify-center rounded-full border border-[color:var(--color-texto)/0.2] transition-colors duration-300 bg-[var(--color-primario)] hover:opacity-80"
       title="Compartir agenda"
     >
       <img src={ShareIcon} alt="Compartir" className="w-4 h-4 invert" />
@@ -1037,7 +1066,7 @@ useEffect(() => {
             overflow: editandoDescripcion ? "auto" : "hidden",
           }}
           placeholder="Escribe una descripción de tu negocio (máx 200 caracteres)"
-          className={`w-full text-sm text-center text-white resize-none outline-none transition break-words whitespace-pre-wrap ${
+          className={`w-full text-sm text-center text-[var(--color-texto)] resize-none outline-none transition break-words whitespace-pre-wrap ${
             editandoDescripcion
               ? "bg-[var(--color-primario-oscuro)] rounded p-2"
               : "bg-transparent"
@@ -1060,10 +1089,10 @@ useEffect(() => {
           <button
             onClick={handleGuardarDescripcion}
             disabled={nuevaDescripcion.trim() === (negocio.descripcion || "")}
-            className={`px-4 py-2 rounded font-medium transition ${
+            className={`px-4 py-2 rounded font-medium transition-colors duration-300 ${
               nuevaDescripcion.trim() === (negocio.descripcion || "")
-                ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                ? "bg-[var(--color-primario-oscuro)] opacity-50 text-[var(--color-texto)] cursor-not-allowed"
+                : "bg-[var(--color-primario-oscuro)] hover:opacity-80 text-[var(--color-texto)]"
             }`}
           >
             Guardar
@@ -1071,13 +1100,14 @@ useEffect(() => {
         )}
       </div>
     ) : (
-      <p className="text-gray-300 text-sm text-center break-words whitespace-pre-wrap">
+      <p className="text-[color:var(--color-texto)/0.8] text-sm text-center break-words whitespace-pre-wrap">
         {negocio.descripcion || "Este negocio aún no tiene descripción."}
       </p>
     )}
   </div>
 </div>
 {/* 🔹 Fin Perfil */}
+
 
 
 {/* Columna derecha -> Mapa */}

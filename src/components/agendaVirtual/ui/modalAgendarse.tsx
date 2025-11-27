@@ -12,11 +12,10 @@ import {
   getDoc,
   deleteDoc,
   setDoc,
-  Firestore
+  Firestore,
 } from "firebase/firestore";
-import type { DocumentReference, DocumentData } from "firebase/firestore"; // ✅ Import solo de tipos
+import type { DocumentReference, DocumentData } from "firebase/firestore";
 
-// al inicio de ModalAgendarse:
 import Loader from "../../ui/loaderSpinner";
 
 import { db } from "../../../lib/firebase";
@@ -28,6 +27,7 @@ type Empleado = {
   fotoPerfil?: string;
   trabajos?: string[];
   calendario?: any;
+  id?: string;
 };
 
 type Servicio = {
@@ -60,8 +60,6 @@ type Props = {
   };
 };
 
-
-// ✅ Tipo consistente para el bloqueo
 type Bloqueo = {
   activo: boolean;
   inicio: Date | null;
@@ -69,23 +67,19 @@ type Bloqueo = {
   docPath?: string | null;
 };
 
-// ✅ Helper global para construir un DocumentReference desde un path
 function docFromPath(path: string): DocumentReference<DocumentData> {
   const segments = path.split("/").filter(Boolean);
   if (segments.length < 2) {
     throw new Error("Path inválido en docFromPath: " + path);
   }
-  // ✅ Se fuerza a Firestore + segments como [string,...]
   return doc(db as Firestore, ...segments as [string, ...string[]]);
 }
 
-// ✅ Tipo para los datos que guarda un turno en Usuarios/{uid}/Turnos
 type TurnoData = {
   negocioId?: string;
   turnoIdNegocio?: string;
 };
 
-/* -------------------- HELPERS -------------------- */
 function toDateSafe(f: any): Date {
   if (!f) return new Date(NaN);
   if (f instanceof Date) return f;
@@ -126,7 +120,6 @@ function calcularInicioFinDesdeDoc(t: any): { inicio: Date; fin: Date } | null {
   return { inicio, fin };
 }
 
-/* -------------------- VERIFICACIÓN DE TURNO ACTIVO -------------------- */
 async function verificarTurnoActivoPorUsuarioYNegocio(
   negocioId: string,
   u: { uid?: string | null; email?: string | null } | null
@@ -209,8 +202,7 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
           )
         );
     } catch {
-      if (u.email)
-        negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
+      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
     }
 
     for (const s of negSnaps) {
@@ -243,7 +235,6 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 
   const siguiente = () => setPaso((p) => p + 1);
   const volver = () => setPaso((p) => p - 1);
-  
 
   useEffect(() => {
     if (!abierto || !negocio?.id) return;
@@ -269,7 +260,6 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
     return () => off();
   }, [abierto, negocio?.id]);
 
-  // 🔹 Configuración de pago con seña
   const requiereSenia =
     negocio?.configuracionAgenda?.modoPago === "senia" &&
     negocio?.configuracionAgenda?.mercadoPago?.conectado;
@@ -278,152 +268,150 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 
   if (!abierto) return null;
 
-
   return (
-  <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
-  <div
-    className="relative flex flex-col h-[450px] overflow-y-auto px-4 pb-6 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent"
-    style={{ WebkitOverflowScrolling: "touch" }} // 👈 scroll suave en mobile
-  >
-    {cargandoCheck && (
-      <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
-    )}
+    <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
+      <div
+        className="relative flex flex-col h-[450px] overflow-y-auto px-4 pb-6 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {cargandoCheck && (
+          <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
+        )}
 
-    {/* 🔹 Si el usuario YA tiene turno reservado */}
-    {!cargandoCheck && bloqueo.activo && (
-      <div className="p-4 space-y-3">
-        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
-          <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
-          <div className="text-amber-200 text-sm">
-            Día:{" "}
-            <b>
-              {bloqueo.inicio?.toLocaleDateString("es-ES", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </b>{" "}
-            a las{" "}
-            <b>
-              {bloqueo.inicio?.toLocaleTimeString("es-ES", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </b>
-            . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
+        {!cargandoCheck && bloqueo.activo && (
+          <div className="p-4 space-y-3">
+            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+              <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
+              <div className="text-amber-200 text-sm">
+                Día:{" "}
+                <b>
+                  {bloqueo.inicio?.toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </b>{" "}
+                a las{" "}
+                <b>
+                  {bloqueo.inicio?.toLocaleTimeString("es-ES", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </b>
+                . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+              >
+                Entendido
+              </button>
+
+              {bloqueo.docPath && (
+                <button
+                  onClick={async () => {
+                    if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
+                    try {
+                      const refUser = docFromPath(bloqueo.docPath!);
+                      const snap = await getDoc(refUser);
+                      if (!snap.exists()) throw new Error("Turno no encontrado en usuario");
+                      const data = snap.data() as TurnoData & { negocioId: string };
+                      await deleteDoc(refUser);
+                      if (data.negocioId) {
+                        const turnoId = refUser.id;
+                        const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", turnoId);
+                        await deleteDoc(refNeg);
+                      }
+                      setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
+                      setPaso(1);
+                      setServicio(null);
+                      setEmpleado(null);
+                      setTurno(null);
+                      alert("Tu turno fue cancelado y el horario quedó libre.");
+                    } catch (err) {
+                      console.error("Error cancelando turno:", err);
+                      alert("Hubo un error al cancelar el turno.");
+                    }
+                  }}
+                  className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+                >
+                  Cancelar turno
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
-          >
-            Entendido
-          </button>
+        {!cargandoCheck && !bloqueo.activo && (
+          <>
+            {paso === 1 && (
+              <PasoServicios
+                negocio={negocio}
+                onSelect={(s) => {
+                  setServicio(s);
+                  setPaso(2);
+                }}
+              />
+            )}
 
-          {bloqueo.docPath && (
-            <button
-              onClick={async () => {
-                if (!confirm("¿Seguro que deseas cancelar este turno?")) return;
-                try {
-                  const refUser = docFromPath(bloqueo.docPath!);
-                  const snap = await getDoc(refUser);
-                  if (!snap.exists()) throw new Error("Turno no encontrado en usuario");
-                  const data = snap.data() as TurnoData & { negocioId: string };
-                  await deleteDoc(refUser);
-                  if (data.negocioId) {
-                    const turnoId = refUser.id;
-                    const refNeg = doc(db, "Negocios", data.negocioId, "Turnos", turnoId);
-                    await deleteDoc(refNeg);
-                  }
-                  setBloqueo({ activo: false, inicio: null, fin: null, docPath: null });
-                  setPaso(1);
-                  setServicio(null);
-                  setEmpleado(null);
-                  setTurno(null);
-                  alert("Tu turno fue cancelado y el horario quedó libre.");
-                } catch (err) {
-                  console.error("Error cancelando turno:", err);
-                  alert("Hubo un error al cancelar el turno.");
-                }
-              }}
-              className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
-            >
-              Cancelar turno
-            </button>
-          )}
-        </div>
+            {paso === 2 && servicio && (
+              <PasoEmpleados
+                servicio={servicio}
+                negocio={negocio}
+                onSelect={(e) => {
+                  setEmpleado(e);
+                  setPaso(3);
+                }}
+                onBack={() => setPaso(1)}
+              />
+            )}
+
+            {paso === 3 && empleado && servicio && (
+              <PasoTurnos
+                negocio={negocio}
+                empleado={empleado}
+                servicio={servicio}
+                onSelect={(t) => {
+                  setTurno(t);
+                  setPaso(4);
+                }}
+                onBack={() => setPaso(2)}
+              />
+            )}
+
+            {paso === 4 && turno && servicio && empleado && (
+              <PasoConfirmacion
+                servicio={servicio}
+                empleado={empleado}
+                turno={turno}
+                negocio={negocio}
+                usuario={usuario}
+                requiereSenia={requiereSenia}
+                porcentajeSenia={porcentajeSenia}
+                onBack={() => setPaso(3)}
+                onSaved={() => {
+                  // al guardarse correctamente, mostramos paso final
+                  setPaso(5);
+                }}
+              />
+            )}
+
+            {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
+          </>
+        )}
       </div>
-    )}
-
-    {/* 🔹 Si NO tiene turno reservado → mostrar flujo normal */}
-    {!cargandoCheck && !bloqueo.activo && (
-      <>
-        {paso === 1 && (
-          <PasoServicios
-            negocio={negocio}
-            onSelect={(s) => {
-              setServicio(s);
-              setPaso(2);
-            }}
-          />
-        )}
-
-        {paso === 2 && servicio && (
-          <PasoEmpleados
-            servicio={servicio}
-            negocio={negocio}
-            onSelect={(e) => {
-              setEmpleado(e);
-              setPaso(3);
-            }}
-            onBack={() => setPaso(1)}
-          />
-        )}
-
-        {paso === 3 && empleado && servicio && (
-          <PasoTurnos
-            negocio={negocio}
-            empleado={empleado}
-            servicio={servicio}
-            onSelect={(t) => {
-              setTurno(t);
-              setPaso(4);
-            }}
-            onBack={() => setPaso(2)}
-          />
-        )}
-
-        {paso === 4 && turno && servicio && empleado && (
-          <PasoConfirmacion
-            servicio={servicio}
-            empleado={empleado}
-            turno={turno}
-            negocio={negocio}
-            usuario={usuario}
-            onConfirm={() => setPaso(5)}
-            onBack={() => setPaso(3)}
-          />
-        )}
-
-        {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
-      </>
-    )}
-  </div>
-</ModalBase>
-
-);
-
+    </ModalBase>
+  );
 }
 
+/* ===========================================================
+   SUBCOMPONENTES (igual que antes, con PasoConfirmacion modificado)
+   =========================================================== */
 
-/* ============================================================
-   SUBCOMPONENTES
-   ============================================================ */
-
-// 🔹 Paso 1 – Servicios
 function PasoServicios({
   negocio,
   onSelect,
@@ -439,13 +427,7 @@ function PasoServicios({
       try {
         const ref = collection(db, "Negocios", negocio.id, "Precios");
         const snap = await getDocs(ref);
-        const lista = snap.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            } as Servicio)
-        );
+        const lista = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Servicio));
         setServicios(lista);
       } catch (err) {
         console.error("Error cargando servicios:", err);
@@ -480,7 +462,6 @@ function PasoServicios({
   );
 }
 
-// 🔹 Paso 2 – Empleados
 function PasoEmpleados({
   servicio,
   negocio,
@@ -500,10 +481,7 @@ function PasoEmpleados({
 
     const disponibles = negocio.empleadosData.filter(
       (emp: Empleado) =>
-        Array.isArray(emp.trabajos) &&
-        emp.trabajos.some(
-          (t: string) => String(t).trim() === String(servicio.id).trim()
-        )
+        Array.isArray(emp.trabajos) && emp.trabajos.some((t: string) => String(t).trim() === String(servicio.id).trim())
     );
 
     setFiltrados(disponibles);
@@ -533,25 +511,13 @@ function PasoEmpleados({
         Selecciona un empleado
       </p>
 
-      {error && (
-        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">
-          {error}
-        </p>
-      )}
+      {error && <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">{error}</p>}
 
       {filtrados.length > 0 ? (
         filtrados.map((e, idx) => (
-          <button
-            key={idx}
-            onClick={() => validarEmpleado(e)}
-            className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
-          >
+          <button key={idx} onClick={() => validarEmpleado(e)} className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700">
             {e.fotoPerfil || (e as any).foto ? (
-              <img
-                src={e.fotoPerfil || (e as any).foto}
-                alt={e.nombre}
-                className="w-12 h-12 rounded-full object-cover"
-              />
+              <img src={e.fotoPerfil || (e as any).foto} alt={e.nombre} className="w-12 h-12 rounded-full object-cover" />
             ) : (
               <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
                 {e.nombre?.charAt(0) || "?"}
@@ -563,9 +529,7 @@ function PasoEmpleados({
           </button>
         ))
       ) : (
-        <p className="text-gray-400 text-sm">
-          No hay empleados disponibles para este servicio.
-        </p>
+        <p className="text-gray-400 text-sm">No hay empleados disponibles para este servicio.</p>
       )}
 
       <button onClick={onBack} className="text-sm text-gray-400">
@@ -575,7 +539,6 @@ function PasoEmpleados({
   );
 }
 
-// 🔹 Paso 3 – Turnos
 function PasoTurnos({
   negocio,
   empleado,
@@ -607,10 +570,7 @@ function PasoTurnos({
       </div>
 
       <div className="text-center">
-        <button
-          onClick={onBack}
-          className="text-sm text-gray-400 hover:text-gray-200 transition"
-        >
+        <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-200 transition">
           ← Volver
         </button>
       </div>
@@ -618,32 +578,28 @@ function PasoTurnos({
   );
 }
 
-// 🔹 Paso 4 – Confirmación
+/* ---------- PasoConfirmacion con guardado en Firestore ---------- */
 function PasoConfirmacion({
   servicio,
   empleado,
   turno,
   negocio,
   usuario,
-  onConfirm,
+  requiereSenia,
+  porcentajeSenia,
   onBack,
+  onSaved,
 }: any) {
   const [pagando, setPagando] = useState(false);
   const [esperandoPago, setEsperandoPago] = useState(false);
+  const [guardandoTurno, setGuardandoTurno] = useState(false);
 
-  const requiereSenia =
-    negocio?.configuracionAgenda?.modoPago === "senia" &&
-    negocio?.configuracionAgenda?.mercadoPago?.conectado;
-
-  const porcentajeSenia = negocio?.configuracionAgenda?.porcentajeSenia || 0;
   const montoSenia = Math.round((servicio.precio * porcentajeSenia) / 100);
 
-  // 🔹 Iniciar pago con Mercado Pago (sin crear turno aún)
   const pagarSenia = async () => {
     try {
       setPagando(true);
 
-      // 🔸 Enviamos todos los datos a create-preference
       const res = await fetch("/.netlify/functions/create-preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -665,10 +621,7 @@ function PasoConfirmacion({
 
       const data = await res.json();
       if (data?.init_point) {
-        // 🔹 Abrimos MP
         window.open(data.init_point, "_blank");
-
-        // 🔹 Mostramos mensaje de espera
         setEsperandoPago(true);
       } else {
         throw new Error(data?.error || "No se pudo iniciar el pago.");
@@ -681,24 +634,76 @@ function PasoConfirmacion({
     }
   };
 
-  // 🔹 Render cuando está esperando pago
+  // ---------- NUEVA FUNCIÓN: crear turno en Firestore ----------
+  const guardarTurno = async () => {
+    if (!usuario?.uid) {
+      alert("Debes iniciar sesión para reservar un turno.");
+      return;
+    }
+    setGuardandoTurno(true);
+    try {
+      // Construir fechas/timestamps
+      const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
+      const dur = parseDuracionMin(servicio.duracion);
+      const finDate = new Date(inicioDate.getTime() + dur * 60000);
+      const inicioTs = Timestamp.fromDate(inicioDate);
+      const finTs = Timestamp.fromDate(finDate);
+
+      // Datos para el documento en Negocios
+      const docNegocioData: any = {
+        servicioId: servicio.id,
+        servicio: servicio.servicio,
+        duracion: servicio.duracion,
+        precio: servicio.precio,
+        empleadoId: empleado.id || null,
+        empleadoNombre: empleado.nombre || null,
+        fecha: turno.fecha,
+        hora: turno.hora,
+        inicioTs,
+        finTs,
+        clienteUid: usuario.uid || null,
+        clienteEmail: usuario.email || null,
+        clienteNombre: usuario?.nombre || usuario?.email || "",
+        negocioId: negocio.id,
+        creadoEn: Timestamp.fromDate(new Date()),
+        estado: "confirmado",
+      };
+
+      // 1) Crear en Negocios/{negocio.id}/Turnos
+      const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
+      const created = await addDoc(turnosRef, docNegocioData);
+      const nuevoId = created.id;
+
+      // 2) Crear copia en Usuarios/{uid}/Turnos con mismo id
+      const turnoUsuarioData = {
+        ...docNegocioData,
+        turnoIdNegocio: nuevoId,
+      };
+      await setDoc(doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId), turnoUsuarioData);
+
+      // Opcional: actualizar el doc en Negocios con el id (si lo quieres dentro del doc)
+      // await setDoc(doc(db, "Negocios", negocio.id, "Turnos", nuevoId), { ...docNegocioData, id: nuevoId }, { merge: true });
+
+      alert("✅ Turno guardado correctamente.");
+      if (onSaved) onSaved();
+    } catch (err) {
+      console.error("❌ Error guardando turno:", err);
+      alert("No se pudo guardar el turno. Intenta nuevamente.");
+    } finally {
+      setGuardandoTurno(false);
+    }
+  };
+
   if (esperandoPago) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <Loader />
-        <p className="mt-4 text-yellow-300 font-medium">
-          💳 Esperando confirmación del pago...
-        </p>
+        <p className="mt-4 text-yellow-300 font-medium">💳 Esperando confirmación del pago...</p>
         <p className="text-xs text-gray-400 mt-2 max-w-xs">
-          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente
-          cuando Mercado Pago apruebe tu seña. Si no completas el pago, el
-          turno no se guardará.
+          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente cuando Mercado Pago apruebe tu seña.
         </p>
 
-        <button
-          onClick={() => setEsperandoPago(false)}
-          className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
-        >
+        <button onClick={() => setEsperandoPago(false)} className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition">
           Volver a intentar
         </button>
       </div>
@@ -712,39 +717,26 @@ function PasoConfirmacion({
         <li>Servicio: {servicio?.servicio}</li>
         <li>Empleado: {empleado?.nombre}</li>
         <li>
-          Día: {turno?.fecha?.toLocaleDateString("es-ES")} – {turno?.hora}
+          Día: {turno?.fecha?.toLocaleDateString?.("es-ES") || new Date(turno.fecha).toLocaleDateString("es-ES")} – {turno?.hora}
         </li>
 
         {requiereSenia && (
-          <li className="text-amber-400">
-            💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
-          </li>
+          <li className="text-amber-400">💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})</li>
         )}
       </ul>
 
       <div className="flex justify-end gap-4">
-        <button
-          onClick={onBack}
-          className="px-4 py-2 rounded bg-gray-700 text-white"
-          disabled={pagando}
-        >
+        <button onClick={onBack} className="px-4 py-2 rounded bg-gray-700 text-white" disabled={pagando || guardandoTurno}>
           Volver
         </button>
 
         {requiereSenia ? (
-          <button
-            onClick={pagarSenia}
-            className="px-4 py-2 rounded bg-blue-600 text-white"
-            disabled={pagando}
-          >
+          <button onClick={pagarSenia} className="px-4 py-2 rounded bg-blue-600 text-white" disabled={pagando || guardandoTurno}>
             {pagando ? "Procesando..." : "Pagar seña"}
           </button>
         ) : (
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded bg-green-600 text-white"
-          >
-            Confirmar turno
+          <button onClick={guardarTurno} className="px-4 py-2 rounded bg-green-600 text-white" disabled={guardandoTurno}>
+            {guardandoTurno ? "Guardando..." : "Confirmar turno"}
           </button>
         )}
       </div>
@@ -752,19 +744,12 @@ function PasoConfirmacion({
   );
 }
 
-
-// 🔹 Paso 5 – Final
 function PasoFinal({ negocio, onClose }: any) {
   return (
     <div className="text-center">
-      <h2 className="text-xl font-semibold mb-4">
-        ✅ Turno agendado con éxito
-      </h2>
+      <h2 className="text-xl font-semibold mb-4">✅ Turno agendado con éxito</h2>
       <p className="mb-4">Te esperamos en {negocio.nombre}</p>
-      <button
-        className="mt-6 w-full py-2 bg-purple-600 rounded-xl"
-        onClick={onClose}
-      >
+      <button className="mt-6 w-full py-2 bg-purple-600 rounded-xl" onClick={onClose}>
         Cerrar
       </button>
     </div>

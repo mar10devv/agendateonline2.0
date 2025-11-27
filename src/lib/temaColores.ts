@@ -1,11 +1,9 @@
-// src/lib/temaColores.ts
-
 // 🎨 Paleta de colores disponibles
 export const temas = {
   azul: {
-    primario: "#3b82f6",           // Azul claro
-    fondo: "#1e3a8a",              // Azul oscuro
-    oscuro: "#1e3a8a",             // Variante más oscura
+    primario: "#3b82f6", // Azul claro
+    fondo: "#1e3a8a",    // Azul oscuro
+    oscuro: "#1e3a8a",   // Variante más oscura
   },
   rosado: {
     primario: "#ec4899",
@@ -30,28 +28,43 @@ export const temas = {
   gris: {
     primario: "#262626",
     fondo: "#171717",
-    oscuro: "#0a0a0a", // 👈 negro casi puro, modo por defecto
+    oscuro: "#0a0a0a", // negro casi puro, modo por defecto
+  },
+  // 🤍 Tema claro
+  white: {
+    primario: "#ffffff", // Fondo principal blanco
+    fondo: "#f9fafb",    // Gris muy claro para el fondo
+    oscuro: "#e5e7eb",   // Gris medio para bordes/sombras
   },
 };
 
-// 🧠 Guarda el tema en localStorage y aplica colores
+// 🧠 Aplica y guarda el tema en localStorage
 export function aplicarTema(nombre: keyof typeof temas) {
   const tema = temas[nombre];
   if (!tema) return;
 
+  // 🎨 Actualizar variables CSS globales
   document.documentElement.style.setProperty("--color-primario", tema.primario);
   document.documentElement.style.setProperty("--color-fondo", tema.fondo);
-  document.documentElement.style.setProperty("--color-primario-oscuro", tema.oscuro); // 👈 nueva variable
+  document.documentElement.style.setProperty("--color-primario-oscuro", tema.oscuro);
 
+  // 🌓 Ajuste automático del color del texto
+  const colorTexto = nombre === "white" ? "#111111" : "#ffffff";
+  document.documentElement.style.setProperty("--color-texto", colorTexto);
+
+  // 🔖 Atributo auxiliar para CSS específicos
+  document.documentElement.setAttribute("data-tema", nombre);
+
+  // 💾 Guardar en localStorage
   localStorage.setItem("temaSeleccionado", nombre);
 }
 
-// 🚀 Carga el tema guardado al iniciar
+// 🚀 Cargar tema guardado o por defecto
 export function inicializarTema() {
   const guardado = localStorage.getItem("temaSeleccionado") as keyof typeof temas;
   if (guardado && temas[guardado]) {
     aplicarTema(guardado);
   } else {
-    aplicarTema("gris"); // tema oscuro por defecto
+    aplicarTema("gris"); // Tema oscuro por defecto
   }
 }
