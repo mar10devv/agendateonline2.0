@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import ModalBase from "../ui/modalGenerico";
-import InputAnimado from "../ui/InputAnimado"; // ✅ nuevo input visual animado
+import InputAnimado from "../ui/InputAnimado";
 import LoaderSpinner from "../ui/loaderSpinner";
 import AddIcon from "../../assets/add.svg?url";
 
@@ -20,14 +20,14 @@ type Servicio = {
   id?: string;
   servicio: string;
   precio: number | string;
-  duracion: number; // minutos totales
+  duracion: number;
   createdAt?: any;
 };
 
 type Props = {
   abierto: boolean;
   onCerrar: () => void;
-  negocioId: string; // ID del negocio
+  negocioId: string;
 };
 
 export default function ModalAgregarServicios({
@@ -37,8 +37,73 @@ export default function ModalAgregarServicios({
 }: Props) {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [estadoBoton, setEstadoBoton] = useState<"normal" | "guardando" | "exito" | "error">("normal");
+  const [estadoBoton, setEstadoBoton] = useState<
+    "normal" | "guardando" | "exito" | "error"
+  >("normal");
 
+  const [abiertoIndex, setAbiertoIndex] = useState<number | null>(null);
+
+  // ============================================
+  // Duraciones predefinidas (EN MINUTOS)
+  // ============================================
+  const duraciones = [
+    10, 20, 30, 40, 50,
+    60, 70, 80, 90,
+    120, 150, 180, 210, 240
+  ];
+
+  const formatearDuracion = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h === 0) return `${m} min`;
+    if (m === 0) return `${h} hr`;
+    return `${h} hr ${m} min`;
+  };
+
+  // ============================================
+  // Detectar servicio vacío
+  // ============================================
+  const esServicioVacio = (s: Servicio) => {
+    return (
+      (s.servicio.trim() === "") &&
+      (s.precio === "" || s.precio === 0) &&
+      s.duracion === 30
+    );
+  };
+
+  // ============================================
+  // Eliminar TODOS los servicios nuevos vacíos
+  // ============================================
+  const limpiarServiciosVacios = () => {
+    setServicios((prev) =>
+      prev.filter((s) => s.id || !esServicioVacio(s))
+    );
+  };
+
+  // ============================================
+  // Expandir/minimizar y eliminar vacíos
+  // ============================================
+  const toggleExpand = (i: number) => {
+    setServicios((prevServicios) => {
+      let nuevaLista = [...prevServicios];
+
+      if (abiertoIndex !== null && abiertoIndex !== i) {
+        const anterior = nuevaLista[abiertoIndex];
+
+        if (!anterior.id && esServicioVacio(anterior)) {
+          nuevaLista.splice(abiertoIndex, 1);
+          if (i > abiertoIndex) i--;
+        }
+      }
+
+      setAbiertoIndex((prev) => (prev === i ? null : i));
+      return nuevaLista;
+    });
+  };
+
+  // ============================================
+  // Carga en tiempo real
+  // ============================================
   useEffect(() => {
     if (!abierto || !negocioId) return;
 
@@ -57,8 +122,10 @@ export default function ModalAgregarServicios({
             createdAt: d.data().createdAt,
           } as Servicio)
       );
+
       setServicios(data);
       setCargando(false);
+      setAbiertoIndex(null);
     });
 
     return () => unsubscribe();
@@ -66,33 +133,22 @@ export default function ModalAgregarServicios({
 
   const handleChange = (index: number, field: keyof Servicio, value: any) => {
     setServicios((prev) =>
-      prev.map((s, i) =>
-        i === index ? { ...s, [field]: field === "servicio" ? value : value } : s
-      )
+      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
     );
   };
 
-  const handleDuracionChange = (
-    index: number,
-    tipo: "horas" | "minutos",
-    value: number
-  ) => {
-    setServicios((prev) =>
-      prev.map((s, i) => {
-        if (i !== index) return s;
-        const horas = Math.floor(s.duracion / 60);
-        const minutos = s.duracion % 60;
-        const newHoras = tipo === "horas" ? value : horas;
-        const newMin = tipo === "minutos" ? value : minutos;
-        return { ...s, duracion: newHoras * 60 + newMin };
-      })
-    );
-  };
-
+  // ============================================
+  // Agregar servicio
+  // ============================================
   const handleAgregar = () => {
-    setServicios([{ servicio: "", precio: "", duracion: 30 }, ...servicios]);
+    limpiarServiciosVacios();
+    setServicios((prev) => [{ servicio: "", precio: "", duracion: 30 }, ...prev]);
+    setAbiertoIndex(0);
   };
 
+  // ============================================
+  // Eliminar manualmente
+  // ============================================
   const handleEliminar = async (index: number) => {
     const servicio = servicios[index];
     try {
@@ -101,15 +157,23 @@ export default function ModalAgregarServicios({
         const preciosRef = collection(negocioRef, "Precios");
         await deleteDoc(doc(preciosRef, servicio.id));
       }
-      setServicios(servicios.filter((_, i) => i !== index));
+
+      setServicios((prev) => prev.filter((_, i) => i !== index));
+
+      if (abiertoIndex === index) setAbiertoIndex(null);
     } catch (err) {
       console.error("❌ Error eliminando servicio:", err);
     }
   };
 
+  // ============================================
+  // Guardar
+  // ============================================
   const handleGuardar = async () => {
+    limpiarServiciosVacios();
+
     try {
-      setEstadoBoton("guardando"); // 🟡 Cambia a “Guardando”
+      setEstadoBoton("guardando");
 
       const negocioRef = doc(db, "Negocios", negocioId);
       const preciosRef = collection(negocioRef, "Precios");
@@ -117,6 +181,7 @@ export default function ModalAgregarServicios({
       for (const s of servicios) {
         if (s.servicio.trim() !== "") {
           const precioFinal = s.precio === "" ? 0 : Number(s.precio);
+
           if (s.id) {
             await setDoc(
               doc(preciosRef, s.id),
@@ -138,14 +203,18 @@ export default function ModalAgregarServicios({
         }
       }
 
-      setEstadoBoton("exito"); // ✅ Éxito
+      setEstadoBoton("exito");
       setTimeout(() => setEstadoBoton("normal"), 3000);
-      console.log("✅ Servicios guardados correctamente");
     } catch (err) {
       console.error("❌ Error guardando servicios:", err);
-      setEstadoBoton("error"); // 🔴 Error
+      setEstadoBoton("error");
       setTimeout(() => setEstadoBoton("normal"), 3000);
     }
+  };
+
+  const cerrarModal = () => {
+    limpiarServiciosVacios();
+    onCerrar();
   };
 
   if (!abierto) return null;
@@ -153,7 +222,7 @@ export default function ModalAgregarServicios({
   return (
     <ModalBase
       abierto={abierto}
-      onClose={onCerrar}
+      onClose={cerrarModal}
       titulo="Servicios del negocio"
       maxWidth="max-w-3xl"
     >
@@ -167,82 +236,83 @@ export default function ModalAgregarServicios({
           ) : servicios.length === 0 ? (
             <p className="text-gray-400 text-sm">No hay servicios cargados aún.</p>
           ) : (
-            <>
-              <div className="hidden sm:grid grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] gap-2 px-2 text-gray-200 text-sm font-medium">
-                <span>Nombre</span>
-                <span>Precio</span>
-                <span>H</span>
-                <span>Min</span>
-                <span></span>
-              </div>
-
-              {servicios.map((serv, i) => (
-                <div
-                  key={serv.id || i}
-                  className="grid sm:grid-cols-[2fr_1fr_0.5fr_0.5fr_auto] grid-cols-1 gap-3 items-center rounded-lg p-3 transition-colors duration-300"
-                  style={{ backgroundColor: "var(--color-primario)" }}
+            servicios.map((serv, i) => (
+              <div
+                key={serv.id || i}
+                className="rounded-xl border border-white/10 bg-black/20"
+              >
+                <button
+                  onClick={() => toggleExpand(i)}
+                  className="w-full text-left px-4 py-3 flex justify-between items-center text-white font-medium"
                 >
-                  <InputAnimado
-                    label="Nombre del servicio"
-                    id={`nombre-${i}`}
-                    value={serv.servicio}
-                    onChange={(e) => handleChange(i, "servicio", e.target.value)}
-                  />
+                  <span>{serv.servicio || "Nuevo servicio"}</span>
+                  <span className="text-xl">
+                    {abiertoIndex === i ? "▲" : "▼"}
+                  </span>
+                </button>
 
-                  <InputAnimado
-                    label="Precio"
-                    id={`precio-${i}`}
-                    value={serv.precio === 0 ? "" : String(serv.precio)}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleChange(i, "precio", val === "" ? "" : Number(val));
-                    }}
-                  />
+                {abiertoIndex === i && (
+  <div className="p-4 flex flex-col gap-4 bg-black/30 rounded-b-xl">
 
-                  <select
-                    value={Math.floor(serv.duracion / 60)}
-                    onChange={(e) => {
-                      const horas = Number(e.target.value);
-                      const minutos = serv.duracion % 60;
-                      handleDuracionChange(i, "horas", horas);
-                      handleDuracionChange(i, "minutos", minutos);
-                    }}
-                    className="px-2 py-2 bg-black/30 border border-white/20 rounded text-white text-center outline-none"
-                  >
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
+    <InputAnimado
+      label="Nombre del servicio"
+      id={`nombre-${i}`}
+      value={serv.servicio}
+      onChange={(e) => handleChange(i, "servicio", e.target.value)}
+    />
 
-                  <InputAnimado
-                    label="Minutos"
-                    id={`minutos-${i}`}
-                    value={String(serv.duracion % 60 || "")}
-                    onChange={(e) => {
-                      const minutos = e.target.value === "" ? 0 : Number(e.target.value);
-                      const horas = Math.floor(serv.duracion / 60);
-                      handleDuracionChange(i, "minutos", minutos);
-                      handleDuracionChange(i, "horas", horas);
-                    }}
-                  />
+    <InputAnimado
+      label="Precio"
+      id={`precio-${i}`}
+      value={serv.precio === 0 ? "" : String(serv.precio)}
+      onChange={(e) => {
+        const val = e.target.value;
+        handleChange(i, "precio", val === "" ? "" : Number(val));
+      }}
+    />
 
-                  <div className="flex justify-end sm:items-center">
-                    <button
-                      onClick={() => handleEliminar(i)}
-                      className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-semibold w-full sm:w-auto"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </>
+    {/* SLIDER DURACIÓN */}
+    <div className="flex flex-col gap-1">
+      <label className="text-sm text-gray-300">Duración</label>
+
+      <input
+        type="range"
+        min={0}
+        max={duraciones.length - 1}
+        step={1}
+        value={duraciones.indexOf(serv.duracion)}
+        onChange={(e) => {
+          const index = Number(e.target.value);
+          const nuevaDuracion = duraciones[index];
+          handleChange(i, "duracion", nuevaDuracion);
+        }}
+        className="w-full accent-green-500"
+      />
+
+      <p className="text-gray-200 text-sm font-medium mt-1">
+        {formatearDuracion(serv.duracion)}
+      </p>
+    </div>
+
+    {/* BOTÓN ELIMINAR */}
+<div className="w-[calc(100%+2rem)] -ml-4 mt-3 pt-3 border-t border-white/10">
+  <button
+    onClick={() => handleEliminar(i)}
+    className="w-full py-2 rounded-b-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md transition text-center"
+  >
+    ✕
+  </button>
+</div>
+
+
+  </div>
+)}
+
+              </div>
+            ))
           )}
         </div>
 
-        {/* Botón añadir */}
         <div className="mt-4">
           <button
             onClick={handleAgregar}
@@ -257,16 +327,14 @@ export default function ModalAgregarServicios({
           </button>
         </div>
 
-        {/* Botones finales */}
         <div className="flex justify-end gap-3 mt-6">
           <button
-            onClick={onCerrar}
+            onClick={cerrarModal}
             className="px-5 py-2 rounded-lg bg-black/40 text-gray-200 hover:bg-black/60 transition"
           >
             Cancelar
           </button>
 
-          {/* 🔹 Botón dinámico con los 4 estados */}
           <button
             onClick={handleGuardar}
             disabled={estadoBoton === "guardando"}
@@ -282,6 +350,7 @@ export default function ModalAgregarServicios({
               }`}
           >
             {estadoBoton === "guardando" && <LoaderSpinner size={18} />}
+
             {estadoBoton === "guardando"
               ? "Guardando cambios..."
               : estadoBoton === "exito"

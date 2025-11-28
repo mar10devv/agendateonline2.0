@@ -92,16 +92,17 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
       >
         {/* Botón cerrar */}
         <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/10 transition"
-          title="Cerrar"
-        >
-          <img
-            src={CloseIcon}
-            alt="Cerrar"
-            className="w-5 h-5 invert opacity-80 hover:opacity-100 transition"
-          />
-        </button>
+  onClick={onClose}
+  className="absolute top-3 right-3 p-1 rounded-full hover:bg-white/10 transition"
+  title="Cerrar"
+  style={{ touchAction: "manipulation" }}
+>
+  <img
+    src={CloseIcon}
+    alt="Cerrar"
+    className="w-12 h-12 invert opacity-90 hover:opacity-100 transition"
+  />
+</button>
 
         {/* Título opcional */}
         {titulo && (
