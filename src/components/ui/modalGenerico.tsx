@@ -25,18 +25,41 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
   const [visible, setVisible] = useState(false);
   const [animClass, setAnimClass] = useState("");
 
-  // 🛑 BLOQUEO TOTAL DEL SCROLL (Android + iPhone + Desktop)
+  // 🔥 BLOQUEAR SCROLL EN TODOS LOS ANCESTROS (iOS + Android + Desktop)
   useEffect(() => {
-    const html = document.documentElement;
+    if (!abierto) return;
 
-    if (abierto) {
-      html.classList.add("no-scroll");
-    } else {
-      html.classList.remove("no-scroll");
+    let node: HTMLElement | null = document.body;
+
+    while (node) {
+      node.dataset.prevOverflow = node.style.overflow;
+      node.dataset.prevPosition = node.style.position;
+      node.dataset.prevHeight = node.style.height;
+      node.dataset.prevTouch = node.style.touchAction;
+
+      node.style.overflow = "hidden";
+      node.style.position = "fixed";
+      node.style.height = "100%";
+      node.style.touchAction = "none";
+
+      node = node.parentElement;
     }
 
     return () => {
-      html.classList.remove("no-scroll");
+      let node: HTMLElement | null = document.body;
+
+      while (node) {
+        if (node.dataset.prevOverflow !== undefined)
+          node.style.overflow = node.dataset.prevOverflow;
+        if (node.dataset.prevPosition !== undefined)
+          node.style.position = node.dataset.prevPosition;
+        if (node.dataset.prevHeight !== undefined)
+          node.style.height = node.dataset.prevHeight;
+        if (node.dataset.prevTouch !== undefined)
+          node.style.touchAction = node.dataset.prevTouch;
+
+        node = node.parentElement;
+      }
     };
   }, [abierto]);
 
@@ -87,7 +110,7 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
           </h2>
         )}
 
-        {/* Contenido con scroll interno */}
+        {/* Scroll interno del modal */}
         <div
           className="max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
         >
