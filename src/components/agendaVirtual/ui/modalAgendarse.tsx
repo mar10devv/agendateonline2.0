@@ -636,63 +636,103 @@ function PasoConfirmacion({
 
   // ---------- NUEVA FUNCIÓN: crear turno en Firestore ----------
   const guardarTurno = async () => {
-    if (!usuario?.uid) {
-      alert("Debes iniciar sesión para reservar un turno.");
-      return;
-    }
-    setGuardandoTurno(true);
-    try {
-      // Construir fechas/timestamps
-      const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
-      const dur = parseDuracionMin(servicio.duracion);
-      const finDate = new Date(inicioDate.getTime() + dur * 60000);
-      const inicioTs = Timestamp.fromDate(inicioDate);
-      const finTs = Timestamp.fromDate(finDate);
+  if (!usuario?.uid) {
+    alert("Debes iniciar sesión para reservar un turno.");
+    return;
+  }
 
-      // Datos para el documento en Negocios
-      const docNegocioData: any = {
-        servicioId: servicio.id,
-        servicio: servicio.servicio,
-        duracion: servicio.duracion,
-        precio: servicio.precio,
-        empleadoId: empleado.id || null,
-        empleadoNombre: empleado.nombre || null,
-        fecha: turno.fecha,
-        hora: turno.hora,
-        inicioTs,
-        finTs,
-        clienteUid: usuario.uid || null,
-        clienteEmail: usuario.email || null,
-        clienteNombre: usuario?.nombre || usuario?.email || "",
-        negocioId: negocio.id,
-        creadoEn: Timestamp.fromDate(new Date()),
-        estado: "confirmado",
-      };
+  setGuardandoTurno(true);
+  try {
+    // --- FECHAS CORRECTAS ---
+    const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
+    const dur = parseDuracionMin(servicio.duracion);
+    const finDate = new Date(inicioDate.getTime() + dur * 60000);
+    const inicioTs = Timestamp.fromDate(inicioDate);
+    const finTs = Timestamp.fromDate(finDate);
 
-      // 1) Crear en Negocios/{negocio.id}/Turnos
-      const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
-      const created = await addDoc(turnosRef, docNegocioData);
-      const nuevoId = created.id;
+    // --- FORMATEO CORRECTO PARA EMAILS ---
+    const fechaTexto = inicioDate.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
 
-      // 2) Crear copia en Usuarios/{uid}/Turnos con mismo id
-      const turnoUsuarioData = {
+    const horaTexto = inicioDate.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const slugNegocio = negocio.nombre
+      ? negocio.nombre.toLowerCase().replace(/\s+/g, "-")
+      : negocio.id;
+
+    // --- DOC PRINCIPAL (Negocios/Turnos)
+    const docNegocioData: any = {
+      servicioId: servicio.id,
+      servicio: servicio.servicio,
+      servicioNombre: servicio.servicio,
+
+      empleadoId: empleado.id || null,
+      empleadoNombre: empleado.nombre || null,
+
+      inicioTs,
+      finTs,
+      fecha: fechaTexto,     // lo que esperan las functions
+      hora: horaTexto,       // lo que esperan las functions
+
+      precio: servicio.precio,
+      duracion: servicio.duracion,
+
+      clienteUid: usuario.uid || null,
+      clienteEmail: usuario.email || null,
+      clienteNombre: usuario?.displayName || usuario?.email || "",
+
+      negocioId: negocio.id,
+      negocioNombre: negocio.nombre || "",
+      slugNegocio,
+
+      estado: "confirmado",
+      creadoEn: Timestamp.now(),
+
+      emailConfirmacionEnviado: false,
+      emailConfirmacionError: null,
+    };
+
+    // --- CREAR EN NEGOCIO ---
+    const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
+    const created = await addDoc(turnosRef, docNegocioData);
+    const nuevoId = created.id;
+
+    // --- COPIAR A USUARIO ---
+    await setDoc(
+      doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId),
+      {
         ...docNegocioData,
         turnoIdNegocio: nuevoId,
-      };
-      await setDoc(doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId), turnoUsuarioData);
+      },
+      { merge: true }
+    );
 
-      // Opcional: actualizar el doc en Negocios con el id (si lo quieres dentro del doc)
-      // await setDoc(doc(db, "Negocios", negocio.id, "Turnos", nuevoId), { ...docNegocioData, id: nuevoId }, { merge: true });
+    // --- ENVIAR MAIL DE CONFIRMACIÓN ---
+    await fetch("/.netlify/functions/confirmar-turno", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        docPath: `Negocios/${negocio.id}/Turnos/${nuevoId}`,
+      }),
+    });
 
-      alert("✅ Turno guardado correctamente.");
-      if (onSaved) onSaved();
-    } catch (err) {
-      console.error("❌ Error guardando turno:", err);
-      alert("No se pudo guardar el turno. Intenta nuevamente.");
-    } finally {
-      setGuardandoTurno(false);
-    }
-  };
+    alert("✅ Turno guardado y email enviado correctamente.");
+    onSaved?.();
+  } catch (err) {
+    console.error("❌ Error guardando turno:", err);
+    alert("No se pudo guardar el turno. Intenta nuevamente.");
+  } finally {
+    setGuardandoTurno(false);
+  }
+};
+
 
   if (esperandoPago) {
     return (
