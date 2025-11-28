@@ -25,25 +25,18 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
   const [visible, setVisible] = useState(false);
   const [animClass, setAnimClass] = useState("");
 
-  // 🛑 BLOQUEO REAL DEL SCROLL DE FONDO (sin bugs)
+  // 🛑 BLOQUEO TOTAL DEL SCROLL (Android + iPhone + Desktop)
   useEffect(() => {
-    const body = document.body;
+    const html = document.documentElement;
 
     if (abierto) {
-      const scrollBarWidth = window.innerWidth - body.clientWidth + "px";
-      body.style.overflow = "hidden";
-      body.style.paddingRight = scrollBarWidth; // evita el salto del layout
-      body.style.touchAction = "none"; // bloquea scroll táctil en mobile
+      html.classList.add("no-scroll");
     } else {
-      body.style.overflow = "";
-      body.style.paddingRight = "";
-      body.style.touchAction = "";
+      html.classList.remove("no-scroll");
     }
 
     return () => {
-      body.style.overflow = "";
-      body.style.paddingRight = "";
-      body.style.touchAction = "";
+      html.classList.remove("no-scroll");
     };
   }, [abierto]);
 
@@ -95,7 +88,9 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
         )}
 
         {/* Contenido con scroll interno */}
-        <div className="max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        <div
+          className="max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+        >
           {children}
         </div>
       </div>
