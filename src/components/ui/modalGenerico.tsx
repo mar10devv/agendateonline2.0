@@ -1,14 +1,14 @@
 // src/components/ui/ModalGenerico.tsx
 import React, { useEffect, useState } from "react";
 import "animate.css";
-import CloseIcon from "../../assets/close-svg.svg?url"; // 👈 importamos tu SVG
+import CloseIcon from "../../assets/close-svg.svg?url";
 
 type ModalGenericoProps = {
   abierto: boolean;
   onClose: () => void;
   titulo?: string;
   children: React.ReactNode;
-  maxWidth?: string;            // ej: "max-w-4xl" o "max-w-lg"
+  maxWidth?: string;
   animacionEntrada?: string;
   animacionSalida?: string;
 };
@@ -25,19 +25,15 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
   const [visible, setVisible] = useState(false);
   const [animClass, setAnimClass] = useState("");
 
-  // 🚫 Bloquear scroll cuando está abierto
+  // ❌ Bloquear scroll del body al abrir
   useEffect(() => {
-    if (abierto) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = abierto ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
   }, [abierto]);
 
-  // 🎬 Manejo de animaciones
+  // 🎬 Animaciones
   useEffect(() => {
     if (abierto) {
       setVisible(true);
@@ -57,10 +53,14 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-md">
       <div
-        className={`text-white rounded-xl shadow-2xl w-[90%] ${maxWidth} p-6 relative transition-colors duration-300 ${animClass}`}
+        className={`
+          text-white rounded-xl shadow-2xl w-[90%] ${maxWidth}
+          p-6 relative transition-colors duration-300
+          ${animClass}
+        `}
         style={{ backgroundColor: "var(--color-fondo)" }}
       >
-        {/* Botón cerrar con SVG personalizado */}
+        {/* Botón cerrar */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/10 transition"
@@ -73,12 +73,17 @@ const ModalGenerico: React.FC<ModalGenericoProps> = ({
           />
         </button>
 
+        {/* Título opcional */}
         {titulo && (
           <h2 className="text-lg font-semibold mb-4 text-center">
             {titulo}
           </h2>
         )}
-        <div>{children}</div>
+
+        {/* 📌 CONTENEDOR CON SCROLL Y ALTURA FIJA */}
+        <div className="max-h-[80vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          {children}
+        </div>
       </div>
     </div>
   );
