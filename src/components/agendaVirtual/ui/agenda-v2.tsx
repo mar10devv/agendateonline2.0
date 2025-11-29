@@ -17,19 +17,16 @@ import { Instagram, Facebook, Phone } from "lucide-react";
 import ConfigIcon from "../../ui/Config-icono";
 import ModalAgregarServicios from "../modalAgregarServicios";
 import { obtenerDireccion } from "../../../lib/geocoding";
-import { guardarUbicacionNegocio } from "../backend/agenda-backend";
+import { guardarUbicacionNegocio, escucharServicios } from "../backend/agenda-backend";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 
+import { db } from "../../../lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 import { useMap } from "react-leaflet";
-
-
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
-
-// 🔥 IMPORTANTE: Listener de servicios
-import { escucharServicios } from "../backend/agenda-backend";
 
 const customIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
@@ -132,75 +129,73 @@ export default function AgendaVirtualUIv3({
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] = useState<"idle" | "cargando" | "exito">("idle");
 
-const mapWrapperRef = useRef<HTMLDivElement>(null);
-const [readyToShowMap, setReadyToShowMap] = useState(false);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const [readyToShowMap, setReadyToShowMap] = useState(false);
 
-useEffect(() => {
-  // Esperar a que el contenedor tenga tamaño real
-  const timer = setTimeout(() => {
-    if (mapWrapperRef.current && mapWrapperRef.current.clientHeight > 0) {
-      setReadyToShowMap(true);
-    }
-  }, 100);
-
-  return () => clearTimeout(timer);
-}, [vista]);
-
-function FixMapRender() {
-  const map = useMap();
   useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 150);
-  }, [map]);
-  return null;
-}
+    const timer = setTimeout(() => {
+      if (mapWrapperRef.current && mapWrapperRef.current.clientHeight > 0) {
+        setReadyToShowMap(true);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [vista]);
+
+  function FixMapRender() {
+    const map = useMap();
+    useEffect(() => {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 150);
+    }, [map]);
+    return null;
+  }
 
   // 🔥 Nuevo estado: servicios en tiempo real
   const [serviciosState, setServiciosState] = useState<Servicio[]>([]);
   const [modalServicios, setModalServicios] = useState(false);
+
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
-const handleGuardarUbicacion = () => {
-  if (!navigator.geolocation) {
-    console.error("Tu navegador no soporta geolocalización.");
-    return;
-  }
+  const handleGuardarUbicacion = () => {
+    if (!navigator.geolocation) {
+      console.error("Tu navegador no soporta geolocalización.");
+      return;
+    }
 
-  setEstadoUbicacion("cargando");
+    setEstadoUbicacion("cargando");
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      try {
-        const { latitude, longitude } = pos.coords;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
 
-        const direccion = await obtenerDireccion(latitude, longitude);
+          const direccion = await obtenerDireccion(latitude, longitude);
 
-        const nuevaUbicacion = {
-          lat: latitude,
-          lng: longitude,
-          direccion,
-        };
+          const nuevaUbicacion = {
+            lat: latitude,
+            lng: longitude,
+            direccion,
+          };
 
-        await guardarUbicacionNegocio(negocio.slug, nuevaUbicacion);
+          await guardarUbicacionNegocio(negocio.slug, nuevaUbicacion);
 
-        setUbicacion(nuevaUbicacion);
+          setUbicacion(nuevaUbicacion);
 
-        // Cambia el estado visual del botón
-        setEstadoUbicacion("exito");
-        setTimeout(() => setEstadoUbicacion("idle"), 2500);
-      } catch (error) {
-        console.error("Error guardando ubicación:", error);
+          setEstadoUbicacion("exito");
+          setTimeout(() => setEstadoUbicacion("idle"), 2500);
+        } catch (error) {
+          console.error("Error guardando ubicación:", error);
+          setEstadoUbicacion("idle");
+        }
+      },
+      (err) => {
+        console.error("Error al obtener ubicación:", err);
         setEstadoUbicacion("idle");
-      }
-    },
-    (err) => {
-      console.error("Error al obtener ubicación:", err);
-      setEstadoUbicacion("idle");
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-};
-
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   /* --------  CARGA REAL DE SERVICIOS  -------- */
 
@@ -220,7 +215,55 @@ const handleGuardarUbicacion = () => {
     };
   }, [negocio.slug]);
 
-  
+  /* --------  TEMAS (COLORES) -------- */
+
+  // ✅ Leer SIEMPRE el tema desde Firestore igual que en el modelo anterior
+  useEffect(() => {
+    if (!negocio?.slug) return;
+
+    const q = query(
+      collection(db, "Negocios"),
+      where("slug", "==", negocio.slug)
+    );
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      if (snap.empty) return;
+
+      const data = snap.docs[0].data() as Negocio;
+      const tema = data.tema;
+
+      if (tema && tema.colorPrimario) {
+        requestAnimationFrame(() => {
+          document.documentElement.style.setProperty(
+            "--color-primario",
+            tema.colorPrimario || "#262626"
+          );
+          document.documentElement.style.setProperty(
+            "--color-fondo",
+            tema.colorFondo || "#171717"
+          );
+          document.documentElement.style.setProperty(
+            "--color-primario-oscuro",
+            tema.colorPrimarioOscuro || "#0a0a0a"
+          );
+          document.documentElement.style.setProperty(
+            "--color-texto",
+            "#ffffff"
+          );
+        });
+      } else {
+        document.documentElement.style.setProperty("--color-primario", "#262626");
+        document.documentElement.style.setProperty("--color-fondo", "#171717");
+        document.documentElement.style.setProperty(
+          "--color-primario-oscuro",
+          "#0a0a0a"
+        );
+        document.documentElement.style.setProperty("--color-texto", "#ffffff");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [negocio.slug]);
 
   /* --------  NAVBAR  -------- */
 
@@ -235,7 +278,6 @@ const handleGuardarUbicacion = () => {
 
   const renderVista = () => {
     switch (vista) {
-
       case "servicios":
         return (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -243,7 +285,7 @@ const handleGuardarUbicacion = () => {
               serviciosState.map((s) => (
                 <div
                   key={s.id}
-                  className="p-4 bg-purple-800/60 rounded-2xl text-center"
+                  className="p-4 rounded-2xl text-center bg-[color:var(--color-primario-oscuro)/0.7]"
                 >
                   <p className="font-semibold">{s.servicio}</p>
                   <p className="text-sm opacity-80">${s.precio}</p>
@@ -257,43 +299,46 @@ const handleGuardarUbicacion = () => {
         );
 
       case "empleados":
-  return (
-    <div className="relative w-full">
-
-      {/* LISTA DE EMPLEADOS */}
-      <div className="flex flex-wrap justify-center gap-6 mt-10">
-        {empleados?.length > 0 ? (
-          empleados.map((e) => (
-            <div key={e.id} className="flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full overflow-hidden border border-white/30">
-                {e.fotoPerfil ? (
-                  <img
-                    src={e.fotoPerfil}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-purple-900 flex items-center justify-center">
-                    <span className="text-xl font-bold">{e.nombre[0]}</span>
+        return (
+          <div className="relative w-full">
+            <div className="flex flex-wrap justify-center gap-6 mt-10">
+              {empleados?.length > 0 ? (
+                empleados.map((e) => (
+                  <div key={e.id} className="flex flex-col items-center">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border border-white/30">
+                      {e.fotoPerfil ? (
+                        <img
+                          src={e.fotoPerfil}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-[var(--color-primario-oscuro)] flex items-center justify-center">
+                          <span className="text-xl font-bold">
+                            {e.nombre[0]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm">{e.nombre}</p>
                   </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm">{e.nombre}</p>
+                ))
+              ) : (
+                <p className="opacity-80">No hay empleados cargados.</p>
+              )}
             </div>
-          ))
-        ) : (
-          <p className="opacity-80">No hay empleados cargados.</p>
-        )}
-      </div>
-
-    </div>
-  );
+          </div>
+        );
 
       case "agenda":
         return modo === "cliente" ? (
           <div className="flex justify-center">
             <button
               onClick={() => setModalAgendarse(true)}
-              className="bg-purple-800 px-6 py-3 rounded-2xl hover:bg-purple-900 transition"
+              className="
+                px-6 py-3 rounded-2xl transition
+                bg-[var(--color-primario)]
+                hover:bg-[var(--color-primario-oscuro)]
+              "
             >
               Reservar Turno
             </button>
@@ -309,101 +354,97 @@ const handleGuardarUbicacion = () => {
           />
         );
 
-case "ubicacion":
-  return (
-    <div className="w-full">
+      case "ubicacion":
+        return (
+          <div className="w-full">
+            {/* Título */}
+            <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
+              {(modo === "dueño" || modo === "admin")
+                ? "Mi ubicación"
+                : `Ubicación de ${negocio.nombre}`}
+            </h2>
 
-      {/* Título */}
-      <h2 className="text-lg font-semibold mb-4 text-white">
-        {(modo === "dueño" || modo === "admin")
-          ? "Mi ubicación"
-          : `Ubicación de ${negocio.nombre}`}
-      </h2>
-
-      {/* Si NO existe ubicación */}
-      {!ubicacion && (
-        <>
-          {(modo === "dueño" || modo === "admin") ? (
-            <button
-              onClick={handleGuardarUbicacion}
-              disabled={estadoUbicacion === "cargando"}
-              className={`
-                px-4 py-2 rounded-md flex items-center justify-center gap-2
-                font-medium transition-all
-                ${
-                  estadoUbicacion === "cargando"
-                    ? "bg-purple-900 opacity-60 text-white"
-                    : estadoUbicacion === "exito"
-                    ? "bg-green-600 text-white"
-                    : "bg-purple-900 hover:bg-purple-800 text-white"
-                }
-              `}
-            >
-              {estadoUbicacion === "cargando" && (
-                <>
-                  <LoaderSpinner size={20} color="white" />
-                  Cargando nueva ubicación...
-                </>
-              )}
-              {estadoUbicacion === "exito" && "✅ Se ha cambiado la ubicación"}
-              {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
-            </button>
-          ) : (
-            <p className="opacity-80 text-sm">Ubicación no disponible.</p>
-          )}
-        </>
-      )}
-
-      {/* Si SÍ existe ubicación */}
-      {ubicacion && (
-        <div className="flex flex-col gap-4">
-
-          {/* MAPA REUTILIZABLE */}
-          <div className="w-full flex justify-center">
-            <ComponenteMapa
-              ubicacion={ubicacion}
-              modo={modo}
-              negocioSlug={negocio.slug}
-              onUbicacionActualizada={(u) => setUbicacion(u)}
-              height="h-64"
-            />
-          </div>
-
-          {/* Botón actualizar ubicación */}
-          {(modo === "dueño" || modo === "admin") && (
-            <div className="flex justify-end">
-              <button
-                onClick={handleGuardarUbicacion}
-                disabled={estadoUbicacion === "cargando"}
-                className={`
-                  px-3 py-1.5 text-sm rounded-md flex items-center gap-2
-                  transition-all font-medium
-                  ${
-                    estadoUbicacion === "cargando"
-                      ? "bg-purple-900 opacity-60 text-white"
-                      : estadoUbicacion === "exito"
-                      ? "bg-green-600 text-white"
-                      : "bg-purple-900 hover:bg-purple-800 text-white"
-                  }
-                `}
-              >
-                {estadoUbicacion === "cargando" && (
-                  <>
-                    <LoaderSpinner size={14} color="white" />
-                    Buscando nueva ubicación...
-                  </>
+            {/* Si NO existe ubicación */}
+            {!ubicacion && (
+              <>
+                {(modo === "dueño" || modo === "admin") ? (
+                  <button
+                    onClick={handleGuardarUbicacion}
+                    disabled={estadoUbicacion === "cargando"}
+                    className={`
+                      px-4 py-2 rounded-md flex items-center justify-center gap-2
+                      font-medium transition-all
+                      ${
+                        estadoUbicacion === "cargando"
+                          ? "bg-[var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
+                          : estadoUbicacion === "exito"
+                          ? "bg-green-600 text-white"
+                          : "bg-[var(--color-primario-oscuro)] hover:opacity-90 text-[var(--color-texto)]"
+                      }
+                    `}
+                  >
+                    {estadoUbicacion === "cargando" && (
+                      <>
+                        <LoaderSpinner size={20} color="white" />
+                        Cargando nueva ubicación...
+                      </>
+                    )}
+                    {estadoUbicacion === "exito" && "✅ Se ha cambiado la ubicación"}
+                    {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
+                  </button>
+                ) : (
+                  <p className="opacity-80 text-sm">Ubicación no disponible.</p>
                 )}
-                {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
-                {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+              </>
+            )}
 
+            {/* Si SÍ existe ubicación */}
+            {ubicacion && (
+              <div className="flex flex-col gap-4">
+                {/* MAPA REUTILIZABLE */}
+                <div className="w-full flex justify-center">
+                  <ComponenteMapa
+                    ubicacion={ubicacion}
+                    modo={modo}
+                    negocioSlug={negocio.slug}
+                    onUbicacionActualizada={(u) => setUbicacion(u)}
+                    height="h-64"
+                  />
+                </div>
 
+                {/* Botón actualizar ubicación */}
+                {(modo === "dueño" || modo === "admin") && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleGuardarUbicacion}
+                      disabled={estadoUbicacion === "cargando"}
+                      className={`
+                        px-3 py-1.5 text-sm rounded-md flex items-center gap-2
+                        transition-all font-medium
+                        ${
+                          estadoUbicacion === "cargando"
+                            ? "bg-[var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
+                            : estadoUbicacion === "exito"
+                            ? "bg-green-600 text-white"
+                            : "bg-[var(--color-primario-oscuro)] hover:opacity-90 text-[var(--color-texto)]"
+                        }
+                      `}
+                    >
+                      {estadoUbicacion === "cargando" && (
+                        <>
+                          <LoaderSpinner size={14} color="white" />
+                          Buscando nueva ubicación...
+                        </>
+                      )}
+                      {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
+                      {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
 
       default:
         return null;
@@ -413,18 +454,28 @@ case "ubicacion":
   /* --------  UI PRINCIPAL -------- */
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center bg-gradient-to-b from-indigo-900 to-blue-600 text-white p-4">
-
+    <div
+      className="
+        min-h-screen w-full flex flex-col items-center
+        bg-[var(--color-fondo)]
+        text-[var(--color-texto)]
+        p-4
+        transition-colors duration-300
+      "
+    >
       {/* HEADER */}
-      <div className="
-  w-full max-w-3xl bg-purple-700 rounded-3xl p-6 flex flex-col items-center 
-  shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-  hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-  transition-all duration-300
-  relative
-">
-
-
+      <div
+        className="
+          w-full max-w-3xl 
+          bg-[var(--color-primario)]
+          rounded-3xl p-6 flex flex-col items-center 
+          shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+          hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+          transition-all duration-300
+          relative
+          text-[var(--color-texto)]
+        "
+      >
         {/* ⚙️ Config */}
         {(modo === "dueño" || modo === "admin") && (
           <button
@@ -436,9 +487,12 @@ case "ubicacion":
         )}
 
         {/* Foto */}
-        <div className="w-24 h-24 rounded-full bg-purple-900 overflow-hidden border-4 border-white/20">
+        <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
           {negocio.perfilLogo ? (
-            <img src={negocio.perfilLogo} className="w-full h-full object-cover" />
+            <img
+              src={negocio.perfilLogo}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-3xl">
               {negocio.nombre[0]}
@@ -505,76 +559,107 @@ case "ubicacion":
       </div>
 
       {/* NAV */}
-     <div className="
-  w-full max-w-3xl bg-purple-800 mt-4 p-3 rounded-3xl flex justify-around gap-2
-  shadow-[0_6px_16px_rgba(0,0,0,0.40)]
-  hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
-  transition-all duration-300
-">
+      <div
+        className="
+          w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
+          bg-[var(--color-primario-oscuro)]
+          text-[var(--color-texto)]
+          shadow-[0_6px_16px_rgba(0,0,0,0.40)]
+          hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
+          transition-all duration-300
+        "
+      >
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setVista(item.id)}
             className={`flex flex-col items-center p-2 min-w-[70px] transition 
-              ${vista === item.id ? "bg-purple-600 text-white rounded-xl" : "bg-transparent"}`}
+              ${
+                vista === item.id
+                  ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
+                  : "bg-transparent"
+              }`}
           >
-            <div className="w-6 h-6 flex items-center justify-center">{item.icon}</div>
+            <div className="w-6 h-6 flex items-center justify-center">
+              {item.icon}
+            </div>
             <span className="text-xs mt-1 text-center">{item.label}</span>
           </button>
         ))}
       </div>
 
-{/* CONTENIDO */}
-<div
-  key={vista}
-  className={`
-    relative
-    w-full max-w-3xl bg-purple-700 mt-6 p-6 rounded-3xl 
-    shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-    hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-    transition-all duration-300
+      {/* CONTENIDO */}
+      <div
+        key={vista}
+        className={`
+          relative
+          w-full max-w-3xl mt-6 p-6 rounded-3xl 
+          bg-[var(--color-primario)]
+          shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+          hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+          transition-all duration-300
+          ${
+            vista === "agenda" && modo === "cliente"
+              ? "min-h-0" 
+              : vista === "ubicacion"
+              ? "min-h-0"
+              : vista === "empleados"
+              ? "min-h-fit"
+              : "min-h-[280px]"
+          }
+        `}
+      >
+        {/* CONFIG PARA EMPLEADOS */}
+        {vista === "empleados" && (modo === "dueño" || modo === "admin") && (
+          <button
+            onClick={() => setModalEmpleados(true)}
+            className="absolute top-4 right-4 z-20"
+            title="Administrar empleados"
+          >
+            <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+          </button>
+        )}
 
-    ${
-      vista === "agenda" && modo === "cliente"
-        ? "min-h-0" 
-        : vista === "ubicacion"
-        ? "min-h-0"
-        : vista === "empleados"
-        ? "min-h-fit"
-        : "min-h-[280px]"
-    }
-  `}
->
+        {/* CONFIG PARA SERVICIOS */}
+        {vista === "servicios" && (modo === "dueño" || modo === "admin") && (
+          <button
+            onClick={() => setModalServicios(true)}
+            className="absolute top-4 right-4 z-20"
+            title="Administrar servicios"
+          >
+            <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+          </button>
+        )}
 
-  {/* CONFIG PARA EMPLEADOS */}
-  {(vista === "empleados") && (modo === "dueño" || modo === "admin") && (
-    <button
-      onClick={() => setModalEmpleados(true)}
-      className="absolute top-4 right-4 z-20"
-      title="Administrar empleados"
-    >
-      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-    </button>
-  )}
-
-  {/* CONFIG PARA SERVICIOS */}
-  {(vista === "servicios") && (modo === "dueño" || modo === "admin") && (
-    <button
-      onClick={() => setModalServicios(true)}
-      className="absolute top-4 right-4 z-20"
-      title="Administrar servicios"
-    >
-      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-    </button>
-  )}
-
-  {renderVista()}
-</div>
-
+        {renderVista()}
+      </div>
 
       {/* FOOTER */}
-      <div className="w-full max-w-3xl bg-black mt-6 p-4 rounded-3xl text-center opacity-80">
-        FOOTER DE AGENDATEONLINE
+      <div
+        className="
+          w-full max-w-3xl bg-black/80 mt-6 p-6 rounded-3xl 
+          text-center text-white 
+          shadow-[0_8px_20px_rgba(0,0,0,0.4)]
+          flex flex-col items-center gap-2
+        "
+      >
+        <p className="text-sm opacity-80 leading-relaxed">
+          © {new Date().getFullYear()} {negocio.nombre} — Todos los derechos reservados.
+          <br />
+          <span className="opacity-70">Powered by AgendateOnline</span>
+        </p>
+
+        <button
+          onClick={() => (window.location.href = "/")}
+          className="
+            mt-1 px-4 py-2 text-sm rounded-xl font-medium
+            bg-[var(--color-primario)]
+            hover:bg-[var(--color-primario-oscuro)]
+            transition-colors duration-300
+          "
+        >
+          Obtener tu agenda
+        </button>
       </div>
 
       {/* MODALES */}
@@ -611,15 +696,14 @@ case "ubicacion":
           modo={modo === "cliente" ? "dueño" : modo}
         />
       )}
-        {/* MODAL DE SERVICIOS */}
-{modalServicios && (
-  <ModalAgregarServicios
-    abierto={modalServicios}
-    onCerrar={() => setModalServicios(false)}
-    negocioId={negocio.id}
-  />
-)}
+
+      {modalServicios && (
+        <ModalAgregarServicios
+          abierto={modalServicios}
+          onCerrar={() => setModalServicios(false)}
+          negocioId={negocio.id}
+        />
+      )}
     </div>
   );
-  
 }
