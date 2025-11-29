@@ -612,57 +612,61 @@ const handleEliminarTurno = async (
 <div className="max-h-[420px] overflow-auto pr-1">
   <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
     {slots.map((s, i) => {
-      const bloqueado = s.turno?.bloqueado; // 👈 nuevo flag
-      const ocupado = s.ocupado && !bloqueado; // ocupado real
-      const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
+  const bloqueado = s.turno?.bloqueado; // 👈 nuevo flag
+  const ocupado = s.ocupado && !bloqueado; // ocupado real
+  const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
 
-      // 🎨 estilos según estado
-      const clase = vencido
-        ? ocupado
-          ? "bg-gray-700 hover:bg-gray-600 text-white"
-          : "bg-gray-700 text-gray-400 cursor-not-allowed"
-        : bloqueado
-          ? "bg-gray-500 text-gray-300 cursor-not-allowed" // bloqueado = gris
-          : ocupado
-            ? "bg-red-600/95 hover:bg-red-600 text-white"
-            : "bg-emerald-600/90 hover:bg-emerald-600 text-white";
+  // 🎨 usamos las clases del global.css
+  let claseEstado = "";
+  if (vencido) {
+    claseEstado = "horario-pasado";
+  } else if (bloqueado) {
+    claseEstado = "horario-bloqueado";
+  } else if (ocupado) {
+    claseEstado = "horario-ocupado";
+  } else {
+    claseEstado = "horario-disponible";
+  }
 
-      return (
-        <button
-          key={i}
-          disabled={vencido && !ocupado && !bloqueado}
-          onClick={async () => {
-            if (bloqueado) {
-
-              // 👇 solo negocio puede liberar antes que venza
-              if (!vencido) {
-                if (confirm("¿Desea liberar este turno para que vuelva a estar disponible?")) {
-                  await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", s.turno!.id));
-                }
-              }
-            } else if (ocupado) {
-              setDetalles(s.turno!); // ver detalle
-            } else if (!vencido) {
-              setModalOpciones({ visible: true, hora: s.hora }); // opciones
+  return (
+    <button
+      key={i}
+      disabled={vencido && !ocupado && !bloqueado}
+      onClick={async () => {
+        if (bloqueado) {
+          // 👇 solo negocio puede liberar antes que venza
+          if (!vencido) {
+            if (confirm("¿Desea liberar este turno para que vuelva a estar disponible?")) {
+              await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", s.turno!.id));
             }
-          }}
-          className={`h-14 rounded-xl grid place-items-center text-sm font-semibold transition focus:outline-none ${clase}`}
-          title={
-            vencido
-              ? ocupado
-                ? "Turno pasado (ver detalle)"
-                : "Turno pasado"
-              : bloqueado
-                ? "No disponible (bloqueado)"
-                : ocupado
-                  ? "Turno ocupado"
-                  : "Opciones de turno"
           }
-        >
-          {s.hora}
-        </button>
-      );
-    })}
+        } else if (ocupado) {
+          setDetalles(s.turno!); // ver detalle
+        } else if (!vencido) {
+          setModalOpciones({ visible: true, hora: s.hora }); // opciones
+        }
+      }}
+      className={`horario-btn h-14 grid place-items-center text-sm font-semibold transition focus:outline-none ${claseEstado}`}
+      style={{
+        ["--horario-bg" as any]: undefined, // por si acaso
+      }}
+      title={
+        vencido
+          ? ocupado
+            ? "Turno pasado (ver detalle)"
+            : "Turno pasado"
+          : bloqueado
+            ? "No disponible (bloqueado)"
+            : ocupado
+              ? "Turno ocupado"
+              : "Opciones de turno"
+      }
+    >
+      {s.hora}
+    </button>
+  );
+})}
+
   </div>
 </div>
             </>

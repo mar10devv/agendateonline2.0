@@ -170,7 +170,7 @@ body {
   transition: color 0.3s ease;
 }
 
-/* ================= ⚡ Sincronización global mínima ================= */
+/* ================= ⚡ Sincronización global ================= */
 body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   color: var(--color-texto);
   transition: color 0.3s ease;
@@ -195,8 +195,7 @@ body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   transition: stroke 0.3s ease;
 }
 
-/* ░░░░░░░░░░░░░░░░░░░░░░░░ */
-/* Bloquea TODO el scroll del sitio cuando el modal está abierto */
+/* No scroll con modal */
 .no-scroll {
   position: fixed !important;
   overflow: hidden !important;
@@ -214,7 +213,6 @@ body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   --color-fondo-gradient: linear-gradient(to right, #2563eb, #4f46e5);
 }
 
-/* Fondo degradado */
 html[data-tema="gradient"],
 body[data-tema="gradient"] {
   background-image: var(--color-fondo-gradient);
@@ -223,7 +221,6 @@ body[data-tema="gradient"] {
   background-repeat: no-repeat;
 }
 
-/* Contenedores blancos */
 [data-tema="gradient"] .bg-primario,
 [data-tema="gradient"] .bg-fondo,
 [data-tema="gradient"] .card,
@@ -235,7 +232,6 @@ body[data-tema="gradient"] {
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 
-/* Texto adaptable */
 [data-tema="gradient"] body,
 [data-tema="gradient"] h1,
 [data-tema="gradient"] h2,
@@ -251,12 +247,6 @@ body[data-tema="gradient"] {
 [data-tema="gradient"] a,
 [data-tema="gradient"] .text-dinamico {
   color: #111111 !important;
-}
-
-/* Sombras suaves */
-[data-tema="gradient"] .bg-primario,
-[data-tema="gradient"] .bg-fondo {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 /* ================= ⭐ FIX MODAL ================= */
@@ -298,17 +288,7 @@ body[data-tema="gradient"] {
   box-shadow: 0 3px 6px rgba(0,0,0,0.15) !important;
 }
 
-[data-tema="white"] .swiper-pagination-bullet {
-  background: #111111 !important;
-  opacity: 0.4 !important;
-}
-
-[data-tema="white"] .swiper-pagination-bullet-active {
-  background: #111111 !important;
-  opacity: 1 !important;
-}
-
-/* Cards con color dinámico real */
+/* Cards */
 .card,
 .bloque,
 .contenedor,
@@ -322,7 +302,7 @@ body[data-tema="gradient"] {
   background-position: center !important;
 }
 
-/* 🔵 Bordes redondeados globales (swiper-slide ELIMINADO) */
+/* Bordes */
 .card,
 .bloque,
 .contenedor,
@@ -333,4 +313,39 @@ body[data-tema="gradient"] {
   border-radius: 18px !important;
   overflow: hidden !important;
   border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ================================================================== */
+/* 🚫 FIX FINAL DEFINITIVO — HORARIOS IGNORAN LOS GRADIENTS           */
+/* ================================================================== */
+
+/* Reset base de los botones de horario */
+.horario-btn {
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0.75rem;
+}
+
+/* COLORES REALES (se aplican encima del reset) */
+.horario-disponible {
+  background-color: #059669;
+  color: #ffffff;
+}
+
+.horario-ocupado {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.horario-bloqueado {
+  background-color: #6b7280;
+  color: #e5e7eb;
+}
+
+.horario-pasado {
+  background-color: #374151;
+  color: #9ca3af;
 }
