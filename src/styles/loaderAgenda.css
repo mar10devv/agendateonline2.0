@@ -3,8 +3,13 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
   min-height: 100vh;
-  background: #000; /* Fondo negro como tu agenda */
+  width: 100vw;            /* ⬅️ Ocupa TODO el ancho */
+  margin: 0;               /* ⬅️ Evita márgenes externos */
+  padding: 0;              /* ⬅️ Evita padding del contenedor padre */
+
+  background: linear-gradient(to right, rgb(37, 99, 235), rgb(79, 70, 229));
   color: white;
   gap: 1.5rem;
 }
@@ -209,9 +214,8 @@
                 22px 10px 0 #fff,
                 37px 10px 0 #fff,
                 52px 10px 0 #fff,
-                60px 10px 0 #fff,
+                60px 0 0 #fff,
                 68px 10px 0 #fff,
                 83px 10px 0 #fff;
   }
-  /* 👈 seguí igual que en tu código original */
 }
