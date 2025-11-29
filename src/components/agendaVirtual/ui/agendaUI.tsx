@@ -68,10 +68,19 @@ type Turno = {
 export type Empleado = {
   id?: string;
   nombre: string;
-  foto?: string;       // 👈 usamos solo "foto"
-  especialidad?: string;
+  email?: string;
+  foto?: string;
+  fotoPerfil?: string;
+  rol?: "empleado" | "admin" | "dueño";
+  admin?: boolean;
+  adminEmail?: string;
+
+  trabajos?: string[];
   calendario?: any;
+
+  esEmpleado?: boolean; // 👈 MUY IMPORTANTE
 };
+
 
 
 type Servicio = {
@@ -381,10 +390,6 @@ const unsubscribeNegocio = onSnapshot(q, (snap: any) => {
 
     console.log("Negocio cargado:", data);
 
-    if (data.empleadosData) {
-      setEmpleadosState(data.empleadosData);
-    }
-
     if (data.ubicacion) {
       setUbicacion(data.ubicacion);
     }
@@ -639,14 +644,15 @@ useEffect(() => {
   }}
 />
 
-            {/* Empleados */}
+{/* Empleados */}
+{/* Empleados */}
 <div className="order-2 bg-[var(--color-primario)] rounded-2xl p-6 relative shadow-lg transition-colors duration-300">
 
   <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
     Empleados
   </h2>
 
-  {/* 👑 Dueño y Admin pueden abrir el modal de empleados de ESTE negocio */}
+  {/* 👑 Dueño y Admin pueden abrir el modal de empleados */}
   {(modo === "dueño" || modo === "admin") && (
     <>
       <button
@@ -660,7 +666,6 @@ useEffect(() => {
         />
       </button>
 
-      {/* Modal empleados → siempre abre el del negocio actual */}
       <ModalEmpleadosUI
         abierto={modalAbierto}
         onCerrar={() => setModalAbierto(false)}
@@ -672,38 +677,48 @@ useEffect(() => {
   )}
 
   <div className="flex gap-6 flex-wrap mt-2 justify-center">
+
     {empleadosState && empleadosState.length > 0 ? (
-      empleadosState.map((e, idx) => (
-        <button
-          key={idx}
-          onClick={() => setEmpleadoSeleccionado(e)}
-          className="relative w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] hover:opacity-80 transition flex items-center justify-center"
-        >
-          {e.foto ? (
-            <img
-              src={e.foto}
-              alt={e.nombre || 'Empleado'}
-              className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
-            />
-          ) : (
-            <div
-              className="w-24 h-24 rounded-full flex items-center justify-center font-bold text-[var(--color-texto)] border-4 border-[color:var(--color-texto)/0.5] text-xl"
-              style={{
-                backgroundColor: "var(--color-primario-oscuro, #171717)",
-              }}
-            >
-              {e.nombre ? e.nombre.charAt(0) : "?"}
-            </div>
-          )}
-        </button>
-      ))
+      empleadosState
+        .filter((e: any) => {
+  if (e.rol !== "dueño") return true;
+  return e.esEmpleado === true;
+})
+
+        .map((e, idx) => (
+          <button
+            key={idx}
+            onClick={() => setEmpleadoSeleccionado(e)}
+            className="relative w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] hover:opacity-80 transition flex items-center justify-center"
+          >
+            {e.fotoPerfil || e.foto ? (
+              <img
+                src={e.fotoPerfil || e.foto}
+                alt={e.nombre || "Empleado"}
+                className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
+              />
+            ) : (
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center font-bold text-[var(--color-texto)] border-4 border-[color:var(--color-texto)/0.5] text-xl"
+                style={{
+                  backgroundColor: "var(--color-primario-oscuro, #171717)",
+                }}
+              >
+                {e.nombre ? e.nombre.charAt(0) : "?"}
+              </div>
+            )}
+          </button>
+        ))
     ) : (
       <p className="text-[color:var(--color-texto)/0.7] text-sm">
         No hay empleados cargados.
       </p>
     )}
+
   </div>
 </div>
+
+
 
            {/* 🗓️ Calendario + Botón Agendarse */}
 {(modo === "dueño" || modo === "admin") && (

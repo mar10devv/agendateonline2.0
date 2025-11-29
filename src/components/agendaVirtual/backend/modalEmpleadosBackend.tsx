@@ -10,19 +10,18 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from "firebase/storage";
-import { guardarConfigNegocio, obtenerConfigNegocio } from "../../../lib/firestore";
-import { compressImageFileToWebP } from "../../../lib/imageUtils"; // 👈 importamos el helper
+import { obtenerConfigNegocio } from "../../../lib/firestore";
+import { compressImageFileToWebP } from "../../../lib/imageUtils";
 
-// 🔒 Tipo base de Empleado
 export type Empleado = {
   id?: string;
   nombre: string;
   email?: string;
-  rol?: "empleado" | "admin";
+  rol?: "empleado" | "admin" | "dueño";
   admin?: boolean;
   adminEmail?: string;
   fotoPerfil?: string;
-  foto?: string; // 👈 compatibilidad con UI anterior
+  foto?: string; 
   nombreArchivo?: string;
   trabajos: string[];
   calendario: {
@@ -30,19 +29,17 @@ export type Empleado = {
     fin: string;
     diasLibres: string[];
   };
-  esEmpleado?: boolean; // 👈 nuevo: true = aparece como empleado disponible, false = solo dueño
+  esEmpleado?: boolean; 
 };
 
-// 🚀 Subida de imágenes a ImgBB (con compresión WebP)
+// 🔥 Subida ImgBB → con compresión
 export async function subirImagenImgBB(file: File): Promise<string | null> {
   try {
-    // 🔥 1) Comprimir antes de subir
     const compressedFile = await compressImageFileToWebP(file);
 
     const formData = new FormData();
     formData.append("image", compressedFile);
 
-    // 🔥 2) Subir a ImgBB
     const res = await fetch(
       `https://api.imgbb.com/1/upload?key=2d9fa5d6354c8d98e3f92b270213f787`,
       { method: "POST", body: formData }
@@ -51,47 +48,73 @@ export async function subirImagenImgBB(file: File): Promise<string | null> {
     const data = await res.json();
     return data?.data?.display_url || null;
   } catch (err) {
-    console.error("❌ Error subiendo foto de empleado:", err);
+    console.error("❌ Error subiendo foto:", err);
     return null;
   }
 }
 
-// 📌 Subida de foto a Firebase Storage (opcional si no usás ImgBB)
+// 📌 Storage (no usado pero lo dejo)
 export async function subirFotoEmpleadoStorage(file: File, empleadoId: string) {
   const storageRef = ref(storage, `empleados/${empleadoId}`);
   await uploadBytes(storageRef, file);
   return await getDownloadURL(storageRef);
 }
 
-// 📌 Obtener configuración del negocio
+// 📌 Obtener empleados
 export async function obtenerEmpleados(uid: string) {
-  return await obtenerConfigNegocio(uid);
+  const data = await obtenerConfigNegocio(uid);
+
+  if (data?.empleadosData) {
+  data.empleadosData = data.empleadosData.map((e: any) => ({
+    ...e,
+    esEmpleado: e.esEmpleado === true, // 👈 CLARÍSIMO
+  }));
 }
 
-// 📌 Guardar configuración completa (incluye empleados + adminUids)
+  return data;
+}
+
+// 🟩🟩🟩 **GUARDAR EMPLEADOS — COMPLETAMENTE ARREGLADO**
 export async function guardarEmpleados(uid: string, config: any) {
   try {
     const negocioRef = doc(db, "Negocios", uid);
 
-    // 🧩 Construir array de adminUids con los correos de empleados admins
-    const adminUids = (config.empleadosData || [])
-      .filter((emp: any) => emp.rol === "admin" && emp.adminEmail)
-      .map((emp: any) => emp.adminEmail.toLowerCase().trim());
+    const empleadosNormalizados = (config.empleadosData || []).map((e: any) => ({
+      nombre: e.nombre || "",
+      email: e.email || "",
+      rol: e.rol || "empleado",
+      admin: e.rol === "admin",
+      adminEmail: e.adminEmail || "",
+      fotoPerfil: e.fotoPerfil || "",
+      nombreArchivo: e.nombreArchivo || "",
+      trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
+      calendario: e.calendario || {
+        inicio: "",
+        fin: "",
+        diasLibres: [],
+      },
+      esEmpleado: e.esEmpleado === false ? false : true, // 👈 SIEMPRE SE GUARDA
+    }));
 
-    // 🧠 Guardamos configuración + adminUids en Firestore
+    // admins por correo
+    const adminUids = empleadosNormalizados
+      .filter((e: any) => e.rol === "admin" && e.adminEmail)
+      .map((e: any) => e.adminEmail.toLowerCase().trim());
+
     await updateDoc(negocioRef, {
       ...config,
-      adminUids: adminUids,
+      empleadosData: empleadosNormalizados, // 👈 GUARDADO CORRECTO
+      adminUids,
     });
 
-    console.log("✅ Empleados y adminUids actualizados correctamente");
+    console.log("✅ Empleados guardados correctamente con esEmpleado");
   } catch (err) {
     console.error("❌ Error guardando empleados:", err);
     throw err;
   }
 }
 
-// 📌 Agregar un nuevo empleado a la config local
+// 📌 Nuevo empleado vacío
 export function crearEmpleadoVacio(): Empleado {
   return {
     nombre: "",
@@ -106,11 +129,11 @@ export function crearEmpleadoVacio(): Empleado {
       fin: "",
       diasLibres: [],
     },
-    esEmpleado: true, // 👈 por defecto todos los nuevos son empleados activos
+    esEmpleado: true, // 👈 default: empleado activo
   };
 }
 
-// 📌 Actualizar datos de un empleado dentro de config
+// 📌 Actualizar
 export function actualizarEmpleado(
   config: any,
   index: number,
@@ -122,7 +145,7 @@ export function actualizarEmpleado(
   return { ...config, empleadosData: nuevo };
 }
 
-// 📌 Eliminar empleado de la config local
+// 📌 Eliminar
 export function eliminarEmpleado(config: any, index: number) {
   return {
     ...config,

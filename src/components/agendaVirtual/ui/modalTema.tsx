@@ -7,13 +7,16 @@ import { doc, updateDoc } from "firebase/firestore";
 type Props = {
   abierto: boolean;
   onCerrar: () => void;
-  negocioId: string; // ✅ necesario para guardar el color en Firestore
+  negocioId: string;
 };
 
 export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
+
+  // ⛔️ Hace que el modal se destruya inmediatamente (sin animación)
+  if (!abierto) return null;
+
   const [temaSeleccionado, setTemaSeleccionado] = useState<string>("gris");
 
-  // 🔹 Carga el tema guardado en localStorage
   useEffect(() => {
     const guardado = localStorage.getItem("temaSeleccionado");
     if (guardado && temas[guardado as keyof typeof temas]) {
@@ -21,7 +24,6 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
     }
   }, []);
 
-  // 🔹 Guardar tema local + Firestore
   const manejarGuardar = async () => {
     aplicarTema(temaSeleccionado as keyof typeof temas);
 
@@ -42,7 +44,11 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
       console.error("❌ Error al guardar el tema:", err);
     }
 
+    // Cerrar modal
     onCerrar();
+
+    // 🔥 Recargar la web (solución definitiva al bug visual)
+    window.location.reload();
   };
 
   return (
@@ -76,6 +82,7 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
         >
           Cancelar
         </button>
+
         <button
           onClick={manejarGuardar}
           className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium"

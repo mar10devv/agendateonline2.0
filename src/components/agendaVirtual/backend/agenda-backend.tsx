@@ -250,10 +250,11 @@ export async function escucharEmpleados(
         admin: e.admin || false,
         adminEmail: e.adminEmail || "",
         fotoPerfil: e.fotoPerfil || e.foto || "",
-        foto: e.fotoPerfil || e.foto || "", // 👈 agregado
+        foto: e.fotoPerfil || e.foto || "",
         nombreArchivo: e.nombreArchivo || "",
         trabajos: e.trabajos || [],
         calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
+        esEmpleado: e.esEmpleado === false ? false : true,      // 👈🔥 AGREGADO
       }));
       callback(empleados);
     } else {
@@ -262,7 +263,7 @@ export async function escucharEmpleados(
           id: negocioId,
           nombre: data.nombre || "Empleado",
           fotoPerfil: data.foto || data.fotoPerfil || "",
-          foto: data.foto || data.fotoPerfil || "", // 👈 agregado
+          foto: data.foto || data.fotoPerfil || "",
           rol: "empleado",
           admin: false,
           adminEmail: "",
@@ -272,6 +273,7 @@ export async function escucharEmpleados(
             fin: "",
             diasLibres: [],
           },
+          esEmpleado: true,                                     // 👈🔥 AGREGADO
         },
       ]);
     }
@@ -279,6 +281,7 @@ export async function escucharEmpleados(
 
   return unsubscribe;
 }
+
 
 
 // 📆 Obtener turnos por fecha

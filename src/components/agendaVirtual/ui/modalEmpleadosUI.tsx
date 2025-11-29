@@ -22,7 +22,7 @@ type Props = {
   onCerrar: () => void;
   negocioId: string;
   modo: "dueño" | "admin";
-  userUid?: string; // email del usuario logueado (admin)
+  userUid?: string;
 };
 
 export default function ModalEmpleadosUI({
@@ -36,14 +36,20 @@ export default function ModalEmpleadosUI({
   const [estado, setEstado] = useState<
     "cargando" | "listo" | "guardando" | "exito" | "sin-acceso"
   >("cargando");
+
   const esGuardando = estado === "guardando";
 
-  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | null>(null);
-  const [empleadoAEliminar, setEmpleadoAEliminar] = useState<number | null>(null);
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] =
+    useState<number | null>(null);
+  const [empleadoAEliminar, setEmpleadoAEliminar] =
+    useState<number | null>(null);
   const [mostrarAviso, setMostrarAviso] = useState(false);
   const [empleadoServicios, setEmpleadoServicios] = useState<number | null>(null);
 
-  const [cargandoFoto, setCargandoFoto] = useState<{ [key: number]: boolean }>({});
+  const [cargandoFoto, setCargandoFoto] = useState<{ [key: number]: boolean }>(
+    {}
+  );
+
   const hayEmpleadoSinEditar = config?.empleadosData?.some(
     (emp: Empleado) => !emp.nombre?.trim()
   );
@@ -51,35 +57,56 @@ export default function ModalEmpleadosUI({
   // 🔑 Cargar empleados
   useEffect(() => {
     if (!abierto || !negocioId) return;
+
     const cargar = async () => {
       try {
         const negocioConfig = await obtenerEmpleados(negocioId);
-        if (negocioConfig) {
-          setConfig({
-            ...negocioConfig,
-            empleados: negocioConfig.empleados || 1,
-            empleadosData: negocioConfig.empleadosData?.length
-              ? negocioConfig.empleadosData
-              : [crearEmpleadoVacio()],
-          });
-          setEstado("listo");
-        } else {
-          setEstado("sin-acceso");
+        if (!negocioConfig) return setEstado("sin-acceso");
+
+        let empleados = negocioConfig.empleadosData?.length
+          ? negocioConfig.empleadosData
+          : [crearEmpleadoVacio()];
+
+        // 🔥 Asignar roles si faltan
+        empleados = empleados.map((emp: any) => {
+          if (!emp.rol) emp.rol = emp.admin ? "admin" : "empleado";
+          return emp;
+        });
+
+        // Garantizar que haya un dueño
+        if (!empleados.some((e: any) => e.rol === "dueño")) {
+          empleados[0].rol = "dueño";
         }
+
+        setConfig({
+          ...negocioConfig,
+          empleados: empleados.length,
+          empleadosData: empleados,
+        });
+
+        setEstado("listo");
       } catch (err) {
         console.error("Error obteniendo empleados:", err);
         setEstado("sin-acceso");
       }
     };
+
     cargar();
   }, [abierto, negocioId]);
 
-  const handleChangeEmpleado = (index: number, field: keyof Empleado, value: any) => {
+  // Cambia campos
+  const handleChangeEmpleado = (
+    index: number,
+    field: keyof Empleado,
+    value: any
+  ) => {
     setConfig((prev: any) => actualizarEmpleado(prev, index, field, value));
   };
 
+  // Maneja fotos
   const handleFotoPerfil = async (index: number, file: File | null) => {
     if (!file) return;
+
     const empleado = config.empleadosData[index];
     const yaTieneUrl = empleado.fotoPerfil && empleado.nombreArchivo;
 
@@ -89,6 +116,7 @@ export default function ModalEmpleadosUI({
     }
 
     setCargandoFoto((prev) => ({ ...prev, [index]: true }));
+
     try {
       const url = await subirImagenImgBB(file);
       if (url) {
@@ -102,20 +130,39 @@ export default function ModalEmpleadosUI({
     }
   };
 
-  const handleSubmit = async () => {
-    if (!negocioId) return;
-    setEstado("guardando");
-    try {
-      await guardarEmpleados(negocioId, config);
-      setEstado("exito");
-      setTimeout(() => setEstado("listo"), 2000);
-    } catch (error) {
-      console.error("Error guardando empleados:", error);
-      setEstado("listo");
-    }
-  };
+  // Guardar cambios
+const handleSubmit = async () => {
+  if (!negocioId) return;
 
-  // 🧠 Determina roles
+  setEstado("guardando");
+
+  try {
+    // 🔥 ORDEN REAL ANTES DE GUARDAR
+    const ordenados = [...config.empleadosData].sort((a, b) => {
+      const peso = (emp: any) =>
+        emp.rol === "dueño" ? 0 : emp.rol === "admin" ? 1 : 2;
+      return peso(a) - peso(b);
+    });
+
+    const configFinal = { ...config, empleadosData: ordenados };
+
+    await guardarEmpleados(negocioId, configFinal);
+
+    // Mostrar éxito
+    setEstado("exito");
+
+    // 👇 Refrescar web para arreglar el body bugeado
+    setTimeout(() => {
+      location.reload();
+    }, 700);
+
+  } catch (error) {
+    console.error("Error guardando empleados:", error);
+    setEstado("listo");
+  }
+};
+
+
   const soyDueno = modo === "dueño";
   const soyAdmin = modo === "admin";
 
@@ -133,27 +180,29 @@ export default function ModalEmpleadosUI({
         {estado === "sin-acceso" && (
           <p className="text-red-400">🚫 No tienes acceso</p>
         )}
-        {(estado === "listo" || estado === "exito" || estado === "guardando") && (
+
+        {(estado === "listo" ||
+          estado === "exito" ||
+          estado === "guardando") && (
           <div className="flex flex-col h-[70vh]">
             <div className="flex-1 overflow-y-auto pr-2">
               <div className="flex flex-col gap-6">
                 {config.empleadosData.map((empleado: Empleado, index: number) => {
-                  // 🏠 índice 0 siempre es el dueño
-                  const esDueno = index === 0;
+                  const esDueno = empleado.rol === "dueño";
 
                   const faltaHorario =
                     !empleado.calendario?.inicio || !empleado.calendario?.fin;
                   const faltaServicios =
-                    !Array.isArray(empleado.trabajos) || empleado.trabajos.length === 0;
+                    !Array.isArray(empleado.trabajos) ||
+                    empleado.trabajos.length === 0;
 
                   return (
                     <div
-  key={index}
-  className="relative rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center 
-             bg-[var(--color-primario)] shadow-lg transition-colors duration-300"
->
-
-                      {/* ❌ Eliminar: permitido para dueño y admin, excepto el dueño mismo */}
+                      key={index}
+                      className="relative rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center 
+                                 bg-[var(--color-primario)] shadow-lg transition-colors duration-300"
+                    >
+                      {/* ❌ Eliminar (excepto dueño) */}
                       {(soyDueno || soyAdmin) && !esDueno && (
                         <button
                           type="button"
@@ -174,11 +223,12 @@ export default function ModalEmpleadosUI({
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          disabled={false} // 👈 dueño y admin pueden cambiar cualquier foto, incluido el dueño
+                          disabled={false}
                           onChange={(e) =>
                             handleFotoPerfil(index, e.target.files?.[0] || null)
                           }
                         />
+
                         <label
                           htmlFor={`fotoPerfil-${index}`}
                           className={`w-24 h-24 rounded-full flex items-center justify-center overflow-hidden cursor-pointer bg-neutral-700`}
@@ -206,8 +256,8 @@ export default function ModalEmpleadosUI({
                           onChange={(e) =>
                             handleChangeEmpleado(index, "nombre", e.target.value)
                           }
-                          disabled={false} // 👈 dueño también puede editar su nombre
-className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray-700 rounded-md text-white transition-colors duration-300"
+                          disabled={false}
+                          className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray-700 rounded-md text-white transition-colors duration-300"
                         />
 
                         {/* Badges */}
@@ -217,6 +267,7 @@ className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray
                               🏠 Dueño
                             </span>
                           )}
+
                           {empleado.rol === "admin" && (
                             <span className="px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded-full">
                               👑 Admin
@@ -224,85 +275,90 @@ className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray
                           )}
                         </div>
 
-                        {/* Botones → dueño y admin */}
-{(soyDueno || soyAdmin) && (
-  <div className="flex flex-wrap gap-3">
-    {/* El dueño también puede configurarse a sí mismo */}
-    <button
-      onClick={() => setEmpleadoSeleccionado(index)}
-      className={
-        faltaHorario
-          ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
-          : "bg-indigo-600 text-white px-4 py-2 rounded-md"
-      }
-    >
-      Configurar horario
-    </button>
-    <button
-      onClick={() => setEmpleadoServicios(index)}
-      className={
-        faltaServicios
-          ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
-          : "bg-purple-600 text-white px-4 py-2 rounded-md"
-      }
-    >
-      Configurar servicios
-    </button>
+                        {/* Botones */}
+                        {(soyDueno || soyAdmin) && (
+                          <div className="flex flex-wrap gap-3">
+                            <button
+                              onClick={() => setEmpleadoSeleccionado(index)}
+                              className={
+                                faltaHorario
+                                  ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
+                                  : "bg-indigo-600 text-white px-4 py-2 rounded-md"
+                              }
+                            >
+                              Configurar horario
+                            </button>
 
-    {/* Botón admin → no disponible para el dueño */}
-    {!esDueno && (
-      <button
-        onClick={() => {
-          const correo = prompt(
-            "Ingrese el correo Gmail del empleado para hacerlo admin:"
-          );
-          if (!correo) return;
-          setConfig((prev: any) => {
-            const nuevos = [...prev.empleadosData];
-            if (nuevos[index].admin) {
-              nuevos[index].admin = false;
-              nuevos[index].adminEmail = "";
-              nuevos[index].rol = "empleado";
-            } else {
-              nuevos[index].admin = true;
-              nuevos[index].adminEmail = correo.trim().toLowerCase();
-              nuevos[index].rol = "admin";
-            }
-            return { ...prev, empleadosData: nuevos };
-          });
-        }}
-        className={
-          empleado.admin
-            ? "bg-red-600 text-white px-4 py-2 rounded-md"
-            : "bg-green-600 text-white px-4 py-2 rounded-md"
-        }
-      >
-        {empleado.admin ? "Quitar admin" : "Agregar admin"}
-      </button>
-    )}
+                            <button
+                              onClick={() => setEmpleadoServicios(index)}
+                              className={
+                                faltaServicios
+                                  ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
+                                  : "bg-purple-600 text-white px-4 py-2 rounded-md"
+                              }
+                            >
+                              Configurar servicios
+                            </button>
 
-    {/* Solo dueño → botón "No empleado" */}
-    {esDueno && (
-      <button
-        onClick={() => {
-          setConfig((prev: any) => {
-            const nuevos = [...prev.empleadosData];
-            nuevos[index].esEmpleado = !nuevos[index].esEmpleado;
-            return { ...prev, empleadosData: nuevos };
-          });
-        }}
-        className={
-          empleado.esEmpleado
-            ? "bg-gray-600 text-white px-4 py-2 rounded-md"
-            : "bg-orange-600 text-white px-4 py-2 rounded-md"
-        }
-      >
-        {empleado.esEmpleado ? "No empleado" : "Soy empleado"}
-      </button>
-    )}
-  </div>
-)}
+                            {/* Admin */}
+                            {!esDueno && (
+                              <button
+                                onClick={() => {
+                                  const correo = prompt(
+                                    "Ingrese el correo Gmail del empleado para hacerlo admin:"
+                                  );
+                                  if (!correo) return;
 
+                                  setConfig((prev: any) => {
+                                    const nuevos = [...prev.empleadosData];
+                                    if (nuevos[index].rol === "admin") {
+                                      nuevos[index].rol = "empleado";
+                                      nuevos[index].adminEmail = "";
+                                    } else {
+                                      nuevos[index].rol = "admin";
+                                      nuevos[index].adminEmail = correo
+                                        .trim()
+                                        .toLowerCase();
+                                    }
+                                    return { ...prev, empleadosData: nuevos };
+                                  });
+                                }}
+                                className={
+                                  empleado.rol === "admin"
+                                    ? "bg-red-600 text-white px-4 py-2 rounded-md"
+                                    : "bg-green-600 text-white px-4 py-2 rounded-md"
+                                }
+                              >
+                                {empleado.rol === "admin"
+                                  ? "Quitar admin"
+                                  : "Agregar admin"}
+                              </button>
+                            )}
+
+                            {/* Soy empleado (solo dueño) */}
+                            {esDueno && (
+                              <button
+                                onClick={() => {
+                                  setConfig((prev: any) => {
+                                    const nuevos = [...prev.empleadosData];
+                                    nuevos[index].esEmpleado =
+                                      !nuevos[index].esEmpleado;
+                                    return { ...prev, empleadosData: nuevos };
+                                  });
+                                }}
+                                className={
+                                  empleado.esEmpleado
+                                    ? "bg-gray-600 text-white px-4 py-2 rounded-md"
+                                    : "bg-orange-600 text-white px-4 py-2 rounded-md"
+                                }
+                              >
+                                {empleado.esEmpleado
+                                  ? "No empleado"
+                                  : "Soy empleado"}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -312,12 +368,17 @@ className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray
 
             {/* Footer */}
             <div className="flex justify-end gap-3 mt-4 border-t border-gray-700 pt-4">
+              
+              {/* ➕ AGREGAR EMPLEADO — SE AGREGA ARRIBA */}
               {(soyDueno || soyAdmin) && (
                 <button
                   onClick={() =>
                     setConfig((prev: any) => ({
                       ...prev,
-                      empleadosData: [crearEmpleadoVacio(), ...prev.empleadosData],
+                      empleadosData: [
+                        crearEmpleadoVacio(), // 👈 aparece primero en la UI
+                        ...prev.empleadosData,
+                      ],
                     }))
                   }
                   disabled={hayEmpleadoSinEditar}
@@ -343,7 +404,7 @@ className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray
         )}
       </ModalBase>
 
-      {/* Otros modales */}
+      {/* Modales secundarios */}
       {empleadoSeleccionado !== null && (
         <ModalHorariosEmpleados
           abierto
