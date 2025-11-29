@@ -10,7 +10,7 @@ import {
 } from "./backend/agenda-backend";
 import type { Empleado } from "./backend/modalEmpleadosBackend";
 import { getCache, setCache } from "../../lib/cacheAgenda";
-import AgendaVirtualUI from "./ui/agendaUI";
+import AgendaVirtualUI from "./ui/agenda-v2";
 import LoaderAgenda from "../ui/loaderAgenda";
 
 type Estado = "cargando" | "no-sesion" | "listo";
@@ -151,13 +151,14 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }
 
-  return (
-    <AgendaVirtualUI
-      empleados={empleados}
-      turnos={turnos}
-      negocio={negocio}
-      modo={modo}
-      plan={negocio.tipoPremium ?? "gratis"}
-    />
-  );
+ return (
+  <AgendaVirtualUI
+    empleados={empleados}
+    turnos={turnos}
+    negocio={negocio}
+    servicios={negocio.servicios ?? []}   // 👈 AGREGADO
+    modo={modo}
+  />
+);
+
 }
