@@ -1,70 +1,105 @@
 // 🎨 Paleta de colores disponibles
 export const temas = {
   azul: {
-    primario: "#3b82f6", // Azul claro
-    fondo: "#1e3a8a",    // Azul oscuro
-    oscuro: "#1e3a8a",   // Variante más oscura
+    primario: "#3b82f6",
+    fondo: "#1e3a8a",
+    oscuro: "#1e3a8a",
+    card: "oscuro",
   },
   rosado: {
     primario: "#ec4899",
     fondo: "#831843",
     oscuro: "#500724",
+    card: "oscuro",
   },
   verde: {
     primario: "#22c55e",
     fondo: "#14532d",
     oscuro: "#064e3b",
+    card: "oscuro",
   },
   violeta: {
     primario: "#8b5cf6",
     fondo: "#4c1d95",
     oscuro: "#2e1065",
+    card: "oscuro",
   },
   naranja: {
     primario: "#f97316",
     fondo: "#7c2d12",
     oscuro: "#431407",
+    card: "oscuro",
   },
   gris: {
     primario: "#262626",
     fondo: "#171717",
-    oscuro: "#0a0a0a", // negro casi puro, modo por defecto
+    oscuro: "#0a0a0a",
+    card: "oscuro",
   },
-  // 🤍 Tema claro
+
+  // 🤍 Tema WHITE → cards con gradient
   white: {
-    primario: "#ffffff", // Fondo principal blanco
-    fondo: "#f9fafb",    // Gris muy claro para el fondo
-    oscuro: "#e5e7eb",   // Gris medio para bordes/sombras
+    primario: "#ffffff",
+    fondo: "#f9fafb",
+    oscuro: "#e5e7eb",
+    card: "gradient",
+  },
+
+  // 🌈 Tema GRADIENT → cards también con gradient
+  gradient: {
+    primario: "#ffffff",
+    fondo: "linear-gradient(to right, #2563eb, #4f46e5)",
+    oscuro: "#ffffff",
+    card: "gradient",
   },
 };
+
 
 // 🧠 Aplica y guarda el tema en localStorage
 export function aplicarTema(nombre: keyof typeof temas) {
   const tema = temas[nombre];
   if (!tema) return;
 
-  // 🎨 Actualizar variables CSS globales
+  // Fondo general
+  if (tema.fondo.startsWith("linear-gradient")) {
+    document.documentElement.style.setProperty("--color-fondo", "transparent");
+    document.documentElement.style.setProperty("--color-fondo-gradient", tema.fondo);
+  } else {
+    document.documentElement.style.setProperty("--color-fondo", tema.fondo);
+    document.documentElement.style.setProperty("--color-fondo-gradient", "none");
+  }
+
+  // 🎨 Fondo de las CARDS
+  if (tema.card === "gradient") {
+    document.documentElement.style.setProperty(
+      "--color-card",
+      "linear-gradient(to right, #2563eb, #4f46e5)"
+    );
+  } else {
+    // Usa el color oscuro del tema
+    document.documentElement.style.setProperty("--color-card", tema.oscuro);
+  }
+
+  // Colores principales de la UI
   document.documentElement.style.setProperty("--color-primario", tema.primario);
-  document.documentElement.style.setProperty("--color-fondo", tema.fondo);
   document.documentElement.style.setProperty("--color-primario-oscuro", tema.oscuro);
 
-  // 🌓 Ajuste automático del color del texto
-  const colorTexto = nombre === "white" ? "#111111" : "#ffffff";
+  // Texto automático
+  const colorTexto =
+    nombre === "white" || nombre === "gradient" ? "#111111" : "#ffffff";
+
   document.documentElement.style.setProperty("--color-texto", colorTexto);
 
-  // 🔖 Atributo auxiliar para CSS específicos
+  // Activar tema
   document.documentElement.setAttribute("data-tema", nombre);
 
-  // 💾 Guardar en localStorage
+  // Guardar selección
   localStorage.setItem("temaSeleccionado", nombre);
 }
 
-// 🚀 Cargar tema guardado o por defecto
+
+// 🚀 Inicializar tema
 export function inicializarTema() {
   const guardado = localStorage.getItem("temaSeleccionado") as keyof typeof temas;
-  if (guardado && temas[guardado]) {
-    aplicarTema(guardado);
-  } else {
-    aplicarTema("gris"); // Tema oscuro por defecto
-  }
+  aplicarTema(guardado && temas[guardado] ? guardado : "gris");
 }

@@ -138,10 +138,10 @@
 
 /* ================= Variables base ================= */
 :root {
-  --color-fondo: #171717;          /* Fondo oscuro por defecto */
-  --color-primario: #262626;       /* Contenedores */
+  --color-fondo: #171717;
+  --color-primario: #262626;
   --color-primario-oscuro: #0a0a0a;
-  --color-texto: #ffffff;          /* Texto blanco por defecto */
+  --color-texto: #ffffff;
 }
 
 /* ================= Colores dinámicos ================= */
@@ -160,7 +160,6 @@ body {
 }
 
 /* ================= ⚡ Texto adaptable global ================= */
-/* 👇 En lugar de forzar !important en todo, aplicamos una clase base reutilizable */
 .text-dinamico {
   color: var(--color-texto);
   transition: color 0.3s ease;
@@ -185,7 +184,6 @@ body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   --color-primario-oscuro: #e5e7eb;
 }
 
-/* 🔳 Sombras más suaves en fondos claros */
 [data-tema="white"] .bg-primario,
 [data-tema="white"] .bg-fondo {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
@@ -197,7 +195,7 @@ body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   transition: stroke 0.3s ease;
 }
 
-
+/* ░░░░░░░░░░░░░░░░░░░░░░░░ */
 /* Bloquea TODO el scroll del sitio cuando el modal está abierto */
 .no-scroll {
   position: fixed !important;
@@ -205,4 +203,134 @@ body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
   width: 100%;
   height: 100%;
   inset: 0;
+}
+
+/* ================= 🌈 TEMA GRADIENT ================= */
+[data-tema="gradient"] {
+  --color-texto: #111111;
+  --color-primario: #ffffff;
+  --color-primario-oscuro: #e5e7eb;
+  --color-fondo: transparent;
+  --color-fondo-gradient: linear-gradient(to right, #2563eb, #4f46e5);
+}
+
+/* Fondo degradado */
+html[data-tema="gradient"],
+body[data-tema="gradient"] {
+  background-image: var(--color-fondo-gradient);
+  background-size: cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* Contenedores blancos */
+[data-tema="gradient"] .bg-primario,
+[data-tema="gradient"] .bg-fondo,
+[data-tema="gradient"] .card,
+[data-tema="gradient"] .bloque,
+[data-tema="gradient"] .contenedor,
+[data-tema="gradient"] .item {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+/* Texto adaptable */
+[data-tema="gradient"] body,
+[data-tema="gradient"] h1,
+[data-tema="gradient"] h2,
+[data-tema="gradient"] h3,
+[data-tema="gradient"] h4,
+[data-tema="gradient"] h5,
+[data-tema="gradient"] h6,
+[data-tema="gradient"] p,
+[data-tema="gradient"] span,
+[data-tema="gradient"] label,
+[data-tema="gradient"] input,
+[data-tema="gradient"] button,
+[data-tema="gradient"] a,
+[data-tema="gradient"] .text-dinamico {
+  color: #111111 !important;
+}
+
+/* Sombras suaves */
+[data-tema="gradient"] .bg-primario,
+[data-tema="gradient"] .bg-fondo {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ================= ⭐ FIX MODAL ================= */
+[data-tema="gradient"] .fixed.inset-0 {
+  backdrop-filter: none !important;
+  background-color: rgba(0,0,0,0.45) !important;
+}
+
+[data-tema="gradient"] .animate-fadeInModal,
+[data-tema="gradient"] .rounded-xl,
+[data-tema="gradient"] .p-4,
+[data-tema="gradient"] .p-6,
+[data-tema="gradient"] .bg-primario {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+}
+
+/* ========================================================= */
+/* 🔥 TEMA WHITE — LAS CARDS USAN EL GRADIENT */
+/* ========================================================= */
+
+[data-tema="white"] .bg-primario,
+[data-tema="white"] .bg-fondo,
+[data-tema="white"] .card,
+[data-tema="white"] .bloque,
+[data-tema="white"] .contenedor,
+[data-tema="white"] .item,
+[data-tema="white"] .rounded-xl,
+[data-tema="white"] .swiper-slide,
+[data-tema="white"] .p-4,
+[data-tema="white"] .p-5,
+[data-tema="white"] .p-6 {
+  background-image: linear-gradient(to right, #2563eb, #4f46e5) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  color: #111111 !important;
+  border: 1px solid rgba(0,0,0,0.15) !important;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15) !important;
+}
+
+[data-tema="white"] .swiper-pagination-bullet {
+  background: #111111 !important;
+  opacity: 0.4 !important;
+}
+
+[data-tema="white"] .swiper-pagination-bullet-active {
+  background: #111111 !important;
+  opacity: 1 !important;
+}
+
+/* Cards con color dinámico real */
+.card,
+.bloque,
+.contenedor,
+.item,
+.bg-primario,
+.bg-fondo,
+.rounded-xl {
+  background: var(--color-card) !important;
+  color: var(--color-texto) !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+
+/* 🔵 Bordes redondeados globales (swiper-slide ELIMINADO) */
+.card,
+.bloque,
+.contenedor,
+.item,
+.rounded-xl,
+.bg-primario,
+.bg-fondo {
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }

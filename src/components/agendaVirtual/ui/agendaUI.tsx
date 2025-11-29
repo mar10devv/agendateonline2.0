@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import ConfigIcon from "../../../assets/config-svg.svg?url";
+import ConfigIcon from "../../ui/Config-icono";
 import { obtenerDireccion } from "../../../lib/geocoding";
 import { useRef } from "react";
 import ModalEmpleadosUI from "./modalEmpleadosUI";
@@ -520,18 +520,18 @@ useEffect(() => {
 <div className="order-1 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg relative transition-colors duration-300">
 
   {/* 🔧 Botón Configuración */}
-  {(modo === "dueño" || modo === "admin") && (
-    <button
-      onClick={() => setModalServiciosAbierto(true)}
-      className="absolute top-4 right-4"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar servicios"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-  )}
+{(modo === "dueño" || modo === "admin") && (
+  <button
+    onClick={() => setModalServiciosAbierto(true)}
+    className="absolute top-4 right-4"
+  >
+    <ConfigIcon
+      className="w-6 h-6 opacity-80 hover:opacity-100 transition 
+                 [filter:var(--icono-filtro)]"
+    />
+  </button>
+)}
+
 
   <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
     Servicios
@@ -653,28 +653,28 @@ useEffect(() => {
   </h2>
 
   {/* 👑 Dueño y Admin pueden abrir el modal de empleados */}
-  {(modo === "dueño" || modo === "admin") && (
-    <>
-      <button
-        onClick={() => setModalAbierto(true)}
-        className="absolute top-4 right-4"
-      >
-        <img
-          src={ConfigIcon}
-          alt="Configurar empleados"
-          className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-        />
-      </button>
-
-      <ModalEmpleadosUI
-        abierto={modalAbierto}
-        onCerrar={() => setModalAbierto(false)}
-        negocioId={negocio.id}
-        modo={modo}
-        userUid={usuario?.email}
+{(modo === "dueño" || modo === "admin") && (
+  <>
+    <button
+      onClick={() => setModalAbierto(true)}
+      className="absolute top-4 right-4"
+    >
+      <ConfigIcon
+        className="w-6 h-6 opacity-80 hover:opacity-100 transition 
+                   [filter:var(--icono-filtro)]"
       />
-    </>
-  )}
+    </button>
+
+    <ModalEmpleadosUI
+      abierto={modalAbierto}
+      onCerrar={() => setModalAbierto(false)}
+      negocioId={negocio.id}
+      modo={modo}
+      userUid={usuario?.email}
+    />
+  </>
+)}
+
 
   <div className="flex gap-6 flex-wrap mt-2 justify-center">
 
@@ -725,30 +725,37 @@ useEffect(() => {
   <div
     className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg flex flex-col relative md:hidden transition-colors duration-300 text-[var(--color-texto)]"
   >
-    {/* ⚙️ Tuerca Configuración (solo dueño) */}
-    {modo === "dueño" && (
-      <button
-        onClick={() => setModalCalendarioAbierto(true)}
-        className="absolute top-4 right-4"
-        title="Configurar calendario"
-      >
-        <img
-          src={ConfigIcon}
-          alt="Configurar calendario"
-          className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-        />
-      </button>
-    )}
+{/* 
+  ⚙️ Tuerca Configuración (solo dueño)
+  (DESACTIVADO TEMPORALMENTE)
+*/}
 
-    {/* Agenda del negocio (solo dueño o admin) */}
-    <AgendaNegocio
-      negocio={{
-        id: negocio.id,
-        nombre: negocio.nombre,
-        empleadosData: empleadosState || empleados || [],
-        slug: negocio.slug,
-      }}
+{/*
+{modo === "dueño" && (
+  <button
+    onClick={() => setModalCalendarioAbierto(true)}
+    className="absolute top-4 right-4"
+    title="Configurar calendario"
+  >
+    <ConfigIcon
+      className="w-6 h-6 opacity-80 hover:opacity-100 transition 
+                 [filter:var(--icono-filtro)]"
     />
+  </button>
+)}
+*/}
+
+
+{/* Agenda del negocio (solo dueño o admin) */}
+<AgendaNegocio
+  negocio={{
+    id: negocio.id,
+    nombre: negocio.nombre,
+    empleadosData: empleadosState || empleados || [],
+    slug: negocio.slug,
+  }}
+/>
+
   </div>
 )}
 
@@ -756,19 +763,19 @@ useEffect(() => {
   className="order-3 bg-[var(--color-primario)] rounded-2xl p-6 shadow-lg hidden md:flex flex-col relative transition-colors duration-300 text-[var(--color-texto)]"
 >
   {/* ⚙️ Tuerca Configuración (solo dueño) */}
-  {modo === "dueño" && (
-    <button
-      onClick={() => setModalCalendarioAbierto(true)}
-      className="absolute top-4 right-4"
-      title="Configurar calendario"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar calendario"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
-  )}
+{modo === "dueño" && (
+  <button
+    onClick={() => setModalCalendarioAbierto(true)}
+    className="absolute top-4 right-4"
+    title="Configurar calendario"
+  >
+    <ConfigIcon
+      className="w-6 h-6 opacity-80 hover:opacity-100 transition 
+                 [filter:var(--icono-filtro)]"
+    />
+  </button>
+)}
+
 
   {(modo === "dueño" || modo === "admin") ? (
     <AgendaNegocio
@@ -945,57 +952,40 @@ useEffect(() => {
       {/* Columna derecha -> Perfil */}
 <div className="order-1 md:order-2 bg-[var(--color-primario)] rounded-2xl p-6 flex flex-col items-center text-center shadow-lg relative mt-10 md:mt-0 transition-colors duration-300 text-[var(--color-texto)]">
 
-  {/* ⚙️ Tuerca */}
-  {modo === "dueño" && (
-    <button
-      onClick={() => setModalPerfilAbierto(true)}
-      className="absolute top-4 right-4"
-      title="Configurar negocio"
-    >
-      <img
-        src={ConfigIcon}
-        alt="Configurar negocio"
-        className="w-6 h-6 opacity-80 hover:opacity-100 transition filter invert"
-      />
-    </button>
+{/* ⚙️ Tuerca */}
+{modo === "dueño" && (
+  <button
+    onClick={() => setModalPerfilAbierto(true)}
+    className="absolute top-4 right-4"
+    title="Configurar negocio"
+  >
+    <ConfigIcon
+      className="w-6 h-6 opacity-80 hover:opacity-100 transition
+                 [filter:var(--icono-filtro)]"
+    />
+  </button>
+)}
+
+
+{/* Logo */}
+<div className="mt-8 relative w-24 h-24">
+  {subiendo ? (
+    <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center border-4 border-[var(--color-texto)]">
+      <LoaderSpinner />
+    </div>
+  ) : logo ? (
+    <img
+      src={logo}
+      alt="Logo negocio"
+      className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
+    />
+  ) : (
+    <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center text-3xl font-bold border-4 border-[var(--color-texto)]">
+      {nombreNegocio.charAt(0)}
+    </div>
   )}
+</div>
 
-  {/* Logo */}
-  <div className="mt-8 relative w-24 h-24">
-    {subiendo ? (
-      <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center border-4 border-[var(--color-texto)]">
-        <LoaderSpinner />
-      </div>
-    ) : logo ? (
-      <img
-        src={logo}
-        alt="Logo negocio"
-        className="w-24 h-24 rounded-full object-cover border-4 border-[var(--color-texto)]"
-      />
-    ) : (
-      <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] flex items-center justify-center text-3xl font-bold border-4 border-[var(--color-texto)]">
-        {nombreNegocio.charAt(0)}
-      </div>
-    )}
-
-    {modo === "dueño" && (
-      <>
-        <label
-          htmlFor="upload-logo"
-          className="absolute bottom-2 right-2 bg-[var(--color-primario)] text-[var(--color-texto)] w-8 h-8 flex items-center justify-center rounded-full cursor-pointer border-2 border-[var(--color-texto)] text-lg transition-colors duration-300 hover:opacity-80"
-        >
-          +
-        </label>
-        <input
-          id="upload-logo"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </>
-    )}
-  </div>
 
   {/* Nombre y slug */}
   <div className="mt-4">
