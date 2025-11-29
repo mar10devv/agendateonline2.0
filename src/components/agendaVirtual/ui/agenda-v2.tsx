@@ -501,7 +501,19 @@ export default function AgendaVirtualUIv3({
         </div>
 
         {/* Nombre */}
-        <h1 className="mt-4 text-2xl font-bold">{negocio.nombre}</h1>
+<h1
+  className="
+    font-euphoria 
+    text-[38px]
+    md:text-[48px]
+    leading-none
+    tracking-wide
+    mt-4
+  "
+>
+  {negocio.nombre}
+</h1>
+
 
         {/* Descripción */}
         <p className="opacity-80 text-center mt-4 px-4">
