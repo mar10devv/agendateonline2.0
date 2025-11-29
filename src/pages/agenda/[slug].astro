@@ -60,9 +60,11 @@ try {
     />
     <meta name="twitter:image" content="https://agendateonline.com/banner-default.webp" />
   </head>
-  <body class="bg-black text-white">
-    <main class="w-full flex justify-center">
-      <AgendaVirtual client:only="react" slug={safeSlug} />
-    </main>
+  <body class="text-white">
+  <main class="w-full min-h-screen m-0 p-0">
+    <AgendaVirtual client:only="react" slug={safeSlug} />
+  </main>
+</body>
+
   </body>
 </html>

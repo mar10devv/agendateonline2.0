@@ -8,8 +8,8 @@ import {
   type Turno,
   type Negocio,
 } from "./backend/agenda-backend";
-import type { Empleado } from "./backend/modalEmpleadosBackend"; // ✅ importamos el tipo correcto
-import { getCache, setCache } from "../../lib/cacheAgenda"; 
+import type { Empleado } from "./backend/modalEmpleadosBackend";
+import { getCache, setCache } from "../../lib/cacheAgenda";
 import AgendaVirtualUI from "./ui/agendaUI";
 import LoaderAgenda from "../ui/loaderAgenda";
 
@@ -91,25 +91,50 @@ export default function AgendaVirtual({ slug }: Props) {
     }
   }, [negocio]);
 
+  // -------------------------
+  // 🔵 ESTADO: CARGANDO
+  // -------------------------
   if (estado === "cargando") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white gap-6">
+      <div
+        className="
+          flex flex-col items-center justify-center
+          min-h-screen
+          bg-gradient-to-r from-blue-600 to-indigo-600
+          text-white gap-6
+        "
+      >
         <LoaderAgenda />
-        <p className="text-lg font-medium animate-pulse">Cargando agenda...</p>
+        <p className="text-lg font-medium animate-pulse">
+          Cargando agenda...
+        </p>
       </div>
     );
   }
 
+  // -------------------------
+  // 🔵 ESTADO: NO SESIÓN
+  // -------------------------
   if (estado === "no-sesion") {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black text-white">
+      <div
+        className="
+          flex items-center justify-center
+          min-h-screen
+          bg-gradient-to-r from-blue-600 to-indigo-600
+          text-white
+        "
+      >
         <div className="text-center space-y-4">
           <p className="text-lg font-medium">
             Debes iniciar sesión para ver la agenda
           </p>
           <button
             onClick={loginConGoogle}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl transition"
+            className="
+              bg-indigo-600 hover:bg-indigo-700
+              text-white px-6 py-3 rounded-xl transition
+            "
           >
             Iniciar sesión con Google
           </button>
