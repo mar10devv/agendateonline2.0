@@ -1,3 +1,4 @@
+// src/components/agendaVirtual/ui/ModalTema.tsx
 import { useState, useEffect } from "react";
 import ModalGenerico from "../../ui/modalGenerico";
 import { aplicarTema, temas } from "../../../lib/temaColores";
@@ -10,8 +11,10 @@ type Props = {
   negocioId: string;
 };
 
-export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
+// temas que NO queremos mostrar todavía (los blancos bugueados)
+const TEMAS_OCULTOS = ["white", "white2", "blanco", "blanco2"];
 
+export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   // ⛔️ Hace que el modal se destruya inmediatamente (sin animación)
   if (!abierto) return null;
 
@@ -20,7 +23,12 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   useEffect(() => {
     const guardado = localStorage.getItem("temaSeleccionado");
     if (guardado && temas[guardado as keyof typeof temas]) {
-      setTemaSeleccionado(guardado);
+      // si el tema guardado está oculto, forzamos a "gris"
+      if (TEMAS_OCULTOS.includes(guardado)) {
+        setTemaSeleccionado("gris");
+      } else {
+        setTemaSeleccionado(guardado);
+      }
     }
   }, []);
 
@@ -44,12 +52,22 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
       console.error("❌ Error al guardar el tema:", err);
     }
 
-    // Cerrar modal
     onCerrar();
-
     // 🔥 Recargar la web (solución definitiva al bug visual)
     window.location.reload();
   };
+
+  // 👉 Filtramos los temas que sí queremos mostrar en el modal
+  const temasVisibles = Object.entries(temas).filter(([nombre, valores]) => {
+    const color = valores.primario.toLowerCase();
+    const esBlanco =
+      color === "#ffffff" ||
+      color === "#fff" ||
+      color === "#f5f5f5" ||
+      color === "#f9f9f9";
+
+    return !TEMAS_OCULTOS.includes(nombre) && !esBlanco;
+  });
 
   return (
     <ModalGenerico
@@ -59,7 +77,7 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
       maxWidth="max-w-sm"
     >
       <div className="grid grid-cols-3 gap-6 p-4">
-        {Object.entries(temas).map(([nombre, valores]) => (
+        {temasVisibles.map(([nombre, valores]) => (
           <button
             key={nombre}
             onClick={() => setTemaSeleccionado(nombre)}

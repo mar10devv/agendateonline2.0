@@ -350,3 +350,6 @@ body[data-tema="gradient"] {
   color: #9ca3af;
 }
 
+.icono-blanco {
+  filter: brightness(0) invert(1);
+}

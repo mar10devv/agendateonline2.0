@@ -21,6 +21,12 @@ import { guardarUbicacionNegocio, escucharServicios } from "../backend/agenda-ba
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 
+import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
+import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
+import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
+import IconUbicacion from "../../../assets/icon-navbar/map.svg?url";
+
+
 import { db } from "../../../lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
@@ -267,12 +273,13 @@ export default function AgendaVirtualUIv3({
 
   /* --------  NAVBAR  -------- */
 
-  const navItems = [
-    { id: "agenda", label: "Agenda", icon: <Calendar /> },
-    { id: "servicios", label: "Servicios", icon: <Wrench /> },
-    { id: "empleados", label: "Empleados", icon: <Users /> },
-    { id: "ubicacion", label: "Ubicación", icon: <MapPin /> },
-  ];
+const navItems = [
+  { id: "agenda", label: "Agenda", icon: IconAgenda },
+  { id: "servicios", label: "Servicios", icon: IconServicios },
+  { id: "empleados", label: "Empleados", icon: IconEmpleados },
+  { id: "ubicacion", label: "Ubicación", icon: IconUbicacion },
+];
+
 
   /* -------- RENDERIZAR VISTA -------- */
 
@@ -284,9 +291,16 @@ export default function AgendaVirtualUIv3({
             {serviciosState.length > 0 ? (
               serviciosState.map((s) => (
                 <div
-                  key={s.id}
-                  className="p-4 rounded-2xl text-center bg-[color:var(--color-primario-oscuro)/0.7]"
-                >
+  key={s.id}
+  className="
+    p-4 rounded-2xl text-center
+    bg-[var(--color-primario-oscuro)]
+    text-[var(--color-texto)]
+    shadow-md border border-white/10
+    transition-all duration-300
+  "
+>
+
                   <p className="font-semibold">{s.servicio}</p>
                   <p className="text-sm opacity-80">${s.precio}</p>
                   <p className="text-xs opacity-60">{s.duracion} min</p>
@@ -581,23 +595,28 @@ export default function AgendaVirtualUIv3({
           transition-all duration-300
         "
       >
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setVista(item.id)}
-            className={`flex flex-col items-center p-2 min-w-[70px] transition 
-              ${
-                vista === item.id
-                  ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
-                  : "bg-transparent"
-              }`}
-          >
-            <div className="w-6 h-6 flex items-center justify-center">
-              {item.icon}
-            </div>
-            <span className="text-xs mt-1 text-center">{item.label}</span>
-          </button>
-        ))}
+    {navItems.map((item) => (
+  <button
+    key={item.id}
+    onClick={() => setVista(item.id)}
+    className={`flex flex-col items-center p-2 min-w-[70px] transition 
+      ${
+        vista === item.id
+          ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
+          : "bg-transparent"
+      }`}
+  >
+    <div className="w-8 h-8 flex items-center justify-center">
+      <img
+        src={item.icon}
+        alt={item.label}
+        className="w-8 h-8 icono-blanco"
+      />
+    </div>
+    <span className="text-xs mt-1 text-center">{item.label}</span>
+  </button>
+))}
+
       </div>
 
       {/* CONTENIDO */}
