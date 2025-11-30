@@ -26,7 +26,7 @@ import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
 import IconUbicacion from "../../../assets/icon-navbar/map.svg?url";
 
-
+import SocialMedia from "../../ui/social-media"
 import { db } from "../../../lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
