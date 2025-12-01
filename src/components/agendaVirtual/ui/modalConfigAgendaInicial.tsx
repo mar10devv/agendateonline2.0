@@ -160,7 +160,8 @@ export default function ModalConfigAgendaInicial({
   const [guardando, setGuardando] = useState(false);
 
   const esNegocio = tipoAgenda === "negocio";
-  const totalPasos = 3;
+  const totalPasos = esNegocio ? 4 : 3;
+
 
   // --------- Cargar datos desde Firebase al abrir ---------
   useEffect(() => {
@@ -794,250 +795,160 @@ export default function ModalConfigAgendaInicial({
     }
   };
 
-  // --------- Render tarjeta empleado ---------
-  const renderEmpleadoCard = (index: number, esCreador: boolean) => {
-    const e = empleados[index];
-    if (!e) return null;
+  // --------- Render tarjeta empleado (Creador / Empleados) ---------
+const renderEmpleadoCard = (index: number, esCreador: boolean) => {
+  const e = empleados[index];
+  if (!e) return null;
 
-    const diasAbiertos = DIAS_LABELS.filter((dia) => {
-      const key = normalizarDiaKey(dia);
-      return !diasCerradosNegocio.includes(key);
-    });
+  const diasAbiertos = DIAS_LABELS.filter((dia) => {
+    const key = normalizarDiaKey(dia);
+    return !diasCerradosNegocio.includes(key);
+  });
 
-    const labelDescanso =
-      e.descansoModo === "negocio"
-        ? "Solo los días que el negocio está cerrado"
-        : e.descansoModo === "1dia"
-        ? "1 día extra libre"
-        : e.descansoModo === "2dias"
-        ? "2 días extra libres"
-        : "1 día y medio (aprox.)";
-
-    const requeridosExtra =
-      e.descansoModo === "1dia"
-        ? 1
-        : e.descansoModo === "2dias" || e.descansoModo === "diaYMedio"
-        ? 2
-        : 0;
-
+  // ✔ SI ES CREADOR → Nueva lógica (trabaja o administra)
+  if (esCreador) {
     return (
-      <div
-        key={index}
-        className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-3"
-      >
-        <div className="flex justify-between items-center gap-2">
-          <p className="font-semibold text-gray-100">
-            {esCreador ? "Vos (creador de la agenda)" : `Empleado ${index + 1}`}
-          </p>
-          {!esCreador && (
+      <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
+        <p className="font-semibold text-gray-100">
+          Vos (creador de la agenda)
+        </p>
+
+        {/* Pregunta principal SOLO para el creador */}
+        <div className="space-y-2">
+          <p className="text-xs text-gray-300">¿Usted trabaja aquí?</p>
+
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => handleEliminarEmpleado(index)}
-              className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+              onClick={() =>
+                handleEmpleadoChange(index, "esEmpleado", true)
+              }
+              className={`px-3 py-2 rounded-lg border text-xs transition
+                ${
+                  e.esEmpleado
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                }`}
             >
-              Eliminar
+              Sí, trabajo aquí
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() =>
+                handleEmpleadoChange(index, "esEmpleado", false)
+              }
+              className={`px-3 py-2 rounded-lg border text-xs transition
+                ${
+                  !e.esEmpleado
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                }`}
+            >
+              No, solo administro
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          {/* Foto */}
-          <div>
-            <label className="block text-xs mb-1 text-gray-300">
-              Foto de perfil
-              <span className="block text-[11px] text-gray-400">
-                Opcional. Si no subís una foto, mostraremos la inicial del
-                nombre.
-              </span>
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
-                {e.fotoPerfil ? (
-                  <img
-                    src={e.fotoPerfil}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>
-                    {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
-                  </span>
-                )}
-              </div>
-
-              <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
-                {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(ev) => {
-                    const file = ev.target.files?.[0];
-                    if (file) handleSubirFotoEmpleado(index, file);
-                  }}
-                />
-              </label>
-            </div>
+        {/* Si el creador NO trabaja → no mostrar NADA más */}
+        {!e.esEmpleado && (
+          <div className="text-xs text-gray-400 bg-[#1c1c1c] border border-[#333] rounded-lg p-3">
+            No configurará turnos porque solo administra la agenda.
           </div>
+        )}
 
-          {/* Nombre */}
-          <div>
-            <label className="block text-xs mb-1 text-gray-300">
-              Nombre completo
-            </label>
-            <input
-              type="text"
-              value={e.nombre}
-              onChange={(ev) =>
-                handleEmpleadoChange(index, "nombre", ev.target.value)
-              }
-              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="Ej: Juan Pérez"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-xs mb-1 text-gray-300">
-              Email (opcional)
-              <span className="block text-[11px] text-gray-400">
-                Solo si querés que tenga acceso a su propia agenda/panel.
-              </span>
-            </label>
-            <input
-              type="email"
-              value={e.email}
-              onChange={(ev) =>
-                handleEmpleadoChange(index, "email", ev.target.value)
-              }
-              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="Ej: empleado@correo.com (opcional)"
-            />
-          </div>
-
-          {/* Rol / esEmpleado */}
-          <div className="grid grid-cols-2 gap-3">
+        {/* SI trabaja → mostrar configuración completa */}
+        {e.esEmpleado && (
+          <div className="space-y-4">
+            {/* Foto */}
             <div>
-              <label className="block text-xs mb-1 text-gray-300">Rol</label>
-              <select
-                value={e.rol}
+              <label className="block text-xs mb-1 text-gray-300">
+                Foto de perfil (opcional)
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
+                  {e.fotoPerfil ? (
+                    <img
+                      src={e.fotoPerfil}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>
+                      {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
+                    </span>
+                  )}
+                </div>
+
+                <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
+                  {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(ev) => {
+                      const file = ev.target.files?.[0];
+                      if (file) handleSubirFotoEmpleado(index, file);
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Nombre */}
+            <div>
+              <label className="block text-xs mb-1 text-gray-300">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                value={e.nombre}
                 onChange={(ev) =>
-                  handleEmpleadoChange(
-                    index,
-                    "rol",
-                    ev.target.value as "empleado" | "admin"
-                  )
+                  handleEmpleadoChange(index, "nombre", ev.target.value)
                 }
                 className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="empleado">Empleado</option>
-                <option value="admin">Administrador</option>
-              </select>
+                placeholder="Ej: Juan Pérez"
+              />
             </div>
 
-            <div>
-              <label className="block text-xs mb-1 text-gray-300">
-                ¿Atiende clientes?
-              </label>
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(index, "esEmpleado", !e.esEmpleado)
-                }
-                className={`w-full px-3 py-2 rounded-md border text-sm transition
-                  ${
-                    e.esEmpleado
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                {e.esEmpleado ? "Sí, atiende clientes" : "No, solo administra"}
-              </button>
-            </div>
-          </div>
+            {/* Servicios */}
+            {serviciosValidos.length > 0 && (
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">
+                  Servicios que realiza
+                </label>
 
-          {/* Servicios del empleado */}
-          {serviciosValidos.length > 0 && (
-            <div>
-              <label className="block text-xs mb-1 text-gray-300">
-                Servicios que realiza
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {serviciosValidos.map((s, idx) => {
-                  const seleccionado = e.trabajos.includes(s.nombre);
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() =>
-                        toggleTrabajoEmpleado(index, s.nombre)
-                      }
-                      className={`px-3 py-1.5 rounded-full border text-xs transition
-                        ${
-                          seleccionado
-                            ? "bg-emerald-600 border-emerald-600 text-white"
-                            : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                        }`}
-                    >
-                      {s.nombre}
-                    </button>
-                  );
-                })}
+                <div className="flex flex-wrap gap-2">
+                  {serviciosValidos.map((s, idx) => {
+                    const seleccionado = e.trabajos.includes(s.nombre);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() =>
+                          toggleTrabajoEmpleado(index, s.nombre)
+                        }
+                        className={`px-3 py-1.5 rounded-full border text-xs transition
+                          ${
+                            seleccionado
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                          }`}
+                      >
+                        {s.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {e.esEmpleado && (
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Si atiende clientes, debe tener al menos un servicio
-                  seleccionado.
-                </p>
-              )}
-            </div>
-          )}
+            )}
 
-          {/* Horario del empleado */}
-          <div className="space-y-2">
-            <label className="block text-xs mb-1 text-gray-300">
-              Horario de este empleado
-            </label>
-            <p className="text-[11px] text-gray-400 mb-1">
-              Horario del negocio: {horarioNegocio.inicio} -{" "}
-              {horarioNegocio.fin}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(index, "horarioModo", "jornada")
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.horarioModo === "jornada"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                Jornada (igual al negocio)
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(
-                    index,
-                    "horarioModo",
-                    "personalizado"
-                  )
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.horarioModo === "personalizado"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                Personalizado
-              </button>
-            </div>
+            {/* Horario */}
+            <div className="space-y-2">
+              <label className="block text-xs mb-1 text-gray-300">
+                Horario de este empleado
+              </label>
 
-            {e.horarioModo === "personalizado" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
                 <div>
                   <label className="block text-xs mb-1 text-gray-300">
                     Hora de entrada
@@ -1052,9 +963,10 @@ export default function ModalConfigAgendaInicial({
                         ev.target.value
                       )
                     }
-                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs mb-1 text-gray-300">
                     Hora de salida
@@ -1069,141 +981,363 @@ export default function ModalConfigAgendaInicial({
                         ev.target.value
                       )
                     }
-                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
                   />
                 </div>
               </div>
-            )}
-
-            {e.horarioModo === "jornada" && (
-              <p className="text-[11px] text-gray-400 mt-1">
-                Este empleado trabajará en el mismo horario que el negocio.
-              </p>
-            )}
-          </div>
-
-          {/* Descanso del empleado */}
-          <div className="space-y-2">
-            <label className="block text-xs mb-1 text-gray-300">
-              Descanso semanal del empleado
-            </label>
-            <p className="text-[11px] text-gray-400 mb-1">
-              El negocio ya está cerrado estos días:{" "}
-              {diasCerradosNegocio.length === 0
-                ? "ninguno"
-                : diasCerradosNegocio
-                    .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
-                    .join(", ")}
-              .
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(index, "descansoModo", "negocio")
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.descansoModo === "negocio"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                Mismos días que el negocio
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(index, "descansoModo", "1dia")
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.descansoModo === "1dia"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                + 1 día libre
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(index, "descansoModo", "2dias")
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.descansoModo === "2dias"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                + 2 días libres
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleEmpleadoChange(
-                    index,
-                    "descansoModo",
-                    "diaYMedio"
-                  )
-                }
-                className={`px-3 py-2 rounded-lg border text-xs transition
-                  ${
-                    e.descansoModo === "diaYMedio"
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                  }`}
-              >
-                1 día y medio (aprox.)
-              </button>
             </div>
 
-            <p className="text-[11px] text-gray-400">
-              Seleccionado:{" "}
-              <span className="font-semibold">{labelDescanso}</span>
-            </p>
+            {/* Descanso */}
+            <div className="space-y-2">
+              <label className="block text-xs mb-1 text-gray-300">
+                Descanso semanal del empleado
+              </label>
 
-            {requeridosExtra > 0 && (
-              <div className="mt-2">
-                <p className="text-[11px] text-gray-300 mb-1">
-                  Elegí {requeridosExtra} día(s) extra entre los días en que el
-                  negocio está abierto:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {diasAbiertos.map((dia) => {
-                    const key = normalizarDiaKey(dia);
-                    const seleccionado = e.diasDescansoExtra.includes(key);
-                    return (
-                      <button
-                        key={dia}
-                        type="button"
-                        onClick={() => toggleDiaExtraEmpleado(index, dia)}
-                        className={`px-3 py-1.5 rounded-full border text-xs transition
-                          ${
-                            seleccionado
-                              ? "bg-emerald-600 border-emerald-600 text-white"
-                              : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                          }`}
-                      >
-                        {dia}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  Para el modo "1 día y medio", de momento se registrarán como 2
-                  días libres completos en la agenda (es más generoso con el
-                  empleado). Más adelante podremos afinar medias jornadas.
-                </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleEmpleadoChange(index, "descansoModo", "negocio")
+                  }
+                  className={`px-3 py-2 rounded-lg border text-xs transition
+                    ${
+                      e.descansoModo === "negocio"
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                    }`}
+                >
+                  Mismos días que el negocio
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleEmpleadoChange(index, "descansoModo", "1dia")
+                  }
+                  className={`px-3 py-2 rounded-lg border text-xs transition
+                    ${
+                      e.descansoModo === "1dia"
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                    }`}
+                >
+                  + 1 día libre
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleEmpleadoChange(index, "descansoModo", "2dias")
+                  }
+                  className={`px-3 py-2 rounded-lg border text-xs transition
+                    ${
+                      e.descansoModo === "2dias"
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                    }`}
+                >
+                  + 2 días libres
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleEmpleadoChange(index, "descansoModo", "diaYMedio")
+                  }
+                  className={`px-3 py-2 rounded-lg border text-xs transition
+                    ${
+                      e.descansoModo === "diaYMedio"
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                    }`}
+                >
+                  1 día y medio (aprox.)
+                </button>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
-  };
+  }
+
+  // ✔ EMPELADOS (NO CREADOR)
+  // ✔ EMPLEADOS (NO CREADOR)
+return (
+  <div
+    key={index}
+    className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4"
+  >
+    {/* HEADER */}
+    <div className="flex justify-between items-center gap-2">
+      <p className="font-semibold text-gray-100">Empleado {index}</p>
+
+      <button
+        type="button"
+        onClick={() => handleEliminarEmpleado(index)}
+        className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+      >
+        Eliminar
+      </button>
+    </div>
+
+    {/* FOTO */}
+    <div>
+      <label className="block text-xs mb-1 text-gray-300">
+        Foto de perfil (opcional)
+      </label>
+
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
+          {e.fotoPerfil ? (
+            <img src={e.fotoPerfil} className="w-full h-full object-cover" />
+          ) : (
+            <span>
+              {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
+            </span>
+          )}
+        </div>
+
+        <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
+          {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(ev) => {
+              const file = ev.target.files?.[0];
+              if (file) handleSubirFotoEmpleado(index, file);
+            }}
+          />
+        </label>
+      </div>
+    </div>
+
+    {/* NOMBRE */}
+    <div>
+      <label className="block text-xs mb-1 text-gray-300">Nombre completo</label>
+      <input
+        type="text"
+        value={e.nombre}
+        onChange={(ev) =>
+          handleEmpleadoChange(index, "nombre", ev.target.value)
+        }
+        className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        placeholder="Ej: Juan Pérez"
+      />
+    </div>
+
+    {/* SERVICIOS */}
+    {serviciosValidos.length > 0 && (
+      <div>
+        <label className="block text-xs mb-1 text-gray-300">
+          Servicios que realiza
+        </label>
+
+        <div className="flex flex-wrap gap-2">
+          {serviciosValidos.map((s, idx) => {
+            const seleccionado = e.trabajos.includes(s.nombre);
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
+                className={`px-3 py-1.5 rounded-full border text-xs transition
+                  ${
+                    seleccionado
+                      ? "bg-emerald-600 border-emerald-600 text-white"
+                      : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                  }`}
+              >
+                {s.nombre}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {/* HORARIO */}
+    <div className="space-y-2">
+      <label className="block text-xs mb-1 text-gray-300">
+        Horario de este empleado
+      </label>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+        <div>
+          <label className="block text-xs mb-1 text-gray-300">
+            Hora de entrada
+          </label>
+          <input
+            type="time"
+            value={e.horarioInicio}
+            onChange={(ev) =>
+              handleEmpleadoChange(index, "horarioInicio", ev.target.value)
+            }
+            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs mb-1 text-gray-300">
+            Hora de salida
+          </label>
+          <input
+            type="time"
+            value={e.horarioFin}
+            onChange={(ev) =>
+              handleEmpleadoChange(index, "horarioFin", ev.target.value)
+            }
+            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* DESCANSO */}
+    <div className="space-y-2">
+      <label className="block text-xs mb-1 text-gray-300">
+        Descanso semanal del empleado
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        {["negocio", "1dia", "2dias", "diaYMedio"].map((modo, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => handleEmpleadoChange(index, "descansoModo", modo)}
+            className={`px-3 py-2 rounded-lg border text-xs transition
+              ${
+                e.descansoModo === modo
+                  ? "bg-emerald-600 border-emerald-600 text-white"
+                  : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+              }`}
+          >
+            {modo === "negocio" && "Mismos días que el negocio"}
+            {modo === "1dia" && "+ 1 día libre"}
+            {modo === "2dias" && "+ 2 días libres"}
+            {modo === "diaYMedio" && "1 día y medio (aprox.)"}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+};
+
+// 🔥 PASO 3 SOLO PARA NEGOCIO: Ubicación sin branding
+const renderPasoUbicacionNegocioSolo = () => {
+  return (
+    <div className="space-y-6 text-sm text-gray-100">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-gray-100">
+          Ubicación de tu negocio
+        </h2>
+        <p className="text-xs text-gray-400">
+          Esta dirección se mostrará a tus clientes. Podés ajustar el pin en el mapa.
+        </p>
+      </div>
+
+      {/* Contenedor */}
+      <div className="rounded-2xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-3">
+        {/* Estado actual */}
+        {ubicacion ? (
+          <div className="text-xs text-gray-300">
+            <p className="font-semibold mb-1">Ubicación guardada</p>
+            <p className="text-gray-200">
+              {direccion || ubicacion.direccion}
+            </p>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Podés mover el pin en el mapa si querés ajustarla.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">
+            Todavía no guardaste una ubicación.
+          </p>
+        )}
+
+        {/* 🔍 Botón geolocalizar */}
+        <button
+          type="button"
+          onClick={handleGeolocalizar}
+          disabled={estadoUbicacion === "cargando"}
+          className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+            ${
+              estadoUbicacion === "cargando"
+                ? "bg-[#181818] border border-[#3a3a3a] text-gray-300 cursor-not-allowed"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            }`}
+        >
+          {estadoUbicacion === "cargando" && "Buscando ubicación..."}
+          {estadoUbicacion === "exito" && "✅ Ubicación guardada"}
+          {estadoUbicacion === "idle" && "📍 Usar mi ubicación actual"}
+        </button>
+
+        {/* 🗺️ Mapa */}
+        {ubicacion && (
+          <div className="mt-3 h-52 rounded-md overflow-hidden border border-[#333]">
+            <MapContainer
+              key={`${ubicacion.lat}-${ubicacion.lng}`}
+              center={[ubicacion.lat, ubicacion.lng]}
+              zoom={16}
+              style={{ width: "100%", height: "100%" }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap contributors'
+              />
+              <Marker
+                position={[ubicacion.lat, ubicacion.lng]}
+                icon={customIcon}
+                draggable={true}
+                eventHandlers={{
+                  dragend: handleMarkerDragEnd,
+                }}
+              >
+                <Popup>
+                  Mueve el pin si la ubicación no es correcta
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+        )}
+
+        {/* Dirección manual */}
+        <div className="space-y-2 pt-2">
+          <label className="block text-xs mb-1 text-gray-300">
+            Dirección o referencia
+          </label>
+          <input
+            type="text"
+            value={direccion}
+            onChange={(e) => setDireccion(e.target.value)}
+            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="Ej: Av. 18 de Julio 1234, Centro"
+          />
+        </div>
+      </div>
+
+      <hr className="border-[#333]" />
+
+      <div className="flex justify-between items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setPaso(2)}
+          className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
+        >
+          Volver
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPaso(4)}
+          className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+};
 
   // ==================== CONTENIDOS POR PASO ====================
 
@@ -1341,63 +1475,119 @@ export default function ModalConfigAgendaInicial({
   };
 
   const renderPasoEmpleados = () => {
-    return (
-      <div className="space-y-6 text-sm text-gray-100">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold text-gray-100">
-            ¿Quiénes van a atender en este negocio?
-          </h2>
+  const creador = empleados[0];
+  const creadorNoTrabaja = creador && creador.esEmpleado === false;
+
+  const empleadosReales = empleados.filter((e, idx) => idx !== 0 && e.esEmpleado);
+
+  return (
+    <div className="space-y-6 text-sm text-gray-100">
+      {/* TÍTULO */}
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-gray-100">
+          ¿Quiénes van a atender en este negocio?
+        </h2>
+
+        {!creadorNoTrabaja ? (
           <p className="text-xs text-gray-400">
             Configurá tus empleados, sus horarios y sus días libres. Después
             podés cambiar todo desde el panel.
           </p>
-        </div>
-
-        {serviciosValidos.length === 0 && (
-          <div className="rounded-lg border border-yellow-600/70 bg-yellow-900/30 px-4 py-3 text-xs text-yellow-100">
-            Primero agregá al menos un servicio en el paso anterior para poder
-            asignarlo a tus empleados.
-          </div>
+        ) : (
+          <p className="text-xs text-gray-400">
+            Usted indicó que solo administra la agenda. Agregue al menos un
+            empleado que atienda clientes.
+          </p>
         )}
-
-        <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-1">
-          {empleados.map((_, idx) =>
-            renderEmpleadoCard(idx, idx === 0)
-          )}
-        </div>
-
-        <div>
-          <button
-            type="button"
-            onClick={handleAgregarEmpleado}
-            className="px-4 py-2 rounded-lg bg-[#222] text-white hover:bg-[#2d2d2d] font-medium"
-          >
-            + Añadir empleado
-          </button>
-        </div>
-
-        <hr className="border-[#333]" />
-
-        <div className="flex justify-between items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPaso(1)}
-            className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
-          >
-            Volver
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setPaso(3)}
-            className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
-          >
-            Siguiente
-          </button>
-        </div>
       </div>
-    );
-  };
+
+      {/* ADVERTENCIA SI NO HAY SERVICIOS */}
+      {serviciosValidos.length === 0 && (
+        <div className="rounded-lg border border-yellow-600/70 bg-yellow-900/30 px-4 py-3 text-xs text-yellow-100">
+          Primero agregá al menos un servicio en el paso anterior para poder
+          asignarlo a tus empleados.
+        </div>
+      )}
+
+      {/* CARDS DE EMPLEADOS */}
+      <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-1">
+
+        {/* CREATOR ALWAYS FIRST */}
+        {renderEmpleadoCard(0, true)}
+
+        {/* EMPLEADOS NORMALES */}
+        {empleados.map((emp, idx) => {
+          if (idx === 0) return null;              // skip creator
+          return renderEmpleadoCard(idx, false);
+        })}
+      </div>
+
+      {/* BOTÓN AÑADIR EMPLEADO */}
+      <div>
+        <button
+          type="button"
+          onClick={handleAgregarEmpleado}
+          className="px-4 py-2 rounded-lg bg-[#222] text-white hover:bg-[#2d2d2d] font-medium"
+        >
+          + Añadir empleado
+        </button>
+      </div>
+
+      {/* VALIDACIÓN SI EL CREADOR NO TRABAJA */}
+      {creadorNoTrabaja && empleadosReales.length === 0 && (
+        <div className="rounded-lg border border-red-700 bg-red-900/30 px-4 py-3 text-xs text-red-200">
+          Debe agregar al menos un empleado que atienda clientes para continuar.
+        </div>
+      )}
+
+      <hr className="border-[#333]" />
+
+      {/* BOTONES SIGUIENTE / VOLVER */}
+      <div className="flex justify-between items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setPaso(1)}
+          className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
+        >
+          Volver
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+
+            // VALIDACIONES
+            if (serviciosValidos.length === 0) {
+              alert("Agregá al menos un servicio para continuar.");
+              return;
+            }
+
+            // ❗ Si el creador NO trabaja → debe haber al menos UN empleado real
+            if (creadorNoTrabaja && empleadosReales.length === 0) {
+              alert("Debe agregar al menos un empleado que atienda clientes.");
+              return;
+            }
+
+            // ❗ Si el creador trabaja → debe tener servicios asignados
+            if (!creadorNoTrabaja) {
+              const c = empleados[0];
+              if (!c.trabajos || c.trabajos.length === 0) {
+                alert("Debe seleccionar al menos un servicio que usted realiza.");
+                return;
+              }
+            }
+
+            setPaso(3);
+          }}
+          className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+};
+
 
   const renderPasoUbicacionEmprendimiento = () => {
     return (
@@ -1527,94 +1717,6 @@ export default function ModalConfigAgendaInicial({
             Completá algunos datos para que tu agenda se vea más profesional.
           </p>
         </div>
-
-        {/* Ubicación SOLO para negocio */}
-        {esNegocio && (
-          <div className="rounded-2xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold text-gray-100">
-                Ubicación del local
-              </p>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-700/20 border border-emerald-600/70 text-emerald-200">
-                Recomendado
-              </span>
-            </div>
-
-            <p className="text-xs text-gray-400">
-              {textoUbicacionObligatoria}
-            </p>
-
-            {ubicacion && (
-              <div className="mt-2 text-xs text-gray-300">
-                <p className="font-semibold text-gray-200">
-                  Ubicación guardada
-                </p>
-                <p className="text-gray-300">
-                  {direccion || ubicacion.direccion}
-                </p>
-              </div>
-            )}
-
-            {/* 🔍 Botón geolocalizar */}
-            <button
-              type="button"
-              onClick={handleGeolocalizar}
-              disabled={estadoUbicacion === "cargando"}
-              className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
-                ${
-                  estadoUbicacion === "cargando"
-                    ? "bg-[#181818] border border-[#3a3a3a] text-gray-300 cursor-not-allowed"
-                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                }`}
-            >
-              {estadoUbicacion === "cargando" && "Buscando ubicación..."}
-              {estadoUbicacion === "exito" && "✅ Ubicación guardada"}
-              {estadoUbicacion === "idle" && "📍 Usar mi ubicación actual"}
-            </button>
-
-            {/* 🗺️ Minimapa draggable (igual que en la otra pantalla) */}
-            {ubicacion && (
-              <div className="mt-3 h-52 rounded-md overflow-hidden border border-[#333]">
-                <MapContainer
-                  key={`${ubicacion.lat}-${ubicacion.lng}`}
-                  center={[ubicacion.lat, ubicacion.lng]}
-                  zoom={16}
-                  style={{ width: "100%", height: "100%" }}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; OpenStreetMap contributors'
-                  />
-                  <Marker
-                    position={[ubicacion.lat, ubicacion.lng]}
-                    icon={customIcon}
-                    draggable={true}
-                    eventHandlers={{
-                      dragend: handleMarkerDragEnd,
-                    }}
-                  >
-                    <Popup>
-                      Mueve el pin si la ubicación no es correcta
-                    </Popup>
-                  </Marker>
-                </MapContainer>
-              </div>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <label className="block text-xs mb-1 text-gray-300">
-                Dirección o referencia
-              </label>
-              <input
-                type="text"
-                value={direccion}
-                onChange={(e) => setDireccion(e.target.value)}
-                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="Ej: Av. 18 de Julio 1234, Centro"
-              />
-            </div>
-          </div>
-        )}
 
         {/* Branding / foto / descripción / redes */}
         <div className="rounded-2xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
@@ -1798,7 +1900,12 @@ export default function ModalConfigAgendaInicial({
 
           {!esNegocio && paso === 2 && renderPasoUbicacionEmprendimiento()}
 
-          {paso === 3 && renderPasoUbicacionYBranding()}
+          {/* PASO 3 = Ubicación */}
+{paso === 3 && (esNegocio ? renderPasoUbicacionNegocioSolo() : renderPasoUbicacionEmprendimiento())}
+
+{/* PASO 4 = Perfil / Branding */}
+{paso === 4 && renderPasoUbicacionYBranding()}
+
         </div>
       )}
     </ModalBase>

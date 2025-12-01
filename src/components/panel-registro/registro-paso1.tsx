@@ -35,7 +35,7 @@ function RegistroPaso1({
   const nombreValido = nombre.trim().length > 2;
   const slugPreview = nombreValido
     ? normalizarTexto(nombre)
-    : "miturnera-perfecta";
+    : "miagenda";
 
   const handleNextClick = () => {
     if (!nombreValido) {
