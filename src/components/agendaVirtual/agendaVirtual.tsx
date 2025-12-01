@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import {
   detectarUsuario,
   loginConGoogle,
-  getEmpleados,
   getTurnos,
   type Turno,
   type Negocio,
 } from "./backend/agenda-backend";
 import type { Empleado } from "./backend/modalEmpleadosBackend";
-import { getCache, setCache } from "../../lib/cacheAgenda";
+
 import AgendaVirtualUI from "./ui/agenda-v2";
 import LoaderAgenda from "../ui/loaderAgenda";
 import ModalConfigAgendaInicial from "./ui/modalConfigAgendaInicial";
@@ -27,13 +26,13 @@ export default function AgendaVirtual({ slug }: Props) {
   const [negocio, setNegocio] = useState<Negocio | null>(null);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
+  const [fechaSeleccionada] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
 
-  // 🔹 Estado para el modal de configuración inicial
   const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] =
     useState(false);
+
   const [configAgendaInicial, setConfigAgendaInicial] = useState<{
     diasLibres?: string[];
     modoTurnos?: "jornada" | "personalizado";
@@ -46,36 +45,16 @@ export default function AgendaVirtual({ slug }: Props) {
       async (estadoDetectado, _modoDetectado, user, negocioDetectado) => {
         setEstado(estadoDetectado);
 
-        // 1️⃣ Intentar cargar negocio desde cache
-        const cachedNegocio = getCache<Negocio>(slug, "negocio");
-        if (cachedNegocio) {
-          setNegocio(cachedNegocio);
-        }
-
         if (estadoDetectado === "listo" && negocioDetectado) {
-          // Actualizar negocio y cachearlo (TTL 1h)
           setNegocio(negocioDetectado);
-          setCache(slug, "negocio", negocioDetectado, 60 * 60 * 1000);
 
-          // 2️⃣ Intentar cargar empleados desde cache
-          const cachedEmps = getCache<Empleado[]>(slug, "empleados");
-          if (cachedEmps && cachedEmps.length > 0) {
-            setEmpleados(cachedEmps);
-          }
-
-          // Firestore siempre para refrescar empleados y turnos
-          const [emps, tns] = await Promise.all([
-            getEmpleados(slug),
-            getTurnos(slug, fechaSeleccionada),
-          ]);
-
+          const emps = (negocioDetectado.empleadosData ??
+            []) as Empleado[];
           setEmpleados(emps);
+
+          const tns = await getTurnos(slug, fechaSeleccionada);
           setTurnos(tns);
 
-          // Cachear empleados (TTL 30 min)
-          setCache(slug, "empleados", emps, 30 * 60 * 1000);
-
-          // 👑 Detección de rol
           if (user) {
             if (user.uid === negocioDetectado.id) {
               setModo("dueño");
@@ -83,11 +62,7 @@ export default function AgendaVirtual({ slug }: Props) {
               const esAdmin = emps.find(
                 (e) => e.admin === true && e.adminEmail === user.email
               );
-              if (esAdmin) {
-                setModo("admin");
-              } else {
-                setModo("cliente");
-              }
+              setModo(esAdmin ? "admin" : "cliente");
             }
           } else {
             setModo("cliente");
@@ -97,20 +72,17 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }, [slug, fechaSeleccionada]);
 
-  // 🔹 👉 ACTUALIZAR <title> dinámicamente
   useEffect(() => {
     if (negocio?.nombre) {
       document.title = `${negocio.nombre} | AgendateOnline`;
     }
   }, [negocio]);
 
-  // 🔹 Detectar si debemos mostrar el modal de configuración inicial
   useEffect(() => {
     if (!negocio) return;
 
-    const cfg: any = (negocio as any).configuracionAgenda || {};
+    const cfg: any = negocio.configuracionAgenda || {};
 
-    // Siempre preparamos la config inicial, aunque el modal no se abra
     setConfigAgendaInicial({
       diasLibres: cfg.diasLibres || [],
       modoTurnos: cfg.modoTurnos || "jornada",
@@ -118,32 +90,16 @@ export default function AgendaVirtual({ slug }: Props) {
         typeof cfg.clientesPorDia === "number" ? cfg.clientesPorDia : null,
     });
 
-    // Solo mostrar si es DUEÑO / ADMIN
     if (modo === "dueño" || modo === "admin") {
-      // 👇 Si NO está explícitamente en true, mostramos el modal
-      if (cfg.onboardingCompletado !== true) {
-        setMostrarModalConfigAgenda(true);
-      } else {
-        setMostrarModalConfigAgenda(false);
-      }
+      setMostrarModalConfigAgenda(cfg.onboardingCompletado !== true);
     } else {
       setMostrarModalConfigAgenda(false);
     }
   }, [negocio, modo]);
 
-  // -------------------------
-  // 🔵 ESTADO: CARGANDO
-  // -------------------------
   if (estado === "cargando") {
     return (
-      <div
-        className="
-          flex flex-col items-center justify-center
-          min-h-screen
-          bg-gradient-to-r from-blue-600 to-indigo-600
-          text-white gap-6
-        "
-      >
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 text-white gap-6">
         <LoaderAgenda />
         <p className="text-lg font-medium animate-pulse">
           Cargando agenda...
@@ -152,29 +108,16 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }
 
-  // -------------------------
-  // 🔵 ESTADO: NO SESIÓN
-  // -------------------------
   if (estado === "no-sesion") {
     return (
-      <div
-        className="
-          flex items-center justify-center
-          min-h-screen
-          bg-gradient-to-r from-blue-600 to-indigo-600
-          text-white
-        "
-      >
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
         <div className="text-center space-y-4">
           <p className="text-lg font-medium">
             Debes iniciar sesión para ver la agenda
           </p>
           <button
             onClick={loginConGoogle}
-            className="
-              bg-indigo-600 hover:bg-indigo-700
-              text-white px-6 py-3 rounded-xl transition
-            "
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl transition"
           >
             Iniciar sesión con Google
           </button>
@@ -193,7 +136,6 @@ export default function AgendaVirtual({ slug }: Props) {
 
   return (
     <>
-      {/* 🟢 Modal inicial de configuración de agenda (solo dueño/admin) */}
       <ModalConfigAgendaInicial
         abierto={mostrarModalConfigAgenda}
         onClose={() => setMostrarModalConfigAgenda(false)}

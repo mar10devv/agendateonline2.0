@@ -2,13 +2,17 @@
 import React, { useState, useEffect } from "react";
 import { useCalendario } from "../lib/useCalendario";
 
-type CalendarioEmpleado = {
-  inicio: string;       // "08:30"
-  fin: string;          // "17:30"
-  diasLibres?: string[];
-  configuracionAgenda?: {
-    clientesPorDia?: number;
-  };
+//
+// Calendario final procesado (NEGOCIO + EMPLEADO)
+// Debe llegar desde AgendaVirtual / ModalAgendarse ya combinado.
+//
+export type CalendarioEmpleado = {
+  inicio: string;                      // "10:00"
+  fin: string;                         // "20:00"
+  modoTurnos: "personalizado" | "jornada";
+  clientesPorDia?: number;             // usado en modo personalizado
+  horasSeparacion?: number;            // usado en modo jornada
+  diasLibres?: string[];               // negocio + empleado (ej: ["domingo"])
 };
 
 type Props = {
@@ -17,28 +21,33 @@ type Props = {
   horariosOcupados?: string[];
 };
 
+// Normaliza día: " Domingo " / "DOMINGO" / "Domíngo" → "domingo"
+function normalizeDia(str: any): string {
+  if (!str) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export default function Calendario({
   calendario,
   onSeleccionarTurno,
   horariosOcupados = [],
 }: Props) {
-  const { diasDisponibles, horariosDisponibles } = useCalendario(calendario, 15);
+  // 🔍 DEBUG: ver qué calendario está llegando
+  console.log("[Calendario] props.calendario:", calendario);
 
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
-  const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
-
-  // ⏰ Seleccionar automáticamente la primera fecha disponible
-  useEffect(() => {
-    const primerDia = diasDisponibles.find((d) => !d.disabled);
-    if (primerDia) {
-      setFechaSeleccionada(primerDia.date);
-      setHoraSeleccionada(null);
-      onSeleccionarTurno?.(primerDia.date, null);
-    }
-  }, [diasDisponibles]);
-
-  // 🚨 Caso: no hay calendario configurado
-  if (!calendario || !calendario.inicio || !calendario.fin) {
+  //
+  // 🔴 Si no hay datos mínimos, mostramos aviso
+  //
+  if (
+    !calendario ||
+    !calendario.inicio ||
+    !calendario.fin ||
+    !calendario.modoTurnos
+  ) {
     return (
       <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
         <p className="text-yellow-700 font-medium mb-3">
@@ -54,9 +63,64 @@ export default function Calendario({
     );
   }
 
+  //
+  // 🟢 useCalendario genera base de días + horarios
+  //
+  const {
+    diasDisponibles: diasBase,
+    horariosDisponibles,
+  } = useCalendario(calendario, 15);
+
+  // Normalizamos los días libres que vienen del negocio/empleado
+  const diasLibresNormalizados =
+    calendario.diasLibres?.map(normalizeDia) ?? [];
+
+  console.log("[Calendario] diasLibres (crudo):", calendario.diasLibres);
+  console.log("[Calendario] diasLibres normalizados:", diasLibresNormalizados);
+
+  // Refuerzo: vuelvo a marcar como disabled los días libres aquí
+  const diasDisponibles = diasBase.map((d) => {
+    const dayNameLong = d.date.toLocaleDateString("es-ES", {
+      weekday: "long",
+    });
+    const dayNameNorm = normalizeDia(dayNameLong);
+
+    const disabledByDiaLibre = diasLibresNormalizados.includes(dayNameNorm);
+
+    const item = {
+      ...d,
+      disabled: d.disabled || disabledByDiaLibre,
+    };
+
+    return item;
+  });
+
+  console.log("[Calendario] diasDisponibles finales:", diasDisponibles);
+
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(
+    null
+  );
+  const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(
+    null
+  );
+
+  //
+  // 🟢 Seleccionar automáticamente el primer día HÁBIL
+  //
+  useEffect(() => {
+    const primerDia = diasDisponibles.find((d) => !d.disabled);
+    if (primerDia) {
+      setFechaSeleccionada(primerDia.date);
+      setHoraSeleccionada(null);
+      onSeleccionarTurno?.(primerDia.date, null);
+    }
+  }, [diasDisponibles, onSeleccionarTurno]);
+
   return (
     <div className="p-6 border rounded-xl shadow bg-white w-full max-w-lg mx-auto">
-      <h3 className="text-xl font-bold mb-6 text-center">Selecciona tu turno</h3>
+      <h3 className="text-xl font-bold mb-6 text-center">
+        Selecciona tu turno
+      </h3>
 
       {/* 📅 Días disponibles */}
       <div className="grid grid-cols-7 gap-3 mb-6">
@@ -95,9 +159,11 @@ export default function Calendario({
               month: "long",
             })}
           </p>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {horariosDisponibles.map((slot) => {
               const ocupado = horariosOcupados.includes(slot);
+
               return (
                 <button
                   key={slot}

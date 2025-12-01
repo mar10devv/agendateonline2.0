@@ -22,6 +22,45 @@ import { db } from "../../../lib/firebase";
 import CalendarioUI from "../ui/calendarioUI";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
+/* -----------------------------------------------------
+   🔥 FUNCIÓN: combinar negocio + empleado
+   (días libres negocio + días libres empleado + horario)
+----------------------------------------------------- */
+function obtenerCalendarioFinal(negocio: any, empleado: any) {
+  const conf = negocio.configuracionAgenda || {};
+
+  const diasNegocio: string[] = conf.diasLibres || [];
+  const diasEmpleado: string[] = empleado?.calendario?.diasLibres || [];
+
+  const calendarioFinal = {
+    // Si el empleado tiene horario propio, se respeta; si no, horario genérico
+    inicio: empleado?.calendario?.inicio || conf.horaInicio || "09:00",
+    fin: empleado?.calendario?.fin || conf.horaFin || "18:00",
+
+    // Config global de la agenda
+    modoTurnos: conf.modoTurnos || "jornada",
+    clientesPorDia:
+      typeof conf.clientesPorDia === "number" ? conf.clientesPorDia : null,
+    horasSeparacion: 30, // minutos por turno, si lo usás en useCalendario
+
+    // 👇 mezcla días libres del negocio + del empleado (sin duplicados)
+    diasLibres: [...new Set([...diasNegocio, ...diasEmpleado])],
+  };
+
+  console.log("[ModalAgendarse] obtenerCalendarioFinal →", {
+    negocioId: negocio?.id,
+    empleadoNombre: empleado?.nombre,
+    diasNegocio,
+    diasEmpleado,
+    calendarioFinal,
+  });
+
+  return calendarioFinal;
+}
+/* ----------------------------------------------------
+   FIN FUNCIÓN NUEVA
+---------------------------------------------------- */
+
 type Empleado = {
   nombre: string;
   fotoPerfil?: string;
@@ -51,6 +90,12 @@ type Props = {
         conectado?: boolean;
         accessToken?: string;
       };
+      // usados en calendario
+      diasLibres?: string[];
+      modoTurnos?: "jornada" | "personalizado";
+      clientesPorDia?: number | null;
+      horaInicio?: string;
+      horaFin?: string;
     };
     ubicacion?: {
       lat: number;
@@ -72,7 +117,7 @@ function docFromPath(path: string): DocumentReference<DocumentData> {
   if (segments.length < 2) {
     throw new Error("Path inválido en docFromPath: " + path);
   }
-  return doc(db as Firestore, ...segments as [string, ...string[]]);
+  return doc(db as Firestore, ...(segments as [string, ...string[]]));
 }
 
 type TurnoData = {
@@ -202,7 +247,10 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
           )
         );
     } catch {
-      if (u.email) negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
+      if (u.email)
+        negSnaps.push(
+          await getDocs(query(refNeg, where("clienteEmail", "==", u.email)))
+        );
     }
 
     for (const s of negSnaps) {
@@ -394,7 +442,6 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
                 porcentajeSenia={porcentajeSenia}
                 onBack={() => setPaso(3)}
                 onSaved={() => {
-                  // al guardarse correctamente, mostramos paso final
                   setPaso(5);
                 }}
               />
@@ -409,7 +456,7 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 }
 
 /* ===========================================================
-   SUBCOMPONENTES (igual que antes, con PasoConfirmacion modificado)
+   SUBCOMPONENTES
    =========================================================== */
 
 function PasoServicios({
@@ -481,7 +528,10 @@ function PasoEmpleados({
 
     const disponibles = negocio.empleadosData.filter(
       (emp: Empleado) =>
-        Array.isArray(emp.trabajos) && emp.trabajos.some((t: string) => String(t).trim() === String(servicio.id).trim())
+        Array.isArray(emp.trabajos) &&
+        emp.trabajos.some(
+          (t: string) => String(t).trim() === String(servicio.id).trim()
+        )
     );
 
     setFiltrados(disponibles);
@@ -515,9 +565,17 @@ function PasoEmpleados({
 
       {filtrados.length > 0 ? (
         filtrados.map((e, idx) => (
-          <button key={idx} onClick={() => validarEmpleado(e)} className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700">
+          <button
+            key={idx}
+            onClick={() => validarEmpleado(e)}
+            className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
+          >
             {e.fotoPerfil || (e as any).foto ? (
-              <img src={e.fotoPerfil || (e as any).foto} alt={e.nombre} className="w-12 h-12 rounded-full object-cover" />
+              <img
+                src={e.fotoPerfil || (e as any).foto}
+                alt={e.nombre}
+                className="w-12 h-12 rounded-full object-cover"
+              />
             ) : (
               <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
                 {e.nombre?.charAt(0) || "?"}
@@ -539,6 +597,7 @@ function PasoEmpleados({
   );
 }
 
+/* ---------- PasoTurnos (AQUÍ USAMOS calendarioFinal) ---------- */
 function PasoTurnos({
   negocio,
   empleado,
@@ -546,12 +605,23 @@ function PasoTurnos({
   onSelect,
   onBack,
 }: {
-  negocio: { id: string };
+  negocio: { id: string; configuracionAgenda?: any };
   empleado: any;
   servicio: any;
   onSelect: (t: { hora: string; fecha: Date }) => void;
   onBack: () => void;
 }) {
+  // 🔥 Crear calendario final negocio + empleado
+  const calendarioFinal = obtenerCalendarioFinal(negocio, empleado);
+
+  // Enviamos al calendario un empleado con su calendario ya mezclado
+  const empleadoConCalendarioFinal = {
+    ...empleado,
+    calendario: calendarioFinal,
+  };
+
+  console.log("[ModalAgendarse] PasoTurnos → empleadoConCalendarioFinal:", empleadoConCalendarioFinal);
+
   return (
     <div>
       <p className="mb-4 text-center">
@@ -560,7 +630,7 @@ function PasoTurnos({
 
       <div className="flex justify-center mb-6">
         <CalendarioUI
-          empleado={empleado}
+          empleado={empleadoConCalendarioFinal}
           servicio={servicio}
           negocioId={negocio.id}
           onSelectTurno={(t) => {
@@ -570,7 +640,10 @@ function PasoTurnos({
       </div>
 
       <div className="text-center">
-        <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-200 transition">
+        <button
+          onClick={onBack}
+          className="text-sm text-gray-400 hover:text-gray-200 transition"
+        >
           ← Volver
         </button>
       </div>
@@ -578,7 +651,7 @@ function PasoTurnos({
   );
 }
 
-/* ---------- PasoConfirmacion con guardado en Firestore ---------- */
+/* ---------- PasoConfirmacion con seña + guardado ---------- */
 function PasoConfirmacion({
   servicio,
   empleado,
@@ -634,116 +707,120 @@ function PasoConfirmacion({
     }
   };
 
-  // ---------- NUEVA FUNCIÓN: crear turno en Firestore ----------
+  // ---------- CREAR TURNO EN FIRESTORE + EMAIL ---------- //
   const guardarTurno = async () => {
-  if (!usuario?.uid) {
-    alert("Debes iniciar sesión para reservar un turno.");
-    return;
-  }
+    if (!usuario?.uid) {
+      alert("Debes iniciar sesión para reservar un turno.");
+      return;
+    }
 
-  setGuardandoTurno(true);
-  try {
-    // --- FECHAS CORRECTAS ---
-    const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
-    const dur = parseDuracionMin(servicio.duracion);
-    const finDate = new Date(inicioDate.getTime() + dur * 60000);
-    const inicioTs = Timestamp.fromDate(inicioDate);
-    const finTs = Timestamp.fromDate(finDate);
+    setGuardandoTurno(true);
+    try {
+      // FECHAS CORRECTAS
+      const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
+      const dur = parseDuracionMin(servicio.duracion);
+      const finDate = new Date(inicioDate.getTime() + dur * 60000);
+      const inicioTs = Timestamp.fromDate(inicioDate);
+      const finTs = Timestamp.fromDate(finDate);
 
-    // --- FORMATEO CORRECTO PARA EMAILS ---
-    const fechaTexto = inicioDate.toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+      // TEXTO PARA EMAILS
+      const fechaTexto = inicioDate.toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
 
-    const horaTexto = inicioDate.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+      const horaTexto = inicioDate.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-    const slugNegocio = negocio.nombre
-      ? negocio.nombre.toLowerCase().replace(/\s+/g, "-")
-      : negocio.id;
+      const slugNegocio = negocio.nombre
+        ? negocio.nombre.toLowerCase().replace(/\s+/g, "-")
+        : negocio.id;
 
-    // --- DOC PRINCIPAL (Negocios/Turnos)
-    const docNegocioData: any = {
-      servicioId: servicio.id,
-      servicio: servicio.servicio,
-      servicioNombre: servicio.servicio,
+      const docNegocioData: any = {
+        servicioId: servicio.id,
+        servicio: servicio.servicio,
+        servicioNombre: servicio.servicio,
 
-      empleadoId: empleado.id || null,
-      empleadoNombre: empleado.nombre || null,
+        empleadoId: empleado.id || null,
+        empleadoNombre: empleado.nombre || null,
 
-      inicioTs,
-      finTs,
-      fecha: fechaTexto,     // lo que esperan las functions
-      hora: horaTexto,       // lo que esperan las functions
+        inicioTs,
+        finTs,
+        fecha: fechaTexto,
+        hora: horaTexto,
 
-      precio: servicio.precio,
-      duracion: servicio.duracion,
+        precio: servicio.precio,
+        duracion: servicio.duracion,
 
-      clienteUid: usuario.uid || null,
-      clienteEmail: usuario.email || null,
-      clienteNombre: usuario?.displayName || usuario?.email || "",
+        clienteUid: usuario.uid || null,
+        clienteEmail: usuario.email || null,
+        clienteNombre: usuario?.displayName || usuario?.email || "",
 
-      negocioId: negocio.id,
-      negocioNombre: negocio.nombre || "",
-      slugNegocio,
+        negocioId: negocio.id,
+        negocioNombre: negocio.nombre || "",
+        slugNegocio,
 
-      estado: "confirmado",
-      creadoEn: Timestamp.now(),
+        estado: "confirmado",
+        creadoEn: Timestamp.now(),
 
-      emailConfirmacionEnviado: false,
-      emailConfirmacionError: null,
-    };
+        emailConfirmacionEnviado: false,
+        emailConfirmacionError: null,
+      };
 
-    // --- CREAR EN NEGOCIO ---
-    const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
-    const created = await addDoc(turnosRef, docNegocioData);
-    const nuevoId = created.id;
+      // Crear en Negocios/{id}/Turnos
+      const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
+      const created = await addDoc(turnosRef, docNegocioData);
+      const nuevoId = created.id;
 
-    // --- COPIAR A USUARIO ---
-    await setDoc(
-      doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId),
-      {
-        ...docNegocioData,
-        turnoIdNegocio: nuevoId,
-      },
-      { merge: true }
-    );
+      // Copiar a Usuarios/{uid}/Turnos/{id}
+      await setDoc(
+        doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId),
+        {
+          ...docNegocioData,
+          turnoIdNegocio: nuevoId,
+        },
+        { merge: true }
+      );
 
-    // --- ENVIAR MAIL DE CONFIRMACIÓN ---
-    await fetch("/.netlify/functions/confirmar-turno", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        docPath: `Negocios/${negocio.id}/Turnos/${nuevoId}`,
-      }),
-    });
+      // Disparar función de email
+      await fetch("/.netlify/functions/confirmar-turno", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          docPath: `Negocios/${negocio.id}/Turnos/${nuevoId}`,
+        }),
+      });
 
-    alert("✅ Turno guardado y email enviado correctamente.");
-    onSaved?.();
-  } catch (err) {
-    console.error("❌ Error guardando turno:", err);
-    alert("No se pudo guardar el turno. Intenta nuevamente.");
-  } finally {
-    setGuardandoTurno(false);
-  }
-};
-
+      alert("✅ Turno guardado y email enviado correctamente.");
+      onSaved?.();
+    } catch (err) {
+      console.error("❌ Error guardando turno:", err);
+      alert("No se pudo guardar el turno. Intenta nuevamente.");
+    } finally {
+      setGuardandoTurno(false);
+    }
+  };
 
   if (esperandoPago) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <Loader />
-        <p className="mt-4 text-yellow-300 font-medium">💳 Esperando confirmación del pago...</p>
+        <p className="mt-4 text-yellow-300 font-medium">
+          💳 Esperando confirmación del pago...
+        </p>
         <p className="text-xs text-gray-400 mt-2 max-w-xs">
-          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente cuando Mercado Pago apruebe tu seña.
+          Puedes cerrar esta ventana. Tu turno será confirmado automáticamente
+          cuando Mercado Pago apruebe tu seña.
         </p>
 
-        <button onClick={() => setEsperandoPago(false)} className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition">
+        <button
+          onClick={() => setEsperandoPago(false)}
+          className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
+        >
           Volver a intentar
         </button>
       </div>
@@ -757,25 +834,42 @@ function PasoConfirmacion({
         <li>Servicio: {servicio?.servicio}</li>
         <li>Empleado: {empleado?.nombre}</li>
         <li>
-          Día: {turno?.fecha?.toLocaleDateString?.("es-ES") || new Date(turno.fecha).toLocaleDateString("es-ES")} – {turno?.hora}
+          Día:{" "}
+          {turno?.fecha?.toLocaleDateString?.("es-ES") ||
+            new Date(turno.fecha).toLocaleDateString("es-ES")}{" "}
+          – {turno?.hora}
         </li>
 
         {requiereSenia && (
-          <li className="text-amber-400">💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})</li>
+          <li className="text-amber-400">
+            💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
+          </li>
         )}
       </ul>
 
       <div className="flex justify-end gap-4">
-        <button onClick={onBack} className="px-4 py-2 rounded bg-gray-700 text-white" disabled={pagando || guardandoTurno}>
+        <button
+          onClick={onBack}
+          className="px-4 py-2 rounded bg-gray-700 text-white"
+          disabled={pagando || guardandoTurno}
+        >
           Volver
         </button>
 
         {requiereSenia ? (
-          <button onClick={pagarSenia} className="px-4 py-2 rounded bg-blue-600 text-white" disabled={pagando || guardandoTurno}>
+          <button
+            onClick={pagarSenia}
+            className="px-4 py-2 rounded bg-blue-600 text-white"
+            disabled={pagando || guardandoTurno}
+          >
             {pagando ? "Procesando..." : "Pagar seña"}
           </button>
         ) : (
-          <button onClick={guardarTurno} className="px-4 py-2 rounded bg-green-600 text-white" disabled={guardandoTurno}>
+          <button
+            onClick={guardarTurno}
+            className="px-4 py-2 rounded bg-green-600 text-white"
+            disabled={guardandoTurno}
+          >
             {guardandoTurno ? "Guardando..." : "Confirmar turno"}
           </button>
         )}
@@ -787,9 +881,14 @@ function PasoConfirmacion({
 function PasoFinal({ negocio, onClose }: any) {
   return (
     <div className="text-center">
-      <h2 className="text-xl font-semibold mb-4">✅ Turno agendado con éxito</h2>
+      <h2 className="text-xl font-semibold mb-4">
+        ✅ Turno agendado con éxito
+      </h2>
       <p className="mb-4">Te esperamos en {negocio.nombre}</p>
-      <button className="mt-6 w-full py-2 bg-purple-600 rounded-xl" onClick={onClose}>
+      <button
+        className="mt-6 w-full py-2 bg-purple-600 rounded-xl"
+        onClick={onClose}
+      >
         Cerrar
       </button>
     </div>

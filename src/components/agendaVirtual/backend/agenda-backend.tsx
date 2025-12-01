@@ -127,19 +127,21 @@ export async function detectarUsuario(
       );
 
       // 🔹 Mapeo de empleados actualizado
-      const empleadosData = (negocioData.empleadosData || []).map((e: any) => ({
-        id: e.id || "",
-        nombre: e.nombre || "",
-        email: e.email || "",
-        rol: e.rol || "empleado",
-        admin: e.admin || false,
-        adminEmail: e.adminEmail || "",
-        fotoPerfil: e.fotoPerfil || e.foto || "",
-        foto: e.fotoPerfil || e.foto || "", // 👈 siempre devolver ambos
-        nombreArchivo: e.nombreArchivo || "",
-        trabajos: e.trabajos || [],
-        calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
-      }));
+const empleadosData = (negocioData.empleadosData || []).map((e: any, idx: number) => ({
+  id: e.id || idx.toString(),
+  nombre: e.nombre || "",
+  email: e.email || "",
+  rol: e.rol || "empleado",
+  admin: e.admin || false,
+  adminEmail: e.adminEmail || "",
+  fotoPerfil: e.fotoPerfil || e.foto || "",
+  foto: e.fotoPerfil || e.foto || "",
+  nombreArchivo: e.nombreArchivo || "",
+  trabajos: e.trabajos || [],
+  calendario: e.calendario || { inicio: "", fin: "", diasLibres: [] },
+  esEmpleado: e.esEmpleado === false ? false : true,   // 👈🔥 IMPORTANTE
+}));
+
 
       const negocio: Negocio = {
         id: negocioId,

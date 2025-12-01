@@ -17,9 +17,9 @@ type Turno = {
 };
 
 type TurnoGuardado = {
-  hora: string;        // "HH:mm"
-  duracion: number|string; // minutos o "H:MM"
-  fecha: Date;         // siempre Date aquí
+  hora: string;             // "HH:mm"
+  duracion: number | string; // minutos o "H:MM"
+  fecha: Date;              // siempre Date aquí
 };
 
 type Props = {
@@ -85,35 +85,6 @@ function toDateSafe(f: any): Date {
   return new Date(f);
 }
 
-/* --------- Disponibilidad: verifica hueco exacto del slot --------- */
-function estaLibreSlot(
-  inicioSlot: number,
-  duracionServicio: number,
-  turnos: TurnoGuardado[],
-  fecha: Date,
-  inicioJornada: number,
-  finJornada: number
-): boolean {
-  const sStart = inicioSlot;
-  const sEnd = sStart + duracionServicio;
-
-  if (sStart < inicioJornada) return false;
-  if (sEnd > finJornada) return false;
-
-  const reservas = turnos
-    .filter((t) => t.fecha && esMismoDia(fecha, t.fecha))
-    .map((t) => {
-      const i = toMin(t.hora);
-      const d = parseDuracionMin(t.duracion);
-      return { inicio: i, fin: i + d };
-    });
-
-  for (const r of reservas) {
-    if (solapan(sStart, sEnd, r.inicio, r.fin)) return false;
-  }
-  return true;
-}
-
 /* =========================== Componente =========================== */
 export default function CalendarioUI({
   empleado,
@@ -141,6 +112,28 @@ export default function CalendarioUI({
   fechaMinima.setDate(hoy.getDate() - 10);
   const fechaMaxima = new Date(hoy);
   fechaMaxima.setDate(hoy.getDate() + 30);
+
+  /* 🔤 Normalizamos días libres (negocio + empleado) */
+  const normalize = (str: string) =>
+    str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const diasLibres: string[] = empleado?.calendario?.diasLibres || [];
+  const diasLibresNorm = diasLibres.map(normalize);
+
+  console.log("[CalendarioUI] diasLibres desde empleado.calendario →", diasLibres);
+  console.log("[CalendarioUI] diasLibres normalizados →", diasLibresNorm);
+
+  const esDiaLibre = (fecha: Date) => {
+    const nombreDia = fecha
+      .toLocaleDateString("es-ES", { weekday: "long" })
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    return diasLibresNorm.includes(nombreDia);
+  };
 
   const dias: (Date | null)[] = [];
   for (let i = 0; i < inicioSemana; i++) dias.push(null);
@@ -170,10 +163,16 @@ export default function CalendarioUI({
     if (puedeIrSiguiente) setMesVisible(new Date(year, month + 1, 1));
   };
 
-  /* -------- Generador de slots de 30' con disponibilidad correcta -------- */
+  /* -------- Generador de slots con disponibilidad correcta -------- */
   const generarTurnosInterno = (fecha: Date) => {
     const turnosTemp: Turno[] = [];
     if (!empleado?.calendario) return [];
+
+    // ❌ Si el día es libre (negocio o empleado), no generamos turnos
+    if (esDiaLibre(fecha)) {
+      console.log("[CalendarioUI] Día libre, no se generan slots para", fecha);
+      return [];
+    }
 
     const [hInicio, mInicio] = (empleado.calendario.inicio || "08:00")
       .split(":")
@@ -193,14 +192,26 @@ export default function CalendarioUI({
       const mm = String(mins % 60).padStart(2, "0");
       const horaSlot = `${hh}:${mm}`;
 
-      const disponible = estaLibreSlot(
-        mins,
-        duracionServicio,
-        turnosOcupados,
-        fecha,
-        inicioJ,
-        finJ
-      );
+      const disponible = (() => {
+        const sStart = mins;
+        const sEnd = sStart + duracionServicio;
+
+        if (sStart < inicioJ) return false;
+        if (sEnd > finJ) return false;
+
+        const reservas = turnosOcupados
+          .filter((t) => t.fecha && esMismoDia(fecha, t.fecha))
+          .map((t) => {
+            const i = toMin(t.hora);
+            const d = parseDuracionMin(t.duracion);
+            return { inicio: i, fin: i + d };
+          });
+
+        for (const r of reservas) {
+          if (sStart < r.fin && sEnd > r.inicio) return false;
+        }
+        return true;
+      })();
 
       turnosTemp.push({ hora: horaSlot, disponible });
     }
@@ -240,7 +251,11 @@ export default function CalendarioUI({
   /* ---- Recalcular slots cuando cambian reservas/duración/calendario/día ---- */
   useEffect(() => {
     if (!diaSeleccionado) return;
-    setTurnos(generarTurnos ? generarTurnos(diaSeleccionado) : generarTurnosInterno(diaSeleccionado));
+    setTurnos(
+      generarTurnos
+        ? generarTurnos(diaSeleccionado)
+        : generarTurnosInterno(diaSeleccionado)
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnosOcupados, servicio?.duracion, empleado?.calendario, diaSeleccionado]);
 
@@ -288,33 +303,42 @@ export default function CalendarioUI({
 
       {/* Días del mes */}
       <div className="grid grid-cols-7 gap-y-2 text-sm mb-4">
-        {dias.map((d, idx) =>
-          d ? (
+        {dias.map((d, idx) => {
+          if (!d) return <div key={idx} className="w-10 h-10" />;
+
+          const esLibre = esDiaLibre(d);
+          const esPasado = d < hoy && !esMismoDia(d, hoy);
+          const fueraRango = d < fechaMinima || d > fechaMaxima;
+
+          const disabled = esLibre || esPasado || fueraRango;
+
+          const baseClases =
+            "w-10 h-10 flex items-center justify-center rounded-lg transition";
+
+          let clases = "";
+          if (esLibre) {
+            clases = "bg-neutral-800 text-red-400 line-through cursor-not-allowed";
+          } else if (esPasado) {
+            clases = "text-gray-500 line-through cursor-not-allowed";
+          } else if (esMismoDia(d, hoy)) {
+            clases = "bg-white text-black font-bold";
+          } else if (diaSeleccionado && esMismoDia(d, diaSeleccionado)) {
+            clases = "bg-indigo-600 text-white font-bold";
+          } else {
+            clases = "hover:bg-neutral-700";
+          }
+
+          return (
             <button
               key={idx}
-              onClick={() => seleccionarDia(d)}
-              disabled={
-                (d < hoy && !esMismoDia(d, hoy)) ||
-                d < fechaMinima ||
-                d > fechaMaxima
-              }
-              className={`w-10 h-10 flex items-center justify-center rounded-lg transition
-                ${
-                  esMismoDia(d, hoy)
-                    ? "bg-white text-black font-bold"
-                    : diaSeleccionado && esMismoDia(d, diaSeleccionado)
-                    ? "bg-indigo-600 text-white font-bold"
-                    : d < hoy && !esMismoDia(d, hoy)
-                    ? "text-gray-500 line-through cursor-not-allowed"
-                    : "hover:bg-neutral-700"
-                }`}
+              onClick={() => !disabled && seleccionarDia(d)}
+              disabled={disabled}
+              className={`${baseClases} ${clases}`}
             >
               {d.getDate()}
             </button>
-          ) : (
-            <div key={idx} className="w-10 h-10" />
-          )
-        )}
+          );
+        })}
       </div>
 
       {/* Turnos disponibles */}
@@ -325,6 +349,12 @@ export default function CalendarioUI({
             {diaSeleccionado.toLocaleDateString("es-ES")}
           </h3>
           <div className="grid grid-cols-2 gap-2">
+            {turnos.length === 0 && (
+              <p className="col-span-2 text-xs text-gray-400">
+                No hay turnos disponibles para este día.
+              </p>
+            )}
+
             {turnos.map((t, i) => {
               const vencido = esTurnoPasado(diaSeleccionado, t.hora);
               const ocupado = !t.disponible;

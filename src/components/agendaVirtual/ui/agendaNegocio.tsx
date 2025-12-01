@@ -11,7 +11,7 @@ import {
   doc,
   getDocs,
   addDoc,
-   deleteDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
@@ -22,10 +22,27 @@ type Empleado = {
   calendario?: {
     inicio?: string; // "HH:mm"
     fin?: string;    // "HH:mm"
-    diasLibres?: number[];
+    // puede venir como números (0-6) o como strings ("lunes", etc.)
+    diasLibres?: (number | string)[];
+  };
+  esEmpleado?: boolean; // true si trabaja atendiendo
+  rol?: string;         // "dueño" | "empleado" etc.
+};
+
+
+type Negocio = {
+  id: string;
+  nombre: string;
+  empleadosData?: Empleado[];
+  slug?: string;
+  configuracionAgenda?: {
+    diasLibres?: string[]; // días libres del negocio
+    modoTurnos?: "personalizado" | "jornada";
+    clientesPorDia?: number | null;
+    horaInicio?: string;
+    horaFin?: string;
   };
 };
-type Negocio = { id: string; nombre: string; empleadosData?: Empleado[]; slug?: string }; // 👈 agrega slug
 
 type TurnoNegocio = {
   id: string;
@@ -47,7 +64,6 @@ type TurnoNegocio = {
 };
 
 type Servicio = { id: string; servicio: string; precio: number; duracion: number | string };
-
 
 /* =============== Helpers fecha/hora =============== */
 const esMismoDia = (a: Date, b: Date) =>
@@ -115,6 +131,48 @@ const calcularInicioFinDesdeDoc = (t: any): { inicio: Date; fin: Date } | null =
 const solapan = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
   aStart < bEnd && aEnd > bStart;
 
+/* ==== Helpers para días libres negocio + empleado ==== */
+const normalize = (str: string) =>
+  (str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+function getDiasLibresNorm(negocio: Negocio, empleadoSel: Empleado | null): string[] {
+  const diasNegocio: string[] = negocio?.configuracionAgenda?.diasLibres || [];
+  const diasEmpleado: string[] = (empleadoSel?.calendario?.diasLibres || []) as string[];
+
+  const mezclados = [...new Set([...diasNegocio, ...diasEmpleado])];
+  return mezclados.map(normalize);
+}
+
+function esDiaLibreFecha(fecha: Date, diasLibresNorm: string[]): boolean {
+  const nombreDia = fecha
+    .toLocaleDateString("es-ES", { weekday: "long" })
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return diasLibresNorm.includes(nombreDia);
+}
+
+/* ==== Helper para saber si un empleado realmente trabaja ==== */
+const esTrabajadorReal = (e: Empleado): boolean => {
+  const rolNorm = (e.rol || "").toLowerCase();
+
+  // Si es dueño y NO está marcado explícitamente como empleado, NO trabaja
+  if ((rolNorm === "dueño" || rolNorm === "dueno" || rolNorm === "owner") && e.esEmpleado !== true) {
+    return false;
+  }
+
+  // Si tiene el flag esEmpleado definido, respetamos ese valor
+  if (typeof e.esEmpleado === "boolean") {
+    return e.esEmpleado;
+  }
+
+  // Para el resto (empleados comunes sin flag), asumimos que sí trabajan
+  return true;
+};
+
 /* =============== Componente principal =============== */
 export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   const hoy = new Date();
@@ -131,37 +189,50 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     return d;
   }, []);
 
-  const [empleadoSel, setEmpleadoSel] = useState<Empleado | null>(
-    negocio.empleadosData?.[0] || null
-  );
+  // Empleado seleccionado inicial: primer empleado que realmente trabaja
+  const [empleadoSel, setEmpleadoSel] = useState<Empleado | null>(() => {
+    const lista = negocio.empleadosData || [];
+    const trabajadores = lista.filter(esTrabajadorReal);
+
+    if (trabajadores.length > 0) return trabajadores[0];
+    return lista[0] || null;
+  });
+
+  // Lista para el selector: solo empleados que realmente trabajan
+  const empleadosParaSelector =
+    (negocio.empleadosData || []).filter(esTrabajadorReal) ?? [];
+
   const [mesVisible, setMesVisible] = useState<Date>(new Date(hoy));
 
-const [modalEliminar, setModalEliminar] = useState<{
-  visible: boolean;
-  turno?: TurnoNegocio | null;
-  motivo?: string;
-  estado?: "idle" | "loading" | "success" | "error";
-}>({ visible: false, turno: null, motivo: "", estado: "idle" });
+  const [modalEliminar, setModalEliminar] = useState<{
+    visible: boolean;
+    turno?: TurnoNegocio | null;
+    motivo?: string;
+    estado?: "idle" | "loading" | "success" | "error";
+  }>({ visible: false, turno: null, motivo: "", estado: "idle" });
 
-const [modalBloquearDia, setModalBloquearDia] = useState<{
-  visible: boolean;
-  fecha?: Date | null;
-  desbloquear?: boolean;
-  estado?: "idle" | "loading" | "success" | "error";
-}>({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
+  const [modalBloquearDia, setModalBloquearDia] = useState<{
+    visible: boolean;
+    fecha?: Date | null;
+    desbloquear?: boolean;
+    estado?: "idle" | "loading" | "success" | "error";
+  }>({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
 
-
-  // ⛔️ NO abrir horarios automáticamente
+  // NO abrir horarios automáticamente
   const [diaSel, setDiaSel] = useState<Date | null>(null);
 
-  // Guardamos TODOS los turnos del empleado (sin filtrar por día en la suscripción)
+  // Turnos del empleado
   const [turnos, setTurnos] = useState<TurnoNegocio[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
 
-  // modales
+  // Modales
   const [detalles, setDetalles] = useState<TurnoNegocio | null>(null);
-  const [clienteExtra, setClienteExtra] = useState<{ nombre?: string; fotoPerfil?: string } | null>(null);
-const [modalOpciones, setModalOpciones] = useState<{ visible: boolean; hora?: string | null }>({ visible: false });
+  const [clienteExtra, setClienteExtra] = useState<{ nombre?: string; fotoPerfil?: string } | null>(
+    null
+  );
+  const [modalOpciones, setModalOpciones] = useState<{ visible: boolean; hora?: string | null }>({
+    visible: false,
+  });
 
   const [manualOpen, setManualOpen] = useState<{
     visible: boolean;
@@ -194,17 +265,23 @@ const [modalOpciones, setModalOpciones] = useState<{ visible: boolean; hora?: st
     const ultimo = new Date(y, m + 1, 0);
     return ultimo >= fechaMinima && primero <= fechaMaxima;
   };
-  // ¿El slot ya pasó respecto a "ahora"?
-const esSlotPasado = (fecha: Date, hhmm: string) => {
-  const d = combinarFechaHora(fecha, hhmm);
-  return d < new Date();
-};
+
+  const esSlotPasado = (fecha: Date, hhmm: string) => {
+    const d = combinarFechaHora(fecha, hhmm);
+    return d < new Date();
+  };
 
   const puedeIrAnterior = hayDiasEnMes(year, month - 1);
   const puedeIrSiguiente = hayDiasEnMes(year, month + 1);
 
   const irMesAnterior = () => puedeIrAnterior && setMesVisible(new Date(year, month - 1, 1));
   const irMesSiguiente = () => puedeIrSiguiente && setMesVisible(new Date(year, month + 1, 1));
+
+  /* ---------- Días libres negocio + empleado NORMALIZADOS ---------- */
+  const diasLibresNorm = useMemo(
+    () => getDiasLibresNorm(negocio, empleadoSel),
+    [negocio, empleadoSel]
+  );
 
   /* ---------- Cargar servicios del negocio ---------- */
   useEffect(() => {
@@ -221,20 +298,31 @@ const esSlotPasado = (fecha: Date, hhmm: string) => {
     })();
   }, [negocio?.id]);
 
-  // ✅ Asegura que siempre haya un empleado seleccionado cuando el prop llega o cambia
-useEffect(() => {
-  const lista = negocio.empleadosData || [];
-  if (!lista.length) return;
+  /* ---------- Asegurar empleado seleccionado válido ---------- */
+  useEffect(() => {
+    const lista = negocio.empleadosData || [];
+    if (!lista.length) return;
 
-  // si no hay seleccionado o el seleccionado ya no existe, tomamos el primero
-  if (!empleadoSel || !lista.some(e => e.nombre === empleadoSel.nombre)) {
-    setEmpleadoSel(lista[0]);
-  }
-  // si sí existe, lo dejamos como está
-}, [negocio.empleadosData]);
+    const trabajadores = lista.filter(esTrabajadorReal);
 
+    // si el seleccionado sigue existiendo y además trabaja, lo dejamos
+    if (
+      empleadoSel &&
+      trabajadores.some((e) => e.nombre === empleadoSel.nombre)
+    ) {
+      return;
+    }
 
-  /* ---------- Escucha de turnos del EMPLEADO (no depende del día) ---------- */
+    // si hay trabajadores, elegimos el primero
+    if (trabajadores.length > 0) {
+      setEmpleadoSel(trabajadores[0]);
+    } else {
+      // si no hay ninguno “trabajador real”, usamos el primero de la lista
+      setEmpleadoSel(lista[0]);
+    }
+  }, [negocio.empleadosData, empleadoSel?.nombre]);
+
+  /* ---------- Escucha de turnos del EMPLEADO ---------- */
   useEffect(() => {
     if (!negocio?.id || !empleadoSel?.nombre) return;
 
@@ -266,51 +354,49 @@ useEffect(() => {
     setDiaSel(null);
   }, [empleadoSel?.nombre, negocio?.id]);
 
-  /* ---------- Slots 30' y ocupación (filtramos por día aquí) ---------- */
-const slots = useMemo(() => {
-  if (!diaSel) return [] as { hora: string; ocupado: boolean; turno?: TurnoNegocio }[];
+  /* ---------- Slots 30' y ocupación ---------- */
+  const slots = useMemo(() => {
+    if (!diaSel) return [] as { hora: string; ocupado: boolean; turno?: TurnoNegocio }[];
 
-  const cal = empleadoSel?.calendario || {};
-  const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
-  const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
-  const inicioJ = (hi || 0) * 60 + (mi || 0);
-  const finJ = (hf || 0) * 60 + (mf || 0);
-  const paso = 30;
+    const cal = empleadoSel?.calendario || {};
+    const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
+    const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
+    const inicioJ = (hi || 0) * 60 + (mi || 0);
+    const finJ = (hf || 0) * 60 + (mf || 0);
+    const paso = 30;
 
-  // Turnos del día (con inicio y fin seguros)
-  const turnosDelDia = turnos
-    .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
-    .map((t) => {
-      const ini = toDateSafe(t.inicioTs as any);
-      const fin = t.finTs ? toDateSafe(t.finTs as any)
-                          : new Date(+ini + parseDuracionMin(t.duracion) * 60000);
-      return { ...t, _ini: ini, _fin: fin };
-    });
+    const turnosDelDia = turnos
+      .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
+      .map((t) => {
+        const ini = toDateSafe(t.inicioTs as any);
+        const fin = t.finTs
+          ? toDateSafe(t.finTs as any)
+          : new Date(+ini + parseDuracionMin(t.duracion) * 60000);
+        return { ...t, _ini: ini, _fin: fin };
+      });
 
-  const out: { hora: string; ocupado: boolean; turno?: TurnoNegocio }[] = [];
+    const out: { hora: string; ocupado: boolean; turno?: TurnoNegocio }[] = [];
 
-  // usamos m < finJ para que el slot completo quede dentro de la jornada
-  for (let m = inicioJ; m < finJ; m += paso) {
-    const hhmm = minToHHMM(m);
-    const slotStart = combinarFechaHora(diaSel, hhmm);
-    const slotEnd = new Date(+slotStart + paso * 60000);
+    for (let m = inicioJ; m < finJ; m += paso) {
+      const hhmm = minToHHMM(m);
+      const slotStart = combinarFechaHora(diaSel, hhmm);
+      const slotEnd = new Date(+slotStart + paso * 60000);
 
-    // ⛔️ Ocupado si CUALQUIER turno se solapa con [slotStart, slotEnd)
-    const covering = turnosDelDia.find(
-      (t) => t._ini < slotEnd && t._fin > slotStart
-    );
+      const covering = turnosDelDia.find(
+        (t) => t._ini < slotEnd && t._fin > slotStart
+      );
 
-    out.push({
-      hora: hhmm,
-      ocupado: Boolean(covering),
-      turno: covering as any,
-    });
-  }
+      out.push({
+        hora: hhmm,
+        ocupado: Boolean(covering),
+        turno: covering as any,
+      });
+    }
 
-  return out;
-}, [empleadoSel?.calendario, turnos, diaSel]);
+    return out;
+  }, [empleadoSel?.calendario, turnos, diaSel]);
 
-  /* ---------- Datos extra del cliente (para detalle) ---------- */
+  /* ---------- Datos extra del cliente ---------- */
   useEffect(() => {
     const loadCliente = async () => {
       setClienteExtra(null);
@@ -327,7 +413,7 @@ const slots = useMemo(() => {
     loadCliente();
   }, [detalles?.clienteUid]);
 
-  /* ---------- Validación de hueco (sin solape) ---------- */
+  /* ---------- Validación de hueco ---------- */
   const puedeAsignarEn = (inicio: Date, durMin: number) => {
     const fin = new Date(inicio.getTime() + durMin * 60000);
     const reservas = turnos
@@ -337,12 +423,12 @@ const slots = useMemo(() => {
       })
       .filter(Boolean) as { i: number; f: number }[];
 
-    const sI = +inicio, sF = +fin;
+    const sI = +inicio;
+    const sF = +fin;
     for (const r of reservas) {
       if (solapan(sI, sF, r.i, r.f)) return false;
     }
 
-    // respetar jornada del empleado
     const cal = empleadoSel?.calendario || {};
     const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
     const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
@@ -353,494 +439,575 @@ const slots = useMemo(() => {
   };
 
   /* ------------------------------- UI ------------------------------- */
-  const nombreMes = mesVisible.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  const nombreMes = mesVisible.toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+  });
 
-  // Reservas “quién se agendó” del día seleccionado
   const reservasDelDia = diaSel
     ? turnos
         .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
         .sort((a, b) => +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any))
     : [];
 
-    // 🔴 Reemplaza todo tu handleEliminarTurno por este
-// ✅ Versión robusta: envía slug + agendaUrl absoluta y loguea el payload
-const handleEliminarTurno = async (
-  turno: TurnoNegocio,
-  motivo: string
-): Promise<boolean> => {
-  try {
-    const batch = writeBatch(db);
+  const handleEliminarTurno = async (
+    turno: TurnoNegocio,
+    motivo: string
+  ): Promise<boolean> => {
+    try {
+      const batch = writeBatch(db);
 
-    // 1) Eliminar en negocio
-    batch.delete(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
+      batch.delete(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
 
-    // 2) Eliminar en cliente (si hay UID)
-    if (turno.clienteUid) {
-      batch.delete(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
-    }
-
-    // ✅ Ejecutar el batch de forma atómica
-    await batch.commit();
-    console.log("✅ Turno borrado en negocio y cliente");
-
-    // 3) Notificar por email al cliente (si hay email)
-    if (turno.clienteEmail) {
-      try {
-        const origin =
-          typeof window !== "undefined" && window.location?.origin
-            ? window.location.origin
-            : "";
-
-        const payload = {
-          email: turno.clienteEmail,
-          nombre: turno.clienteNombre,
-          servicio: turno.servicioNombre,
-          fecha: turno.fecha,
-          hora: turno.hora,
-          motivo,
-          negocioNombre: negocio.nombre,
-          slug: negocio.slug ?? null,
-          agendaUrl: `${origin}/agenda/${negocio.slug || ""}`,
-        };
-
-        console.log("[frontend] notificar-cancelacion payload →", payload);
-
-        const res = await fetch("/.netlify/functions/notificar-cancelacion", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const txt = await res.text();
-        if (!res.ok) {
-          console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
-        } else {
-          console.log("✅ Mail de cancelación enviado:", txt);
-        }
-      } catch (err) {
-        console.error("❌ Error de red enviando el mail:", err);
+      if (turno.clienteUid) {
+        batch.delete(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
       }
+
+      await batch.commit();
+      console.log("✅ Turno borrado en negocio y cliente");
+
+      if (turno.clienteEmail) {
+        try {
+          const origin =
+            typeof window !== "undefined" && window.location?.origin
+              ? window.location.origin
+              : "";
+
+          const payload = {
+            email: turno.clienteEmail,
+            nombre: turno.clienteNombre,
+            servicio: turno.servicioNombre,
+            fecha: turno.fecha,
+            hora: turno.hora,
+            motivo,
+            negocioNombre: negocio.nombre,
+            slug: negocio.slug ?? null,
+            agendaUrl: `${origin}/agenda/${negocio.slug || ""}`,
+          };
+
+          console.log("[frontend] notificar-cancelacion payload →", payload);
+
+          const res = await fetch("/.netlify/functions/notificar-cancelacion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const txt = await res.text();
+          if (!res.ok) {
+            console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
+          } else {
+            console.log("✅ Mail de cancelación enviado:", txt);
+          }
+        } catch (err) {
+          console.error("❌ Error de red enviando el mail:", err);
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error("❌ Error eliminando turno:", e);
+      return false;
     }
-
-    return true;
-  } catch (e) {
-    console.error("❌ Error eliminando turno:", e);
-    return false;
-  }
-};
-
+  };
 
   return (
-<div
-  className="text-white p-5 rounded-2xl transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-fondo)" }}
->
+    <div
+      className="text-white p-5 rounded-2xl transition-colors duration-300"
+      style={{ backgroundColor: "var(--color-fondo)" }}
+    >
       {/* Header */}
-<div className="mb-2">
-  <h2 className="text-xl font-semibold">Mi Agenda</h2>
-</div>
+      <div className="mb-2">
+        <h2 className="text-xl font-semibold">Mi Agenda</h2>
+      </div>
 
-{/* Selector de empleado */}
-<div className="flex items-center gap-2 mb-4">
-  <span
-    className="text-sm font-medium transition-colors duration-300"
-    style={{ color: "var(--color-texto, #fff)" }}
-  >
-    Seleccionar agenda de:
-  </span>
-  <select
-    className="rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-300"
-    style={{
-      backgroundColor: "var(--color-primario)",
-      color: "#fff",
-    }}
-    value={empleadoSel?.nombre || ""}
-    onChange={(e) => {
-      const emp =
-        negocio.empleadosData?.find((x) => x.nombre === e.target.value) || null;
-      setEmpleadoSel(emp);
-    }}
-  >
-    {(negocio.empleadosData || []).map((e, i) => (
-      <option key={i} value={e.nombre}>
-        {e.nombre}
-      </option>
-    ))}
-  </select>
-</div>
-
-
+      {/* Selector de empleado */}
+      <div className="flex items-center gap-2 mb-4">
+        <span
+          className="text-sm font-medium transition-colors duration-300"
+          style={{ color: "var(--color-texto, #fff)" }}
+        >
+          Seleccionar agenda de:
+        </span>
+        <select
+          className="rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-300"
+          style={{
+            backgroundColor: "var(--color-primario)",
+            color: "#fff",
+          }}
+          value={empleadoSel?.nombre || ""}
+          onChange={(e) => {
+            const emp =
+              empleadosParaSelector.find((x) => x.nombre === e.target.value) || null;
+            setEmpleadoSel(emp);
+          }}
+        >
+          {empleadosParaSelector.map((e, i) => (
+            <option key={i} value={e.nombre}>
+              {e.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Calendario + Slots */}
-<div className="flex flex-col gap-6 lg:max-w-3xl mx-auto">
-
+      <div className="flex flex-col gap-6 lg:max-w-3xl mx-auto">
         {/* Calendario mensual */}
-<div
-  className="rounded-2xl p-4 transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-primario)" }}
->
+        <div
+          className="rounded-2xl p-4 transition-colors duration-300"
+          style={{ backgroundColor: "var(--color-primario)" }}
+        >
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={irMesAnterior}
               disabled={!puedeIrAnterior}
-              className={`px-2 ${puedeIrAnterior ? "text-gray-400 hover:text-white" : "text-gray-600 cursor-not-allowed"}`}
+              className={`px-2 ${
+                puedeIrAnterior
+                  ? "text-gray-400 hover:text-white"
+                  : "text-gray-600 cursor-not-allowed"
+              }`}
               title="Mes anterior"
-            >◀</button>
+            >
+              ◀
+            </button>
             <h3 className="text-sm font-semibold capitalize">{nombreMes}</h3>
             <button
               onClick={irMesSiguiente}
               disabled={!puedeIrSiguiente}
-              className={`px-2 ${puedeIrSiguiente ? "text-gray-400 hover:text-white" : "text-gray-600 cursor-not-allowed"}`}
+              className={`px-2 ${
+                puedeIrSiguiente
+                  ? "text-gray-400 hover:text-white"
+                  : "text-gray-600 cursor-not-allowed"
+              }`}
               title="Mes siguiente"
-            >▶</button>
+            >
+              ▶
+            </button>
           </div>
 
           <div className="grid grid-cols-7 text-xs text-gray-400 mb-1">
-            {["L","M","X","J","V","S","D"].map((d, i) => (
-              <div key={i} className="w-10 h-8 flex items-center justify-center">{d}</div>
+            {["L", "M", "X", "J", "V", "S", "D"].map((d, i) => (
+              <div key={i} className="w-10 h-8 flex items-center justify-center">
+                {d}
+              </div>
             ))}
           </div>
 
+          {/* Días (respetando días libres negocio+empleado) */}
+          <div className="grid grid-cols-7 gap-y-1 text-sm">
+            {dias.map((d, idx) => {
+              if (!d) return <div key={idx} className="w-10 h-8" />;
 
-        {/* días tachados */}
-<div className="grid grid-cols-7 gap-y-1 text-sm">
-  {dias.map((d, idx) =>
-    d ? (
-      <button
-        key={idx}
-        onClick={() => {
-          if (diaSel && esMismoDia(diaSel, d)) {
-            // 🔎 Revisar turnos del día seleccionado
-            const turnosDia = turnos.filter((t) =>
-              esMismoDia(toDateSafe(t.inicioTs as any), d)
-            );
-            // ✅ true si hay turnos y todos son bloqueados
-            const todosBloqueados =
-              turnosDia.length > 0 && turnosDia.every((t) => t.bloqueado);
+              const esHoy = esMismoDia(d, hoy);
+              const esPasado =
+                d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+              const esLibre = esDiaLibreFecha(d, diasLibresNorm);
+              const seleccionado = diaSel && esMismoDia(diaSel, d);
+              const disabled = esPasado || esLibre;
 
-            setModalBloquearDia({
-              visible: true,
-              fecha: d,
-              desbloquear: todosBloqueados,
-            });
-          } else {
-            setDiaSel(d);
-          }
-        }}
-        className={`w-10 h-8 flex items-center justify-center rounded-lg transition
-          ${
-            esMismoDia(d, hoy)
-              ? "bg-white text-black font-bold" // 👈 día actual
-              : d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
-              ? "text-gray-500 line-through" // días pasados
-              : diaSel && esMismoDia(diaSel, d)
-              ? "bg-indigo-600 text-white font-bold" // seleccionado
-              : "hover:bg-neutral-700"
-          }`}
-      >
-        {d.getDate()}
-      </button>
-    ) : (
-      <div key={idx} className="w-10 h-8" />
-    )
-  )}
-</div>
+              const handleClick = () => {
+                if (disabled) return;
 
+                if (diaSel && esMismoDia(diaSel, d)) {
+                  const turnosDia = turnos.filter((t) =>
+                    esMismoDia(toDateSafe(t.inicioTs as any), d)
+                  );
+                  const todosBloqueados =
+                    turnosDia.length > 0 && turnosDia.every((t) => t.bloqueado);
+
+                  setModalBloquearDia({
+                    visible: true,
+                    fecha: d,
+                    desbloquear: todosBloqueados,
+                    estado: "idle",
+                  });
+                } else {
+                  setDiaSel(d);
+                }
+              };
+
+              let clases =
+                "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+              if (esLibre) {
+                clases +=
+                  "text-red-400 line-through cursor-not-allowed opacity-70";
+              } else if (esHoy) {
+                clases += "bg-white text-black font-bold";
+              } else if (esPasado) {
+                clases += "text-gray-500 line-through cursor-not-allowed";
+              } else if (seleccionado) {
+                clases += "bg-indigo-600 text-white font-bold";
+              } else {
+                clases += "hover:bg-neutral-700";
+              }
+
+              return (
+                <button
+                  key={idx}
+                  onClick={handleClick}
+                  disabled={disabled}
+                  className={clases}
+                >
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Panel derecho */}
-<div
-  className="rounded-2xl p-4 transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-primario)" }}
->
+        <div
+          className="rounded-2xl p-4 transition-colors duration-300"
+          style={{ backgroundColor: "var(--color-primario)" }}
+        >
           {!diaSel ? (
-            <div className="text-sm text-gray-400">Selecciona un día del calendario para ver los turnos.</div>
+            <div className="text-sm text-gray-400">
+              Selecciona un día del calendario para ver los turnos.
+            </div>
           ) : (
             <>
               {/* Encabezado + contador */}
-<div
-  className="flex items-center justify-between mb-3 sticky top-0 rounded-lg px-3 py-2 transition-colors duration-300"
-  style={{
-    backgroundColor: "var(--color-primario)",
-    color: "#fff",
-  }}
->
-  <div className="text-sm font-medium">
-    {empleadoSel?.nombre} •{" "}
-    {diaSel.toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-    })}
-  </div>
-  <div className="text-xs opacity-90">
-    {reservasDelDia.length} turno
-    {reservasDelDia.length === 1 ? "" : "s"}
-  </div>
-</div>
-
+              <div
+                className="flex items-center justify-between mb-3 sticky top-0 rounded-lg px-3 py-2 transition-colors duration-300"
+                style={{
+                  backgroundColor: "var(--color-primario)",
+                  color: "#fff",
+                }}
+              >
+                <div className="text-sm font-medium">
+                  {empleadoSel?.nombre} •{" "}
+                  {diaSel.toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                  })}
+                </div>
+                <div className="text-xs opacity-90">
+                  {reservasDelDia.length} turno
+                  {reservasDelDia.length === 1 ? "" : "s"}
+                </div>
+              </div>
 
               {/* Quién se agendó o bloqueó */}
-{reservasDelDia.length > 0 && (
-  <ul className="mb-3 space-y-1 text-xs">
-    {reservasDelDia.map((t) => (
-      <li
-        key={t.id}
-        className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1"
-      >
-        <span className="font-semibold">
-          {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+              {reservasDelDia.length > 0 && (
+                <ul className="mb-3 space-y-1 text-xs">
+                  {reservasDelDia.map((t) => (
+                    <li
+                      key={t.id}
+                      className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1"
+                    >
+                      <span className="font-semibold">
+                        {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
 
-        {/* 👇 diferenciamos bloqueado de reservado */}
-        <span className="truncate">
-          {t.bloqueado
-            ? "Bloqueado"
-            : t.clienteNombre ?? "Reservado"}
-          {t.servicioNombre && !t.bloqueado ? ` • ${t.servicioNombre}` : ""}
-        </span>
-      </li>
-    ))}
-  </ul>
-)}
+                      <span className="truncate">
+                        {t.bloqueado ? "Bloqueado" : t.clienteNombre ?? "Reservado"}
+                        {t.servicioNombre && !t.bloqueado
+                          ? ` • ${t.servicioNombre}`
+                          : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
+              {/* Slots del día */}
+              <div className="max-h-[420px] overflow-auto pr-1">
+                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                  {slots.map((s, i) => {
+                    const bloqueado = s.turno?.bloqueado;
+                    const ocupado = s.ocupado && !bloqueado;
+                    const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
 
-              {/* Slots del día (6 columnas) */}
-<div className="max-h-[420px] overflow-auto pr-1">
-  <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-    {slots.map((s, i) => {
-  const bloqueado = s.turno?.bloqueado; // 👈 nuevo flag
-  const ocupado = s.ocupado && !bloqueado; // ocupado real
-  const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
+                    let claseEstado = "";
+                    if (vencido) {
+                      claseEstado = "horario-pasado";
+                    } else if (bloqueado) {
+                      claseEstado = "horario-bloqueado";
+                    } else if (ocupado) {
+                      claseEstado = "horario-ocupado";
+                    } else {
+                      claseEstado = "horario-disponible";
+                    }
 
-  // 🎨 usamos las clases del global.css
-  let claseEstado = "";
-  if (vencido) {
-    claseEstado = "horario-pasado";
-  } else if (bloqueado) {
-    claseEstado = "horario-bloqueado";
-  } else if (ocupado) {
-    claseEstado = "horario-ocupado";
-  } else {
-    claseEstado = "horario-disponible";
-  }
-
-  return (
-    <button
-      key={i}
-      disabled={vencido && !ocupado && !bloqueado}
-      onClick={async () => {
-        if (bloqueado) {
-          // 👇 solo negocio puede liberar antes que venza
-          if (!vencido) {
-            if (confirm("¿Desea liberar este turno para que vuelva a estar disponible?")) {
-              await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", s.turno!.id));
-            }
-          }
-        } else if (ocupado) {
-          setDetalles(s.turno!); // ver detalle
-        } else if (!vencido) {
-          setModalOpciones({ visible: true, hora: s.hora }); // opciones
-        }
-      }}
-      className={`horario-btn h-14 grid place-items-center text-sm font-semibold transition focus:outline-none ${claseEstado}`}
-      style={{
-        ["--horario-bg" as any]: undefined, // por si acaso
-      }}
-      title={
-        vencido
-          ? ocupado
-            ? "Turno pasado (ver detalle)"
-            : "Turno pasado"
-          : bloqueado
-            ? "No disponible (bloqueado)"
-            : ocupado
-              ? "Turno ocupado"
-              : "Opciones de turno"
-      }
-    >
-      {s.hora}
-    </button>
-  );
-})}
-
-  </div>
-</div>
+                    return (
+                      <button
+                        key={i}
+                        disabled={vencido && !ocupado && !bloqueado}
+                        onClick={async () => {
+                          if (bloqueado) {
+                            if (!vencido) {
+                              if (
+                                confirm(
+                                  "¿Desea liberar este turno para que vuelva a estar disponible?"
+                                )
+                              ) {
+                                await deleteDoc(
+                                  doc(db, "Negocios", negocio.id, "Turnos", s.turno!.id)
+                                );
+                              }
+                            }
+                          } else if (ocupado) {
+                            setDetalles(s.turno!);
+                          } else if (!vencido) {
+                            setModalOpciones({ visible: true, hora: s.hora });
+                          }
+                        }}
+                        className={`horario-btn h-14 grid place-items-center text-sm font-semibold transition focus:outline-none ${claseEstado}`}
+                        style={{
+                          ["--horario-bg" as any]: undefined,
+                        }}
+                        title={
+                          vencido
+                            ? ocupado
+                              ? "Turno pasado (ver detalle)"
+                              : "Turno pasado"
+                            : bloqueado
+                            ? "No disponible (bloqueado)"
+                            : ocupado
+                            ? "Turno ocupado"
+                            : "Opciones de turno"
+                        }
+                      >
+                        {s.hora}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
         </div>
       </div>
-      
-{/* Modal detalle de turno (se abre al tocar un slot rojo) */}
-{detalles && (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => {
-        setDetalles(null);
-        setClienteExtra(null);
-      }}
-    />
-<div
-  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-fondo)" }}
->
-      <h3 className="text-lg font-semibold mb-4">Detalle del turno</h3>
 
-      <div className="space-y-2 text-sm">
-        <div><span className="text-gray-400">Hora:</span> <b>{detalles.hora}</b></div>
-        <div><span className="text-gray-400">Fecha:</span> <b>{detalles.fecha}</b></div>
-        <div><span className="text-gray-400">Empleado:</span> <b>{detalles.empleadoNombre}</b></div>
-
-        {!detalles.bloqueado ? (
-          <>
-            <div><span className="text-gray-400">Servicio:</span> <b>{detalles.servicioNombre || "—"}</b></div>
-            <div><span className="text-gray-400">Cliente:</span> <b>{detalles.clienteNombre || "—"}</b></div>
-            <div><span className="text-gray-400">Email:</span> <b>{detalles.clienteEmail || "—"}</b></div>
-            <div><span className="text-gray-400">Teléfono:</span> <b>{detalles.clienteTelefono || "—"}</b></div>
-            {clienteExtra?.nombre && (
-              <div className="text-xs text-gray-400">Perfil: {clienteExtra.nombre}</div>
-            )}
-          </>
-        ) : (
-          <div className="text-amber-300">Este horario está bloqueado por el negocio.</div>
-        )}
-      </div>
-
-      <div className="flex justify-end gap-2 mt-5">
-        <button
-          onClick={() => {
-            setDetalles(null);
-            setClienteExtra(null);
-          }}
-          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
-        >
-          Cerrar
-        </button>
-
-        {!detalles.bloqueado && (
-          <button
+      {/* Modal detalle de turno */}
+      {detalles && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
+          <div
+            className="absolute inset-0 bg-black/60"
             onClick={() => {
-              setModalEliminar({ visible: true, turno: detalles, motivo: "", estado: "idle" });
               setDetalles(null);
               setClienteExtra(null);
             }}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+          />
+          <div
+            className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
+            style={{ backgroundColor: "var(--color-fondo)" }}
           >
-            Eliminar turno
-          </button>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+            <h3 className="text-lg font-semibold mb-4">Detalle del turno</h3>
+
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-gray-400">Hora:</span>{" "}
+                <b>{detalles.hora}</b>
+              </div>
+              <div>
+                <span className="text-gray-400">Fecha:</span>{" "}
+                <b>{detalles.fecha}</b>
+              </div>
+              <div>
+                <span className="text-gray-400">Empleado:</span>{" "}
+                <b>{detalles.empleadoNombre}</b>
+              </div>
+
+              {!detalles.bloqueado ? (
+                <>
+                  <div>
+                    <span className="text-gray-400">Servicio:</span>{" "}
+                    <b>{detalles.servicioNombre || "—"}</b>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Cliente:</span>{" "}
+                    <b>{detalles.clienteNombre || "—"}</b>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Email:</span>{" "}
+                    <b>{detalles.clienteEmail || "—"}</b>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Teléfono:</span>{" "}
+                    <b>{detalles.clienteTelefono || "—"}</b>
+                  </div>
+                  {clienteExtra?.nombre && (
+                    <div className="text-xs text-gray-400">
+                      Perfil: {clienteExtra.nombre}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-amber-300">
+                  Este horario está bloqueado por el negocio.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setDetalles(null);
+                  setClienteExtra(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+              >
+                Cerrar
+              </button>
+
+              {!detalles.bloqueado && (
+                <button
+                  onClick={() => {
+                    setModalEliminar({
+                      visible: true,
+                      turno: detalles,
+                      motivo: "",
+                      estado: "idle",
+                    });
+                    setDetalles(null);
+                    setClienteExtra(null);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Eliminar turno
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal eliminar turno */}
-{modalEliminar.visible && modalEliminar.turno && (
-  <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-6">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => {
-        if (modalEliminar.estado === "loading") return; // no cerrar mientras carga
-        setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" });
-      }}
-    />
-<div
-  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-fondo)" }}
->
-      <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
+      {modalEliminar.visible && modalEliminar.turno && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-6">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => {
+              if (modalEliminar.estado === "loading") return;
+              setModalEliminar({
+                visible: false,
+                turno: null,
+                motivo: "",
+                estado: "idle",
+              });
+            }}
+          />
+          <div
+            className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
+            style={{ backgroundColor: "var(--color-fondo)" }}
+          >
+            <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
 
-      <p className="text-sm mb-4">
-        Estás por eliminar el turno de{" "}
-        <b>{modalEliminar.turno.clienteNombre || "Cliente"}</b> a las{" "}
-        <b>{modalEliminar.turno.hora}</b> el{" "}
-        <b>{modalEliminar.turno.fecha}</b>.
-      </p>
+            <p className="text-sm mb-4">
+              Estás por eliminar el turno de{" "}
+              <b>{modalEliminar.turno.clienteNombre || "Cliente"}</b> a las{" "}
+              <b>{modalEliminar.turno.hora}</b> el{" "}
+              <b>{modalEliminar.turno.fecha}</b>.
+            </p>
 
-      {/* Chips de motivos rápidos */}
-      <div className="mb-3">
-        <div className="text-sm text-gray-300 mb-2">Elige un motivo rápido:</div>
-        <div className="flex flex-wrap gap-2">
-          {MOTIVOS_PREDETERMINADOS.map((m) => {
-            const activo = (modalEliminar.motivo || "").trim() === m;
-            return (
-              <button
-                key={m}
-                type="button"
-                disabled={modalEliminar.estado === "loading"}
-                onClick={() => setModalEliminar((s) => ({ ...s, motivo: m }))}
-                className={`px-3 py-1.5 rounded-full text-xs border transition
+            <div className="mb-3">
+              <div className="text-sm text-gray-300 mb-2">
+                Elige un motivo rápido:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MOTIVOS_PREDETERMINADOS.map((m) => {
+                  const activo = (modalEliminar.motivo || "").trim() === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={modalEliminar.estado === "loading"}
+                      onClick={() =>
+                        setModalEliminar((s) => ({ ...s, motivo: m }))
+                      }
+                      className={`px-3 py-1.5 rounded-full text-xs border transition
                   ${
                     activo
                       ? "bg-indigo-600 text-white border-indigo-500"
                       : "bg-neutral-800 text-gray-200 border-neutral-700 hover:bg-neutral-700"
-                  } ${modalEliminar.estado === "loading" ? "opacity-60 cursor-not-allowed" : ""}`}
-                title={m}
+                  } ${
+                        modalEliminar.estado === "loading"
+                          ? "opacity-60 cursor-not-allowed"
+                          : ""
+                      }`}
+                      title={m}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block text-sm text-gray-300 mb-2">
+              Motivo de cancelación (se notificará al cliente):
+            </label>
+            <textarea
+              className="w-full p-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm mb-4"
+              rows={3}
+              placeholder="Ej. El empleado no podrá asistir"
+              value={modalEliminar.motivo || ""}
+              disabled={modalEliminar.estado === "loading"}
+              onChange={(e) =>
+                setModalEliminar((s) => ({
+                  ...s,
+                  motivo: e.target.value,
+                }))
+              }
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  setModalEliminar({
+                    visible: false,
+                    turno: null,
+                    motivo: "",
+                    estado: "idle",
+                  })
+                }
+                disabled={modalEliminar.estado === "loading"}
+                className={`px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 ${
+                  modalEliminar.estado === "loading"
+                    ? "opacity-60 cursor-not-allowed"
+                    : ""
+                }`}
               >
-                {m}
+                Cancelar
               </button>
-            );
-          })}
-        </div>
-      </div>
 
-      <label className="block text-sm text-gray-300 mb-2">
-        Motivo de cancelación (se notificará al cliente):
-      </label>
-      <textarea
-        className="w-full p-2 rounded-lg bg-neutral-800 border border-neutral-700 text-sm mb-4"
-        rows={3}
-        placeholder="Ej. El empleado no podrá asistir"
-        value={modalEliminar.motivo || ""}
-        disabled={modalEliminar.estado === "loading"}
-        onChange={(e) =>
-          setModalEliminar((s) => ({
-            ...s,
-            motivo: e.target.value,
-          }))
-        }
-      />
+              <button
+                onClick={async () => {
+                  if (modalEliminar.estado === "loading") return;
 
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" })}
-          disabled={modalEliminar.estado === "loading"}
-          className={`px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 ${
-            modalEliminar.estado === "loading" ? "opacity-60 cursor-not-allowed" : ""
-          }`}
-        >
-          Cancelar
-        </button>
+                  setModalEliminar((s) => ({ ...s, estado: "loading" }));
 
-        {/* Botón rojo con loader y estados */}
-        <button
-          onClick={async () => {
-            if (modalEliminar.estado === "loading") return;
+                  const motivo = (modalEliminar.motivo || "").trim();
+                  const ok = await handleEliminarTurno(
+                    modalEliminar.turno!,
+                    motivo
+                  );
 
-            setModalEliminar((s) => ({ ...s, estado: "loading" }));
-
-            const motivo = (modalEliminar.motivo || "").trim();
-            const ok = await handleEliminarTurno(modalEliminar.turno!, motivo);
-
-            if (ok) {
-              setModalEliminar((s) => ({ ...s, estado: "success" }));
-              setTimeout(() => {
-                setModalEliminar({ visible: false, turno: null, motivo: "", estado: "idle" });
-              }, 1200);
-            } else {
-              setModalEliminar((s) => ({ ...s, estado: "error" }));
-            }
-          }}
-          disabled={
-            modalEliminar.estado === "loading" ||
-            (modalEliminar.motivo || "").trim().length === 0
-          }
-          aria-busy={modalEliminar.estado === "loading"}
-          className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
+                  if (ok) {
+                    setModalEliminar((s) => ({ ...s, estado: "success" }));
+                    setTimeout(() => {
+                      setModalEliminar({
+                        visible: false,
+                        turno: null,
+                        motivo: "",
+                        estado: "idle",
+                      });
+                    }, 1200);
+                  } else {
+                    setModalEliminar((s) => ({ ...s, estado: "error" }));
+                  }
+                }}
+                disabled={
+                  modalEliminar.estado === "loading" ||
+                  (modalEliminar.motivo || "").trim().length === 0
+                }
+                aria-busy={modalEliminar.estado === "loading"}
+                className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
             ${
               modalEliminar.estado === "success"
                 ? "bg-emerald-600"
@@ -850,127 +1017,179 @@ const handleEliminarTurno = async (
                 ? "bg-red-700"
                 : "bg-red-600 hover:bg-red-700"
             }`}
-        >
-          {modalEliminar.estado === "loading" && (
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"></path>
-            </svg>
-          )}
-          {modalEliminar.estado === "success"
-            ? "Se eliminó el turno"
-            : modalEliminar.estado === "loading"
-            ? "Eliminando turno…"
-            : modalEliminar.estado === "error"
-            ? "Error. Reintentar"
-            : "Eliminar turno"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+              >
+                {modalEliminar.estado === "loading" && (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"
+                    ></path>
+                  </svg>
+                )}
+                {modalEliminar.estado === "success"
+                  ? "Se eliminó el turno"
+                  : modalEliminar.estado === "loading"
+                  ? "Eliminando turno…"
+                  : modalEliminar.estado === "error"
+                  ? "Error. Reintentar"
+                  : "Eliminar turno"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-{/* Modal bloquear/liberar día */}
-{modalBloquearDia.visible && modalBloquearDia.fecha && (
-  <div className="fixed inset-0 z-[10002] flex items-center justify-center p-2 sm:p-6">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => {
-        if (modalBloquearDia.estado === "loading") return; // no cerrar mientras carga
-        setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
-      }}
-    />
-<div
-  className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-fondo)" }}
->
-      <h3 className="text-lg font-semibold mb-4">
-        {modalBloquearDia.desbloquear ? "Liberar día completo" : "Bloquear día completo"}
-      </h3>
+      {/* Modal bloquear/liberar día */}
+      {modalBloquearDia.visible && modalBloquearDia.fecha && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center p-2 sm:p-6">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => {
+              if (modalBloquearDia.estado === "loading") return;
+              setModalBloquearDia({
+                visible: false,
+                fecha: null,
+                desbloquear: false,
+                estado: "idle",
+              });
+            }}
+          />
+          <div
+            className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duración-300"
+            style={{ backgroundColor: "var(--color-fondo)" }}
+          >
+            <h3 className="text-lg font-semibold mb-4">
+              {modalBloquearDia.desbloquear
+                ? "Liberar día completo"
+                : "Bloquear día completo"}
+            </h3>
 
-      <p className="text-sm mb-4">
-        {modalBloquearDia.desbloquear ? (
-          <>¿Seguro que deseas <b>liberar</b> el día{" "}
-          {modalBloquearDia.fecha.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}?
-          <br/>Todos los turnos bloqueados volverán a estar disponibles.</>
-        ) : (
-          <>¿Seguro que deseas <b>bloquear</b> el día{" "}
-          {modalBloquearDia.fecha.toLocaleDateString("es-ES", { weekday: "long", day: "2-digit", month: "long" })}?
-          <br/>Todos los turnos quedarán inhabilitados.</>
-        )}
-      </p>
+            <p className="text-sm mb-4">
+              {modalBloquearDia.desbloquear ? (
+                <>
+                  ¿Seguro que deseas <b>liberar</b> el día{" "}
+                  {modalBloquearDia.fecha.toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                  })}
+                  ?
+                  <br />
+                  Todos los turnos bloqueados volverán a estar disponibles.
+                </>
+              ) : (
+                <>
+                  ¿Seguro que deseas <b>bloquear</b> el día{" "}
+                  {modalBloquearDia.fecha.toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                  })}
+                  ?
+                  <br />
+                  Todos los turnos quedarán inhabilitados.
+                </>
+              )}
+            </p>
 
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" })}
-          disabled={modalBloquearDia.estado === "loading"}
-          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-60"
-        >
-          Cancelar
-        </button>
-
-        <button
-          onClick={async () => {
-            if (modalBloquearDia.estado === "loading") return;
-
-            setModalBloquearDia(s => ({ ...s, estado: "loading" }));
-
-            try {
-              if (modalBloquearDia.desbloquear) {
-                // 🔓 liberar
-                const turnosDia = turnos.filter(
-                  t =>
-                    esMismoDia(toDateSafe(t.inicioTs as any), modalBloquearDia.fecha!) &&
-                    t.bloqueado
-                );
-                for (const t of turnosDia) {
-                  await deleteDoc(doc(db, "Negocios", negocio.id, "Turnos", t.id));
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  setModalBloquearDia({
+                    visible: false,
+                    fecha: null,
+                    desbloquear: false,
+                    estado: "idle",
+                  })
                 }
-              } else {
-                // 🚫 bloquear
-                const fecha = modalBloquearDia.fecha!;
-                const cal = empleadoSel?.calendario || {};
-                const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
-                const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
-                const inicioJ = (hi || 0) * 60 + (mi || 0);
-                const finJ = (hf || 0) * 60 + (mf || 0);
-                const paso = 30;
+                disabled={modalBloquearDia.estado === "loading"}
+                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
 
-                const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+              <button
+                onClick={async () => {
+                  if (modalBloquearDia.estado === "loading") return;
 
-                for (let m = inicioJ; m < finJ; m += paso) {
-                  const hora = minToHHMM(m);
-                  const inicio = combinarFechaHora(fecha, hora);
-                  const fin = new Date(inicio.getTime() + 30 * 60000);
+                  setModalBloquearDia((s) => ({ ...s, estado: "loading" }));
 
-                  await addDoc(refNeg, {
-                    negocioId: negocio.id,
-                    negocioNombre: negocio.nombre,
-                    empleadoId: empleadoSel?.id || null,
-                    empleadoNombre: empleadoSel?.nombre,
-                    fecha: fecha.toISOString().split("T")[0],
-                    hora,
-                    inicioTs: inicio,
-                    finTs: fin,
-                    bloqueado: true,
-                    creadoEn: new Date(),
-                    creadoPor: "negocio-bloqueo-dia",
-                  });
-                }
-              }
+                  try {
+                    if (modalBloquearDia.desbloquear) {
+                      const turnosDia = turnos.filter(
+                        (t) =>
+                          esMismoDia(
+                            toDateSafe(t.inicioTs as any),
+                            modalBloquearDia.fecha!
+                          ) && t.bloqueado
+                      );
+                      for (const t of turnosDia) {
+                        await deleteDoc(
+                          doc(db, "Negocios", negocio.id, "Turnos", t.id)
+                        );
+                      }
+                    } else {
+                      const fecha = modalBloquearDia.fecha!;
+                      const cal = empleadoSel?.calendario || {};
+                      const [hi, mi] = String(cal.inicio || "08:00")
+                        .split(":")
+                        .map(Number);
+                      const [hf, mf] = String(cal.fin || "22:00")
+                        .split(":")
+                        .map(Number);
+                      const inicioJ = (hi || 0) * 60 + (mi || 0);
+                      const finJ = (hf || 0) * 60 + (mf || 0);
+                      const paso = 30;
 
-              // ✅ éxito
-              setModalBloquearDia(s => ({ ...s, estado: "success" }));
-              setTimeout(() => {
-                setModalBloquearDia({ visible: false, fecha: null, desbloquear: false, estado: "idle" });
-              }, 1200);
-            } catch (e) {
-              console.error("❌ Error bloqueando/liberando día:", e);
-              setModalBloquearDia(s => ({ ...s, estado: "error" }));
-            }
-          }}
-          disabled={modalBloquearDia.estado === "loading"}
-          className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
+                      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+
+                      for (let m = inicioJ; m < finJ; m += paso) {
+                        const hora = minToHHMM(m);
+                        const inicio = combinarFechaHora(fecha, hora);
+                        const fin = new Date(inicio.getTime() + 30 * 60000);
+
+                        await addDoc(refNeg, {
+                          negocioId: negocio.id,
+                          negocioNombre: negocio.nombre,
+                          empleadoId: empleadoSel?.id || null,
+                          empleadoNombre: empleadoSel?.nombre,
+                          fecha: fecha.toISOString().split("T")[0],
+                          hora,
+                          inicioTs: inicio,
+                          finTs: fin,
+                          bloqueado: true,
+                          creadoEn: new Date(),
+                          creadoPor: "negocio-bloqueo-dia",
+                        });
+                      }
+                    }
+
+                    setModalBloquearDia((s) => ({ ...s, estado: "success" }));
+                    setTimeout(() => {
+                      setModalBloquearDia({
+                        visible: false,
+                        fecha: null,
+                        desbloquear: false,
+                        estado: "idle",
+                      });
+                    }, 1200);
+                  } catch (e) {
+                    console.error("❌ Error bloqueando/liberando día:", e);
+                    setModalBloquearDia((s) => ({ ...s, estado: "error" }));
+                  }
+                }}
+                disabled={modalBloquearDia.estado === "loading"}
+                className={`px-4 py-2 rounded-lg text-white flex items-center gap-2
             ${
               modalBloquearDia.estado === "success"
                 ? "bg-emerald-600"
@@ -982,107 +1201,149 @@ const handleEliminarTurno = async (
                 ? "bg-emerald-600 hover:bg-emerald-700"
                 : "bg-red-600 hover:bg-red-700"
             }`}
-        >
-          {modalBloquearDia.estado === "loading"
-            ? modalBloquearDia.desbloquear ? "Liberando..." : "Bloqueando..."
-            : modalBloquearDia.estado === "success"
-            ? modalBloquearDia.desbloquear ? "Se ha liberado" : "Se ha bloqueado"
-            : modalBloquearDia.estado === "error"
-            ? "Error. Reintentar"
-            : modalBloquearDia.desbloquear ? "Liberar día" : "Bloquear día"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+              >
+                {modalBloquearDia.estado === "loading"
+                  ? modalBloquearDia.desbloquear
+                    ? "Liberando..."
+                    : "Bloqueando..."
+                  : modalBloquearDia.estado === "success"
+                  ? modalBloquearDia.desbloquear
+                    ? "Se ha liberado"
+                    : "Se ha bloqueado"
+                  : modalBloquearDia.estado === "error"
+                  ? "Error. Reintentar"
+                  : modalBloquearDia.desbloquear
+                  ? "Liberar día"
+                  : "Bloquear día"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal opciones de turno */}
-{modalOpciones.visible && diaSel && (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
-    <div
-      className="absolute inset-0 bg-black/60"
-      onClick={() => setModalOpciones({ visible: false })}
-    />
-    <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
-      <h3 className="text-lg font-semibold mb-4">
-        Turno {modalOpciones.hora} • {diaSel.toLocaleDateString("es-ES")}
-      </h3>
+      {modalOpciones.visible && diaSel && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setModalOpciones({ visible: false })}
+          />
+          <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
+            <h3 className="text-lg font-semibold mb-4">
+              Turno {modalOpciones.hora} • {diaSel.toLocaleDateString("es-ES")}
+            </h3>
 
-      <div className="flex flex-col gap-3">
-        {/* ➕ Agregar manualmente */}
-        <button
-          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
-          onClick={() => {
-            setManualOpen({ visible: true, hora: modalOpciones.hora || null, paso: 1 });
-            setModalOpciones({ visible: false });
-          }}
-        >
-          ➕ Agregar manualmente
-        </button>
+            <div className="flex flex-col gap-3">
+              {/* Agregar manualmente */}
+              <button
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                onClick={() => {
+                  setManualOpen({
+                    visible: true,
+                    hora: modalOpciones.hora || null,
+                    paso: 1,
+                  });
+                  setModalOpciones({ visible: false });
+                }}
+              >
+                ➕ Agregar manualmente
+              </button>
 
-        {/* 🚫 No trabajar */}
-        <button
-          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
-          onClick={async () => {
-            try {
-              const inicio = combinarFechaHora(diaSel!, modalOpciones.hora!);
-              const fin = new Date(inicio.getTime() + 30 * 60000);
+              {/* No trabajar */}
+              <button
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
+                onClick={async () => {
+                  try {
+                    const inicio = combinarFechaHora(diaSel!, modalOpciones.hora!);
+                    const fin = new Date(inicio.getTime() + 30 * 60000);
 
-              const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
-              await addDoc(refNeg, {
-                negocioId: negocio.id,
-                negocioNombre: negocio.nombre,
-                empleadoId: empleadoSel?.id || null,
-                empleadoNombre: empleadoSel?.nombre,
-                fecha: inicio.toISOString().split("T")[0],
-                hora: modalOpciones.hora,
-                inicioTs: inicio,
-                finTs: fin,
-                bloqueado: true,   // 👈 marca que el negocio no trabaja
-                creadoEn: new Date(),
-                creadoPor: "negocio-manual",
-              });
+                    const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+                    await addDoc(refNeg, {
+                      negocioId: negocio.id,
+                      negocioNombre: negocio.nombre,
+                      empleadoId: empleadoSel?.id || null,
+                      empleadoNombre: empleadoSel?.nombre,
+                      fecha: inicio.toISOString().split("T")[0],
+                      hora: modalOpciones.hora,
+                      inicioTs: inicio,
+                      finTs: fin,
+                      bloqueado: true,
+                      creadoEn: new Date(),
+                      creadoPor: "negocio-manual",
+                    });
 
-              setModalOpciones({ visible: false });
-            } catch (e) {
-              console.error("❌ Error bloqueando turno:", e);
-            }
-          }}
-        >
-          🚫 No trabajar este turno
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+                    setModalOpciones({ visible: false });
+                  } catch (e) {
+                    console.error("❌ Error bloqueando turno:", e);
+                  }
+                }}
+              >
+                🚫 No trabajar este turno
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Modal asignación manual (verde) */}
+      {/* Modal asignación manual */}
       {manualOpen.visible && diaSel && (
         <div className="fixed inset-0 z-[10000]">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() =>
+              setManualOpen({ visible: false, hora: null, paso: 1 })
+            }
+          />
           <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
-<div
-  className="w-full max-w-[680px] sm:rounded-2xl border border-neutral-700 shadow-2xl overflow-hidden transition-colors duration-300"
-  style={{ backgroundColor: "var(--color-fondo)" }}
->
+            <div
+              className="w-full max-w-[680px] sm:rounded-2xl border border-neutral-700 shadow-2xl overflow-hidden transition-colors duration-300"
+              style={{ backgroundColor: "var(--color-fondo)" }}
+            >
               <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
-                <h4 className="text-base sm:text-lg font-semibold">Asignar turno manualmente</h4>
-                <button onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} className="text-gray-300 hover:text-white text-xl">×</button>
+                <h4 className="text-base sm:text-lg font-semibold">
+                  Asignar turno manualmente
+                </h4>
+                <button
+                  onClick={() =>
+                    setManualOpen({ visible: false, hora: null, paso: 1 })
+                  }
+                  className="text-gray-300 hover:text-white text-xl"
+                >
+                  ×
+                </button>
               </div>
 
-              {/* Paso 1: confirmación */}
+              {/* Paso 1 */}
               {manualOpen.paso === 1 && (
                 <div className="p-4 sm:p-6 space-y-4 text-sm">
-                  <p>¿Desea agendar manualmente un turno a las <b>{manualOpen.hora}</b> para <b>{empleadoSel?.nombre}</b> el <b>{diaSel.toLocaleDateString("es-ES")}</b>?</p>
+                  <p>
+                    ¿Desea agendar manualmente un turno a las{" "}
+                    <b>{manualOpen.hora}</b> para{" "}
+                    <b>{empleadoSel?.nombre}</b> el{" "}
+                    <b>{diaSel.toLocaleDateString("es-ES")}</b>?
+                  </p>
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setManualOpen({ visible: false, hora: null, paso: 1 })} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">Cancelar</button>
-                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 2 }))} className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">Continuar</button>
+                    <button
+                      onClick={() =>
+                        setManualOpen({ visible: false, hora: null, paso: 1 })
+                      }
+                      className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() =>
+                        setManualOpen((s) => ({ ...s, paso: 2 }))
+                      }
+                      className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      Continuar
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* Paso 2: elegir servicio */}
+              {/* Paso 2 */}
               {manualOpen.paso === 2 && (
                 <div className="p-4 sm:p-6 space-y-4 text-sm">
                   <div className="text-gray-300">Selecciona un servicio:</div>
@@ -1090,21 +1351,47 @@ const handleEliminarTurno = async (
                     {servicios.map((s) => (
                       <button
                         key={s.id}
-                        onClick={() => setManualOpen((st) => ({ ...st, servicio: s, paso: 3, error: null }))}
-                        className={`p-3 rounded-lg border transition text-left ${manualOpen.servicio?.id === s.id ? "border-indigo-500 bg-neutral-800" : "border-neutral-700 hover:bg-neutral-800"}`}
+                        onClick={() =>
+                          setManualOpen((st) => ({
+                            ...st,
+                            servicio: s,
+                            paso: 3,
+                            error: null,
+                          }))
+                        }
+                        className={`p-3 rounded-lg border transition text-left ${
+                          manualOpen.servicio?.id === s.id
+                            ? "border-indigo-500 bg-neutral-800"
+                            : "border-neutral-700 hover:bg-neutral-800"
+                        }`}
                       >
                         <div className="font-medium">{s.servicio}</div>
-                        <div className="text-gray-400 text-xs">{s.duracion} min • ${s.precio}</div>
+                        <div className="text-gray-400 text-xs">
+                          {s.duracion} min • ${s.precio}
+                        </div>
                       </button>
                     ))}
                   </div>
 
                   <div className="flex justify-between">
-                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 1 }))} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">← Volver</button>
                     <button
-                      onClick={() => setManualOpen((s) => ({ ...s, paso: 3 }))}
+                      onClick={() =>
+                        setManualOpen((s) => ({ ...s, paso: 1 }))
+                      }
+                      className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+                    >
+                      ← Volver
+                    </button>
+                    <button
+                      onClick={() =>
+                        setManualOpen((s) => ({ ...s, paso: 3 }))
+                      }
                       disabled={!manualOpen.servicio}
-                      className={`px-3 py-2 rounded-lg ${manualOpen.servicio ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "bg-gray-700 text-gray-300 cursor-not-allowed"}`}
+                      className={`px-3 py-2 rounded-lg ${
+                        manualOpen.servicio
+                          ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                          : "bg-gray-700 text-gray-300 cursor-not-allowed"
+                      }`}
                     >
                       Siguiente
                     </button>
@@ -1112,35 +1399,56 @@ const handleEliminarTurno = async (
                 </div>
               )}
 
-              {/* Paso 3: datos del cliente + guardar */}
+              {/* Paso 3 */}
               {manualOpen.paso === 3 && (
                 <div className="p-4 sm:p-6 space-y-4 text-sm">
                   <div className="space-y-2">
-                    <label className="block text-gray-300">Nombre del cliente *</label>
+                    <label className="block text-gray-300">
+                      Nombre del cliente *
+                    </label>
                     <input
                       className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
                       placeholder="Ej. Juan Pérez"
                       value={manualOpen.nombre || ""}
-                      onChange={(e) => setManualOpen((s) => ({ ...s, nombre: e.target.value }))}
+                      onChange={(e) =>
+                        setManualOpen((s) => ({
+                          ...s,
+                          nombre: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-gray-300">Email (opcional)</label>
+                      <label className="block text-gray-300">
+                        Email (opcional)
+                      </label>
                       <input
                         className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
                         placeholder="cliente@correo.com"
                         value={manualOpen.email || ""}
-                        onChange={(e) => setManualOpen((s) => ({ ...s, email: e.target.value }))}
+                        onChange={(e) =>
+                          setManualOpen((s) => ({
+                            ...s,
+                            email: e.target.value,
+                          }))
+                        }
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-300">Teléfono (opcional)</label>
+                      <label className="block text-gray-300">
+                        Teléfono (opcional)
+                      </label>
                       <input
                         className="w-full px-3 py-2 rounded-lg bg-neutral-800 outline-none"
                         placeholder="+598 ..."
                         value={manualOpen.telefono || ""}
-                        onChange={(e) => setManualOpen((s) => ({ ...s, telefono: e.target.value }))}
+                        onChange={(e) =>
+                          setManualOpen((s) => ({
+                            ...s,
+                            telefono: e.target.value,
+                          }))
+                        }
                       />
                     </div>
                   </div>
@@ -1152,31 +1460,54 @@ const handleEliminarTurno = async (
                   )}
 
                   <div className="flex justify-between">
-                    <button onClick={() => setManualOpen((s) => ({ ...s, paso: 2 }))} className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">← Volver</button>
+                    <button
+                      onClick={() =>
+                        setManualOpen((s) => ({ ...s, paso: 2 }))
+                      }
+                      className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
+                    >
+                      ← Volver
+                    </button>
                     <button
                       onClick={async () => {
-                        // Validaciones
                         if (!manualOpen.nombre?.trim()) {
-                          setManualOpen((s) => ({ ...s, error: "El nombre del cliente es obligatorio." }));
+                          setManualOpen((s) => ({
+                            ...s,
+                            error: "El nombre del cliente es obligatorio.",
+                          }));
                           return;
                         }
                         if (!manualOpen.servicio) {
-                          setManualOpen((s) => ({ ...s, error: "Seleccione un servicio." }));
+                          setManualOpen((s) => ({
+                            ...s,
+                            error: "Seleccione un servicio.",
+                          }));
                           return;
                         }
 
                         try {
                           const hora = manualOpen.hora!;
                           const inicio = combinarFechaHora(diaSel!, hora);
-                          const dur = parseDuracionMin(manualOpen.servicio.duracion);
+                          const dur = parseDuracionMin(
+                            manualOpen.servicio.duracion
+                          );
 
                           if (!puedeAsignarEn(inicio, dur)) {
-                            setManualOpen((s) => ({ ...s, error: "El servicio no entra en este horario o se solapa con otro turno." }));
+                            setManualOpen((s) => ({
+                              ...s,
+                              error:
+                                "El servicio no entra en este horario o se solapa con otro turno.",
+                            }));
                             return;
                           }
 
                           const fin = new Date(inicio.getTime() + dur * 60000);
-                          const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+                          const refNeg = collection(
+                            db,
+                            "Negocios",
+                            negocio.id,
+                            "Turnos"
+                          );
                           await addDoc(refNeg, {
                             negocioId: negocio.id,
                             negocioNombre: negocio.nombre,
@@ -1198,7 +1529,10 @@ const handleEliminarTurno = async (
 
                           setManualOpen({ visible: false, hora: null, paso: 1 });
                         } catch (e) {
-                          setManualOpen((s) => ({ ...s, error: "No se pudo guardar el turno." }));
+                          setManualOpen((s) => ({
+                            ...s,
+                            error: "No se pudo guardar el turno.",
+                          }));
                         }
                       }}
                       className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"

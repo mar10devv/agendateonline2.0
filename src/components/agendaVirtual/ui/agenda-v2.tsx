@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 import {
   Calendar,
@@ -26,7 +26,7 @@ import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
 import IconUbicacion from "../../../assets/icon-navbar/map.svg?url";
 
-import SocialMedia from "../../ui/social-media"
+import SocialMedia from "../../ui/social-media";
 import { db } from "../../../lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
@@ -67,7 +67,7 @@ export type Empleado = {
   adminEmail?: string;
   trabajos?: string[];
   calendario?: any;
-  esEmpleado?: boolean;
+  esEmpleado?: boolean; // 🔥 clave para saber si trabaja
 };
 
 export type Servicio = {
@@ -120,7 +120,6 @@ export type Negocio = {
   };
 };
 
-
 type Usuario = {
   nombre?: string;
   fotoPerfil?: string;
@@ -146,7 +145,6 @@ export default function AgendaVirtualUIv3({
   modo,
   usuario,
 }: Props) {
-
   /* --------  ESTADOS  -------- */
   const [vista, setVista] = useState<string>("agenda");
   const [modalShare, setModalShare] = useState(false);
@@ -154,13 +152,15 @@ export default function AgendaVirtualUIv3({
   const [modalPerfil, setModalPerfil] = useState(false);
   const [modalEmpleados, setModalEmpleados] = useState(false);
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
-  const [estadoUbicacion, setEstadoUbicacion] = useState<"idle" | "cargando" | "exito">("idle");
+  const [estadoUbicacion, setEstadoUbicacion] =
+    useState<"idle" | "cargando" | "exito">("idle");
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
 
   // 🟢 NUEVO: estado para el modal de configuración de agenda
-  const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] = useState(false);
+  const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] =
+    useState(false);
   const [configAgendaInicial, setConfigAgendaInicial] = useState<{
     diasLibres?: string[];
     modoTurnos?: "jornada" | "personalizado";
@@ -190,6 +190,33 @@ export default function AgendaVirtualUIv3({
   // 🔥 Nuevo estado: servicios en tiempo real
   const [serviciosState, setServiciosState] = useState<Servicio[]>([]);
   const [modalServicios, setModalServicios] = useState(false);
+
+  /* -------- EMPLEADOS ACTIVOS (DUEÑO SOLO SI ES EMPLEADO) -------- */
+
+const empleadosFuente = useMemo<Empleado[]>(() => {
+  const lista = empleados && empleados.length > 0
+    ? empleados
+    : negocio.empleadosData ?? [];
+
+  return Array.isArray(lista) ? lista : [];
+}, [empleados, negocio.empleadosData]);
+
+
+  // Ocultamos:
+  // - Dueño: solo se muestra si esEmpleado === true
+  // - Resto: se ocultan si esEmpleado === false
+  const empleadosActivos = useMemo(() => {
+    return empleadosFuente.filter((e) => {
+      if (e.rol === "dueño") {
+        return e.esEmpleado === true;
+      }
+      return e.esEmpleado !== false;
+    });
+  }, [empleadosFuente]);
+
+  // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
+  const empleadosParaAgenda =
+    empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -252,14 +279,10 @@ export default function AgendaVirtualUIv3({
 
   /* --------  TEMAS (COLORES) -------- */
 
-  // ✅ Leer SIEMPRE el tema desde Firestore igual que en el modelo anterior
   useEffect(() => {
     if (!negocio?.slug) return;
 
-    const q = query(
-      collection(db, "Negocios"),
-      where("slug", "==", negocio.slug)
-    );
+    const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
 
     const unsubscribe = onSnapshot(q, (snap) => {
       if (snap.empty) return;
@@ -281,10 +304,7 @@ export default function AgendaVirtualUIv3({
             "--color-primario-oscuro",
             tema.colorPrimarioOscuro || "#0a0a0a"
           );
-          document.documentElement.style.setProperty(
-            "--color-texto",
-            "#ffffff"
-          );
+          document.documentElement.style.setProperty("--color-texto", "#ffffff");
         });
       } else {
         document.documentElement.style.setProperty("--color-primario", "#262626");
@@ -312,9 +332,7 @@ export default function AgendaVirtualUIv3({
         typeof cfg.clientesPorDia === "number" ? cfg.clientesPorDia : null,
     });
 
-    // Solo dueño / admin
     if (modo === "dueño" || modo === "admin") {
-      // Si NO está explícitamente en true, mostramos el modal
       if (cfg.onboardingCompletado !== true) {
         setMostrarModalConfigAgenda(true);
       } else {
@@ -344,7 +362,7 @@ export default function AgendaVirtualUIv3({
             {serviciosState.length > 0 ? (
               serviciosState.map((s) => (
                 <div
-                  key={s.id}
+                  key={s.id || s.servicio}
                   className="
                     p-4 rounded-2xl text-center
                     bg-[var(--color-primario-oscuro)]
@@ -364,13 +382,19 @@ export default function AgendaVirtualUIv3({
           </div>
         );
 
-      case "empleados":
+      case "empleados": {
+        const listaEmpleados =
+          empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
+
         return (
           <div className="relative w-full">
             <div className="flex flex-wrap justify-center gap-6 mt-10">
-              {empleados?.length > 0 ? (
-                empleados.map((e) => (
-                  <div key={e.id} className="flex flex-col items-center">
+              {listaEmpleados?.length > 0 ? (
+                listaEmpleados.map((e) => (
+                  <div
+                    key={e.id || e.email || e.nombre}
+                    className="flex flex-col items-center"
+                  >
                     <div className="w-20 h-20 rounded-full overflow-hidden border border-white/30">
                       {e.fotoPerfil ? (
                         <img
@@ -380,7 +404,7 @@ export default function AgendaVirtualUIv3({
                       ) : (
                         <div className="w-full h-full bg-[var(--color-primario-oscuro)] flex items-center justify-center">
                           <span className="text-xl font-bold">
-                            {e.nombre[0]}
+                            {(e.nombre && e.nombre[0]) || "?"}
                           </span>
                         </div>
                       )}
@@ -394,6 +418,7 @@ export default function AgendaVirtualUIv3({
             </div>
           </div>
         );
+      }
 
       case "agenda":
         return modo === "cliente" ? (
@@ -414,7 +439,7 @@ export default function AgendaVirtualUIv3({
             negocio={{
               id: negocio.id,
               nombre: negocio.nombre,
-              empleadosData: empleados,
+              empleadosData: empleadosParaAgenda, // 👈 solo empleados activos (dueño solo si esEmpleado === true)
               slug: negocio.slug,
             }}
           />
@@ -425,7 +450,7 @@ export default function AgendaVirtualUIv3({
           <div className="w-full">
             {/* Título */}
             <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
-              {(modo === "dueño" || modo === "admin")
+              {modo === "dueño" || modo === "admin"
                 ? "Mi ubicación"
                 : `Ubicación de ${negocio.nombre}`}
             </h2>
@@ -433,7 +458,7 @@ export default function AgendaVirtualUIv3({
             {/* Si NO existe ubicación */}
             {!ubicacion && (
               <>
-                {(modo === "dueño" || modo === "admin") ? (
+                {modo === "dueño" || modo === "admin" ? (
                   <button
                     onClick={handleGuardarUbicacion}
                     disabled={estadoUbicacion === "cargando"}
@@ -455,7 +480,8 @@ export default function AgendaVirtualUIv3({
                         Cargando nueva ubicación...
                       </>
                     )}
-                    {estadoUbicacion === "exito" && "✅ Se ha cambiado la ubicación"}
+                    {estadoUbicacion === "exito" &&
+                      "✅ Se ha cambiado la ubicación"}
                     {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
                   </button>
                 ) : (
@@ -502,8 +528,10 @@ export default function AgendaVirtualUIv3({
                           Buscando nueva ubicación...
                         </>
                       )}
-                      {estadoUbicacion === "exito" && "✅ Ubicación actualizada"}
-                      {estadoUbicacion === "idle" && "📍 Actualizar ubicación"}
+                      {estadoUbicacion === "exito" &&
+                        "✅ Ubicación actualizada"}
+                      {estadoUbicacion === "idle" &&
+                        "📍 Actualizar ubicación"}
                     </button>
                   </div>
                 )}
@@ -523,18 +551,15 @@ export default function AgendaVirtualUIv3({
     <>
       {/* 🟢 MODAL DE CONFIGURACIÓN INICIAL DE AGENDA */}
       <ModalConfigAgendaInicial
-  abierto={mostrarModalConfigAgenda}
-  onClose={() => setMostrarModalConfigAgenda(false)}
-  negocioId={negocio.id}
-  configuracionActual={configAgendaInicial ?? undefined}
-  onGuardado={(nuevaConfig) => {
-    // opcional: actualizar estado local si querés
-    setConfigAgendaInicial(nuevaConfig);
-    // abrir paso 2: servicios
-    setModalServicios(true);
-  }}
-/>
-
+        abierto={mostrarModalConfigAgenda}
+        onClose={() => setMostrarModalConfigAgenda(false)}
+        negocioId={negocio.id}
+        configuracionActual={configAgendaInicial ?? undefined}
+        onGuardado={(nuevaConfig) => {
+          setConfigAgendaInicial(nuevaConfig);
+          setModalServicios(true);
+        }}
+      />
 
       <div
         className="
@@ -558,7 +583,6 @@ export default function AgendaVirtualUIv3({
             text-[var(--color-texto)]
           "
         >
-          {/* ⚙️ Config */}
           {(modo === "dueño" || modo === "admin") && (
             <button
               onClick={() => setModalPerfil(true)}
@@ -741,7 +765,8 @@ export default function AgendaVirtualUIv3({
           "
         >
           <p className="text-sm opacity-80 leading-relaxed">
-            © {new Date().getFullYear()} {negocio.nombre} — Todos los derechos reservados.
+            © {new Date().getFullYear()} {negocio.nombre} — Todos los derechos
+            reservados.
             <br />
             <span className="opacity-70">Powered by AgendateOnline</span>
           </p>

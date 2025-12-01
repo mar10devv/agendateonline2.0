@@ -5,10 +5,20 @@ type ConfiguracionAgenda = {
   modoTurnos: "personalizado" | "jornada";
   clientesPorDia?: number;     // usado en modo personalizado
   horasSeparacion?: number;    // minutos por cliente en modo jornada
-  diasLibres?: string[];
+  diasLibres?: string[];       // ← NEGOCIO + EMPLEADO
   inicio: string;              // "08:00"
   fin: string;                 // "17:00"
 };
+
+// Normaliza nombre de día: " Domingo " -> "domingo"
+function normalizeDia(str: any): string {
+  if (!str) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 export function useCalendario(
   calendario: ConfiguracionAgenda | null,
@@ -16,24 +26,27 @@ export function useCalendario(
 ) {
   return useMemo(() => {
     if (!calendario?.inicio || !calendario?.fin) {
-      console.warn("⚠️ Calendario no configurado");
+      console.warn("⚠️ Calendario no configurado o incompleto", calendario);
       return { diasDisponibles: [], horariosDisponibles: [] };
     }
 
-    // 📅 Generar días disponibles
+    const diasLibresNorm = (calendario.diasLibres || []).map(normalizeDia);
+
+    console.log("[useCalendario] calendario recibido:", calendario);
+    console.log("[useCalendario] diasLibres normalizados:", diasLibresNorm);
+
+    // 📅 GENERAR DÍAS DISPONIBLES
     const ahora = new Date();
     const diasDisponibles = Array.from({ length: diasAdelante }, (_, i) => {
       const d = new Date();
       d.setDate(ahora.getDate() + i);
 
-      const dayName = d.toLocaleDateString("es-ES", { weekday: "long" });
-      const disabled = calendario.diasLibres?.some(
-        (dl) =>
-          dl.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") ===
-          dayName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      );
+      const dayNameLong = d.toLocaleDateString("es-ES", { weekday: "long" });
+      const dayNameNorm = normalizeDia(dayNameLong);
 
-      return {
+      const disabled = diasLibresNorm.includes(dayNameNorm);
+
+      const item = {
         date: d,
         label: d.toLocaleDateString("es-ES", {
           weekday: "short",
@@ -43,19 +56,22 @@ export function useCalendario(
         value: d.toISOString().split("T")[0],
         disabled,
       };
+
+      return item;
     });
 
-    // ⏰ Calcular horarios disponibles
+    console.log("[useCalendario] diasDisponibles:", diasDisponibles);
+
+    // ⏰ HORARIOS
     const horariosDisponibles: string[] = [];
     const [hIni, mIni] = calendario.inicio.split(":").map(Number);
     const [hFin, mFin] = calendario.fin.split(":").map(Number);
 
-    const start = hIni * 60 + mIni; // minutos desde medianoche
+    const start = hIni * 60 + mIni;
     const end = hFin * 60 + mFin;
     const totalMinutes = end - start;
 
     if (calendario.modoTurnos === "personalizado" && calendario.clientesPorDia) {
-      // 👉 Distribuir X clientes en todo el rango
       const step = Math.floor(totalMinutes / calendario.clientesPorDia);
       for (let i = 0; i < calendario.clientesPorDia; i++) {
         const t = start + i * step;
@@ -64,7 +80,6 @@ export function useCalendario(
         horariosDisponibles.push(`${hh}:${mm}`);
       }
     } else if (calendario.modoTurnos === "jornada" && calendario.horasSeparacion) {
-      // 👉 Usar duración fija por cliente
       let t = start;
       while (t + calendario.horasSeparacion <= end) {
         const hh = String(Math.floor(t / 60)).padStart(2, "0");
@@ -73,6 +88,8 @@ export function useCalendario(
         t += calendario.horasSeparacion;
       }
     }
+
+    console.log("[useCalendario] horariosDisponibles:", horariosDisponibles);
 
     return { diasDisponibles, horariosDisponibles };
   }, [calendario, diasAdelante]);
