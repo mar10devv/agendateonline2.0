@@ -629,22 +629,30 @@ export default function ModalConfigAgendaInicial({
           }
 
           const extra = e.diasDescansoExtra ?? [];
-          if (e.descansoModo === "1dia" && extra.length !== 1) {
-            alert(
-              `Elegí exactamente 1 día extra de descanso para "${e.nombre || "empleado"}".`
-            );
-            return;
-          }
-          if (
-            (e.descansoModo === "2dias" ||
-              e.descansoModo === "diaYMedio") &&
-            extra.length < 2
-          ) {
-            alert(
-              `Elegí 2 días extra de descanso para "${e.nombre || "empleado"}".`
-            );
-            return;
-          }
+
+// 👉 MODO "1 día libre o más": debe haber AL MENOS 1 día seleccionado
+if (e.descansoModo === "1dia" && extra.length < 1) {
+  alert(
+    `Elegí al menos 1 día extra de descanso para "${
+      e.nombre || "empleado"
+    }".`
+  );
+  return;
+}
+
+// 👉 MODO "2 días" o "1 día y medio": deben ser EXACTAMENTE 2 días
+if (
+  (e.descansoModo === "2dias" || e.descansoModo === "diaYMedio") &&
+  extra.length !== 2
+) {
+  alert(
+    `Elegí exactamente 2 días extra de descanso para "${
+      e.nombre || "empleado"
+    }".`
+  );
+  return;
+}
+
         }
       }
     }
@@ -661,8 +669,8 @@ export default function ModalConfigAgendaInicial({
         onboardingCompletado: true,
       };
 
-      // ---- Empleados normalizados ----
       let empleadosNormalizados: any[] = [];
+
       if (tipo === "negocio") {
         empleadosNormalizados = empleados.map((e) => {
           const emailTrim = e.email.trim();
@@ -671,15 +679,82 @@ export default function ModalConfigAgendaInicial({
               ? emailTrim.toLowerCase()
               : "";
 
+          // Días extra seleccionados en el modal (normalizados: "lunes", "domingo", etc.)
           const diasExtraUnique = Array.from(
             new Set(e.diasDescansoExtra || [])
-          );
-          const diasEmpleado = Array.from(
-            new Set([...(diasBase || []), ...diasExtraUnique])
           );
 
           const horaInicioFinal = e.horarioInicio || inicioNegocio;
           const horaFinFinal = e.horarioFin || finNegocio;
+
+          // 👇 NUEVO: calculamos descanso real del empleado
+          let diasLibresEmpleado: string[] = [];
+          let descansoDiaLibre: string | null = null;
+          let descansoDiaMedio: string | null = null;
+          let descansoTurnoMedio: "manana" | "tarde" | null = null;
+
+          // Siempre partimos de los días que el negocio ya tiene cerrados
+          const diasBaseNegocio = Array.isArray(diasBase) ? diasBase : [];
+
+          if (e.descansoModo === "negocio") {
+            // Mismos días que el negocio
+            diasLibresEmpleado = Array.from(new Set(diasBaseNegocio));
+          } else if (e.descansoModo === "1dia" || e.descansoModo === "2dias") {
+            // 1 día libre o más → todos los extras son días libres completos
+            diasLibresEmpleado = Array.from(
+              new Set([...diasBaseNegocio, ...diasExtraUnique])
+            );
+          } else if (e.descansoModo === "diaYMedio") {
+  // Día y medio:
+  // - diasExtraUnique[0] => día libre completo
+  // - diasExtraUnique[1] => día de medio turno
+  if (diasExtraUnique.length >= 1) {
+    descansoDiaLibre = diasExtraUnique[0];
+  }
+  if (diasExtraUnique.length >= 2) {
+    descansoDiaMedio = diasExtraUnique[1];
+  }
+
+  // 👇 Partimos de los días que el negocio tiene cerrados
+  let base = [...diasBaseNegocio];
+
+  // 👉 Si el día de medio turno está en los días cerrados del negocio,
+  // lo sacamos para ESTE empleado (porque él sí trabaja 4h ese día)
+  if (descansoDiaMedio) {
+    base = base.filter((d) => d !== descansoDiaMedio);
+  }
+
+  // 👉 Agregamos el día libre completo del empleado
+  if (descansoDiaLibre) {
+    base.push(descansoDiaLibre);
+  }
+
+  diasLibresEmpleado = Array.from(new Set(base));
+
+  // 🔍 Calculamos si el medio día es mañana o tarde
+  if (descansoDiaLibre && descansoDiaMedio) {
+    const idxLibre = DIAS_LABELS.findIndex(
+      (d) => normalizarDiaKey(d) === descansoDiaLibre
+    );
+    const idxMedio = DIAS_LABELS.findIndex(
+      (d) => normalizarDiaKey(d) === descansoDiaMedio
+    );
+
+    if (idxLibre !== -1 && idxMedio !== -1) {
+      const prevIndex =
+        (idxLibre - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+      const nextIndex =
+        (idxLibre + 1) % DIAS_LABELS.length;
+
+      if (idxMedio === prevIndex) {
+        descansoTurnoMedio = "manana";
+      } else if (idxMedio === nextIndex) {
+        descansoTurnoMedio = "tarde";
+      }
+    }
+  }
+}
+
 
           return {
             nombre: e.nombre.trim(),
@@ -689,14 +764,25 @@ export default function ModalConfigAgendaInicial({
             adminEmail,
             fotoPerfil: e.fotoPerfil || "",
             trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
+
+            // 🗓️ Calendario del empleado
             calendario: {
               inicio: horaInicioFinal,
               fin: horaFinFinal,
-              diasLibres: diasEmpleado,
+              diasLibres: diasLibresEmpleado,
             },
+
             esEmpleado: e.esEmpleado !== false,
+
+            // Guardamos el modo y los extras tal como los eligió en el modal
             descansoModo: e.descansoModo,
             diasDescansoExtra: diasExtraUnique,
+
+            // NUEVO: info explícita para el calendario (día libre + medio día)
+            // Solo tiene sentido en "diaYMedio", pero se puede guardar null en otros casos sin drama.
+            descansoDiaLibre: descansoDiaLibre,
+            descansoDiaMedio: descansoDiaMedio,
+            descansoTurnoMedio: descansoTurnoMedio,
           };
         });
       } else {
@@ -724,9 +810,13 @@ export default function ModalConfigAgendaInicial({
             esEmpleado: true,
             descansoModo: "negocio" as DescansoModo,
             diasDescansoExtra: [],
+            descansoDiaLibre: null,
+            descansoDiaMedio: null,
+            descansoTurnoMedio: null,
           },
         ];
       }
+
 
       const adminUidsEmails = empleadosNormalizados
         .filter((e) => e.adminEmail)
@@ -795,34 +885,296 @@ export default function ModalConfigAgendaInicial({
     }
   };
 
-  // --------- Render tarjeta empleado (Creador / Empleados) ---------
+// --------- Render tarjeta empleado (Creador / Empleados) ---------
 const renderEmpleadoCard = (index: number, esCreador: boolean) => {
   const e = empleados[index];
   if (!e) return null;
 
-  const diasAbiertos = DIAS_LABELS.filter((dia) => {
-    const key = normalizarDiaKey(dia);
-    return !diasCerradosNegocio.includes(key);
-  });
+// ------------ UI de descanso (creador y empleados) ------------
+const BloqueDescanso = () => {
+  const esModo1Dia = e.descansoModo === "1dia";
+  const esModoDiaYMedio = e.descansoModo === "diaYMedio";
 
-  // ✔ SI ES CREADOR → Nueva lógica (trabaja o administra)
+  const diasSeleccionados = e.diasDescansoExtra || [];
+
+  // Para "1 día y medio" interpretamos:
+  // - diasSeleccionados[0] => día libre completo
+  // - diasSeleccionados[1] => día de medio turno (4 horas)
+  const diaLibreKey = esModoDiaYMedio ? diasSeleccionados[0] ?? null : null;
+  const diaMedioKey = esModoDiaYMedio ? diasSeleccionados[1] ?? null : null;
+
+  const labelDesdeKey = (key: string | null) => {
+    if (!key) return null;
+    return DIAS_LABELS.find((d) => normalizarDiaKey(d) === key) ?? null;
+  };
+
+  const diaLibreLabel = labelDesdeKey(diaLibreKey);
+
+  // Para el medio día: solo permitimos el día anterior y el siguiente del día libre
+  const getPrevNextOptions = () => {
+    if (!diaLibreLabel) return [];
+    const index = DIAS_LABELS.findIndex((d) => d === diaLibreLabel);
+    if (index === -1) return [];
+
+    const prevIndex = (index - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+    const nextIndex = (index + 1) % DIAS_LABELS.length;
+
+    const prevLabel = DIAS_LABELS[prevIndex];
+    const nextLabel = DIAS_LABELS[nextIndex];
+
+    return [
+      { label: prevLabel, key: normalizarDiaKey(prevLabel), tipo: "antes" as const },
+      { label: nextLabel, key: normalizarDiaKey(nextLabel), tipo: "despues" as const },
+    ];
+  };
+
+  const opcionesMedioDia = getPrevNextOptions();
+
+  // Helper para setear el array de días de descanso (solo diseño)
+  const setDiasDescanso = (dias: string[]) => {
+    handleEmpleadoChange(index, "diasDescansoExtra", dias);
+  };
+
+  // Paso 1: seleccionar el día libre completo
+  const handleSeleccionDiaLibre = (labelDia: string) => {
+    const key = normalizarDiaKey(labelDia);
+
+    // Si hace clic de nuevo en el mismo día => lo deseleccionamos
+    if (diaLibreKey === key) {
+      // Mantengo (opcional) el medio día si lo hubiera, pero sin día libre no tiene mucho sentido.
+      // Para diseño podríamos simplemente limpiar todo:
+      setDiasDescanso([]);
+      return;
+    }
+
+    // Si ya había medio día, lo mantenemos solo si sigue siendo adyacente; para diseño, lo reseteamos.
+    setDiasDescanso([key]);
+  };
+
+  // Paso 2: seleccionar el día donde hace solo 4 horas
+  const handleSeleccionDiaMedio = (optKey: string) => {
+    if (!diaLibreKey) return; // aún no eligió el día libre
+
+    // Si clickea el mismo día medio ya seleccionado => lo quitamos (opcional)
+    if (diaMedioKey === optKey) {
+      setDiasDescanso([diaLibreKey]);
+      return;
+    }
+
+    setDiasDescanso([diaLibreKey, optKey]);
+  };
+
+  // Para el texto explicativo de mañana / tarde según la posición del medio día
+  const getResumenMedioDia = () => {
+    if (!diaLibreKey || !diaMedioKey) return "";
+
+    const libreIndex = DIAS_LABELS.findIndex(
+      (d) => normalizarDiaKey(d) === diaLibreKey
+    );
+    const medioIndex = DIAS_LABELS.findIndex(
+      (d) => normalizarDiaKey(d) === diaMedioKey
+    );
+    if (libreIndex === -1 || medioIndex === -1) return "";
+
+    const prevIndex = (libreIndex - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+    const nextIndex = (libreIndex + 1) % DIAS_LABELS.length;
+
+    if (medioIndex === prevIndex) {
+      return `Ese día de medio turno será en la mañana.`;
+    }
+    if (medioIndex === nextIndex) {
+      return `Ese día de medio turno será en la tarde.`;
+    }
+    return "";
+  };
+
+  const resumenMedioDia = getResumenMedioDia();
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs mb-1 text-gray-300">
+        Descanso semanal del empleado
+      </label>
+
+      {/* BOTONES MODO DE DESCANSO */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {[
+          {
+            key: "negocio" as DescansoModo,
+            label: "Mismos días que el negocio",
+          },
+          {
+            key: "1dia" as DescansoModo,
+            label: "1 día libre o más",
+          },
+          {
+            key: "diaYMedio" as DescansoModo,
+            label: "1 día libre y medio",
+          },
+        ].map((b) => (
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => handleEmpleadoChange(index, "descansoModo", b.key)}
+            className={`px-3 py-2 rounded-lg border text-xs transition
+              ${
+                e.descansoModo === b.key
+                  ? "bg-emerald-600 border-emerald-600 text-white"
+                  : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+              }`}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+
+      {/* MODO: 1 día libre o más (multi selección simple) */}
+      {esModo1Dia && (
+        <div className="space-y-2 pt-1">
+          <p className="text-xs text-gray-400">
+            Elegí 1 o más días que este empleado tendrá libre.
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {DIAS_LABELS.map((dia) => {
+              const key = normalizarDiaKey(dia);
+              const activo = diasSeleccionados.includes(key);
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleDiaExtraEmpleado(index, dia)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs transition
+                    ${
+                      activo
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                    }`}
+                >
+                  {dia}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MODO: 1 día libre y medio (2 pasos) */}
+      {esModoDiaYMedio && (
+        <div className="space-y-3 pt-1">
+          {/* Paso 1: día libre completo */}
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400">
+              <span className="font-semibold text-gray-200">Paso 1:</span>{" "}
+              elegí el día libre completo de este empleado.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {DIAS_LABELS.map((dia) => {
+                const key = normalizarDiaKey(dia);
+                const activo = diaLibreKey === key;
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleSeleccionDiaLibre(dia)}
+                    className={`px-3 py-1.5 rounded-lg border text-xs transition
+                      ${
+                        activo
+                          ? "bg-emerald-600 border-emerald-600 text-white"
+                          : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                      }`}
+                  >
+                    {dia}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Paso 2: día donde hace solo 4 horas (pegado al libre) */}
+          {diaLibreKey && opcionesMedioDia.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-400">
+                <span className="font-semibold text-gray-200">Paso 2:</span>{" "}
+                ¿qué día hará solo 4 horas?
+                <span className="block text-[11px] text-gray-500">
+                  Debe ser el día anterior o el siguiente al día libre.
+                </span>
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                {opcionesMedioDia.map((opt) => {
+                  const activo = diaMedioKey === opt.key;
+
+                  // Texto pequeño que describe mañana/tarde según sea antes/después
+                  const extraTexto =
+                    opt.tipo === "antes"
+                      ? " (4h en la mañana)"
+                      : " (4h en la tarde)";
+
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => handleSeleccionDiaMedio(opt.key)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs transition text-left
+                        ${
+                          activo
+                            ? "bg-emerald-600 border-emerald-600 text-white"
+                            : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                        }`}
+                    >
+                      {opt.label}
+                      <span className="block text-[10px] opacity-80">
+                        {extraTexto}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Resumen visual (opcional) */}
+          {diaLibreKey && diaMedioKey && resumenMedioDia && (
+            <div className="text-[11px] text-emerald-300 bg-[#102019] border border-emerald-700/40 rounded-md px-3 py-2">
+              Día libre completo:{" "}
+              <span className="font-semibold">
+                {labelDesdeKey(diaLibreKey)}
+              </span>
+              <br />
+              Día de medio turno:{" "}
+              <span className="font-semibold">
+                {labelDesdeKey(diaMedioKey)}
+              </span>
+              <br />
+              {resumenMedioDia}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+  // =============== CARD DEL CREADOR ===============
   if (esCreador) {
     return (
       <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
-        <p className="font-semibold text-gray-100">
-          Vos (creador de la agenda)
-        </p>
+        <p className="font-semibold text-gray-100">Vos (creador de la agenda)</p>
 
-        {/* Pregunta principal SOLO para el creador */}
+        {/* Pregunta si trabaja */}
         <div className="space-y-2">
           <p className="text-xs text-gray-300">¿Usted trabaja aquí?</p>
 
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() =>
-                handleEmpleadoChange(index, "esEmpleado", true)
-              }
+              onClick={() => handleEmpleadoChange(index, "esEmpleado", true)}
               className={`px-3 py-2 rounded-lg border text-xs transition
                 ${
                   e.esEmpleado
@@ -835,9 +1187,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
 
             <button
               type="button"
-              onClick={() =>
-                handleEmpleadoChange(index, "esEmpleado", false)
-              }
+              onClick={() => handleEmpleadoChange(index, "esEmpleado", false)}
               className={`px-3 py-2 rounded-lg border text-xs transition
                 ${
                   !e.esEmpleado
@@ -850,17 +1200,17 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
           </div>
         </div>
 
-        {/* Si el creador NO trabaja → no mostrar NADA más */}
+        {/* Si NO trabaja → no mostrar más */}
         {!e.esEmpleado && (
           <div className="text-xs text-gray-400 bg-[#1c1c1c] border border-[#333] rounded-lg p-3">
             No configurará turnos porque solo administra la agenda.
           </div>
         )}
 
-        {/* SI trabaja → mostrar configuración completa */}
+        {/* Si SÍ trabaja → mostrar todo */}
         {e.esEmpleado && (
           <div className="space-y-4">
-            {/* Foto */}
+            {/* FOTO */}
             <div>
               <label className="block text-xs mb-1 text-gray-300">
                 Foto de perfil (opcional)
@@ -868,10 +1218,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
                   {e.fotoPerfil ? (
-                    <img
-                      src={e.fotoPerfil}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={e.fotoPerfil} className="w-full h-full object-cover" />
                   ) : (
                     <span>
                       {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
@@ -894,7 +1241,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
               </div>
             </div>
 
-            {/* Nombre */}
+            {/* NOMBRE */}
             <div>
               <label className="block text-xs mb-1 text-gray-300">
                 Nombre completo
@@ -905,18 +1252,17 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
                 onChange={(ev) =>
                   handleEmpleadoChange(index, "nombre", ev.target.value)
                 }
-                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
                 placeholder="Ej: Juan Pérez"
               />
             </div>
 
-            {/* Servicios */}
+            {/* SERVICIOS */}
             {serviciosValidos.length > 0 && (
               <div>
                 <label className="block text-xs mb-1 text-gray-300">
                   Servicios que realiza
                 </label>
-
                 <div className="flex flex-wrap gap-2">
                   {serviciosValidos.map((s, idx) => {
                     const seleccionado = e.trabajos.includes(s.nombre);
@@ -924,9 +1270,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
                       <button
                         key={idx}
                         type="button"
-                        onClick={() =>
-                          toggleTrabajoEmpleado(index, s.nombre)
-                        }
+                        onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
                         className={`px-3 py-1.5 rounded-full border text-xs transition
                           ${
                             seleccionado
@@ -942,7 +1286,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
               </div>
             )}
 
-            {/* Horario */}
+            {/* HORARIO */}
             <div className="space-y-2">
               <label className="block text-xs mb-1 text-gray-300">
                 Horario de este empleado
@@ -957,11 +1301,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
                     type="time"
                     value={e.horarioInicio}
                     onChange={(ev) =>
-                      handleEmpleadoChange(
-                        index,
-                        "horarioInicio",
-                        ev.target.value
-                      )
+                      handleEmpleadoChange(index, "horarioInicio", ev.target.value)
                     }
                     className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
                   />
@@ -975,11 +1315,7 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
                     type="time"
                     value={e.horarioFin}
                     onChange={(ev) =>
-                      handleEmpleadoChange(
-                        index,
-                        "horarioFin",
-                        ev.target.value
-                      )
+                      handleEmpleadoChange(index, "horarioFin", ev.target.value)
                     }
                     className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
                   />
@@ -987,240 +1323,148 @@ const renderEmpleadoCard = (index: number, esCreador: boolean) => {
               </div>
             </div>
 
-            {/* Descanso */}
-            <div className="space-y-2">
-              <label className="block text-xs mb-1 text-gray-300">
-                Descanso semanal del empleado
-              </label>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleEmpleadoChange(index, "descansoModo", "negocio")
-                  }
-                  className={`px-3 py-2 rounded-lg border text-xs transition
-                    ${
-                      e.descansoModo === "negocio"
-                        ? "bg-emerald-600 border-emerald-600 text-white"
-                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                    }`}
-                >
-                  Mismos días que el negocio
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleEmpleadoChange(index, "descansoModo", "1dia")
-                  }
-                  className={`px-3 py-2 rounded-lg border text-xs transition
-                    ${
-                      e.descansoModo === "1dia"
-                        ? "bg-emerald-600 border-emerald-600 text-white"
-                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                    }`}
-                >
-                  + 1 día libre
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleEmpleadoChange(index, "descansoModo", "2dias")
-                  }
-                  className={`px-3 py-2 rounded-lg border text-xs transition
-                    ${
-                      e.descansoModo === "2dias"
-                        ? "bg-emerald-600 border-emerald-600 text-white"
-                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                    }`}
-                >
-                  + 2 días libres
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleEmpleadoChange(index, "descansoModo", "diaYMedio")
-                  }
-                  className={`px-3 py-2 rounded-lg border text-xs transition
-                    ${
-                      e.descansoModo === "diaYMedio"
-                        ? "bg-emerald-600 border-emerald-600 text-white"
-                        : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                    }`}
-                >
-                  1 día y medio (aprox.)
-                </button>
-              </div>
-            </div>
+            {/* DESCANSO */}
+            <BloqueDescanso />
           </div>
         )}
       </div>
     );
   }
 
-  // ✔ EMPELADOS (NO CREADOR)
-  // ✔ EMPLEADOS (NO CREADOR)
-return (
-  <div
-    key={index}
-    className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4"
-  >
-    {/* HEADER */}
-    <div className="flex justify-between items-center gap-2">
-      <p className="font-semibold text-gray-100">Empleado {index}</p>
+  // =============== CARD EMPLEADO NORMAL ===============
+  return (
+    <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+        <p className="font-semibold text-gray-100">Empleado {index}</p>
 
-      <button
-        type="button"
-        onClick={() => handleEliminarEmpleado(index)}
-        className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
-      >
-        Eliminar
-      </button>
-    </div>
-
-    {/* FOTO */}
-    <div>
-      <label className="block text-xs mb-1 text-gray-300">
-        Foto de perfil (opcional)
-      </label>
-
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
-          {e.fotoPerfil ? (
-            <img src={e.fotoPerfil} className="w-full h-full object-cover" />
-          ) : (
-            <span>
-              {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
-            </span>
-          )}
-        </div>
-
-        <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
-          {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(ev) => {
-              const file = ev.target.files?.[0];
-              if (file) handleSubirFotoEmpleado(index, file);
-            }}
-          />
-        </label>
+        <button
+          type="button"
+          onClick={() => handleEliminarEmpleado(index)}
+          className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+        >
+          Eliminar
+        </button>
       </div>
-    </div>
 
-    {/* NOMBRE */}
-    <div>
-      <label className="block text-xs mb-1 text-gray-300">Nombre completo</label>
-      <input
-        type="text"
-        value={e.nombre}
-        onChange={(ev) =>
-          handleEmpleadoChange(index, "nombre", ev.target.value)
-        }
-        className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        placeholder="Ej: Juan Pérez"
-      />
-    </div>
-
-    {/* SERVICIOS */}
-    {serviciosValidos.length > 0 && (
+      {/* FOTO */}
       <div>
         <label className="block text-xs mb-1 text-gray-300">
-          Servicios que realiza
+          Foto de perfil (opcional)
         </label>
 
-        <div className="flex flex-wrap gap-2">
-          {serviciosValidos.map((s, idx) => {
-            const seleccionado = e.trabajos.includes(s.nombre);
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
-                className={`px-3 py-1.5 rounded-full border text-xs transition
-                  ${
-                    seleccionado
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                  }`}
-              >
-                {s.nombre}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
+            {e.fotoPerfil ? (
+              <img src={e.fotoPerfil} className="w-full h-full object-cover" />
+            ) : (
+              <span>
+                {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
+              </span>
+            )}
+          </div>
+
+          <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
+            {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(ev) => {
+                const file = ev.target.files?.[0];
+                if (file) handleSubirFotoEmpleado(index, file);
+              }}
+            />
+          </label>
         </div>
       </div>
-    )}
 
-    {/* HORARIO */}
-    <div className="space-y-2">
-      <label className="block text-xs mb-1 text-gray-300">
-        Horario de este empleado
-      </label>
+      {/* NOMBRE */}
+      <div>
+        <label className="block text-xs mb-1 text-gray-300">
+          Nombre completo
+        </label>
+        <input
+          type="text"
+          value={e.nombre}
+          onChange={(ev) =>
+            handleEmpleadoChange(index, "nombre", ev.target.value)
+          }
+          className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+          placeholder="Ej: Juan Pérez"
+        />
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+      {/* SERVICIOS */}
+      {serviciosValidos.length > 0 && (
         <div>
           <label className="block text-xs mb-1 text-gray-300">
-            Hora de entrada
+            Servicios que realiza
           </label>
-          <input
-            type="time"
-            value={e.horarioInicio}
-            onChange={(ev) =>
-              handleEmpleadoChange(index, "horarioInicio", ev.target.value)
-            }
-            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-          />
+          <div className="flex flex-wrap gap-2">
+            {serviciosValidos.map((s, idx) => {
+              const seleccionado = e.trabajos.includes(s.nombre);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
+                  className={`px-3 py-1.5 rounded-full border text-xs transition
+                    ${
+                      seleccionado
+                        ? "bg-emerald-600 border-emerald-600 text-white"
+                        : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                    }`}
+                >
+                  {s.nombre}
+                </button>
+              );
+            })}
+          </div>
         </div>
+      )}
 
-        <div>
-          <label className="block text-xs mb-1 text-gray-300">
-            Hora de salida
-          </label>
-          <input
-            type="time"
-            value={e.horarioFin}
-            onChange={(ev) =>
-              handleEmpleadoChange(index, "horarioFin", ev.target.value)
-            }
-            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-          />
+      {/* HORARIO */}
+      <div className="space-y-2">
+        <label className="block text-xs mb-1 text-gray-300">
+          Horario de este empleado
+        </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+          <div>
+            <label className="block text-xs mb-1 text-gray-300">
+              Hora de entrada
+            </label>
+            <input
+              type="time"
+              value={e.horarioInicio}
+              onChange={(ev) =>
+                handleEmpleadoChange(index, "horarioInicio", ev.target.value)
+              }
+              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs mb-1 text-gray-300">
+              Hora de salida
+            </label>
+            <input
+              type="time"
+              value={e.horarioFin}
+              onChange={(ev) =>
+                handleEmpleadoChange(index, "horarioFin", ev.target.value)
+              }
+              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+            />
+          </div>
         </div>
       </div>
+
+      {/* DESCANSO */}
+      <BloqueDescanso />
     </div>
-
-    {/* DESCANSO */}
-    <div className="space-y-2">
-      <label className="block text-xs mb-1 text-gray-300">
-        Descanso semanal del empleado
-      </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        {["negocio", "1dia", "2dias", "diaYMedio"].map((modo, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => handleEmpleadoChange(index, "descansoModo", modo)}
-            className={`px-3 py-2 rounded-lg border text-xs transition
-              ${
-                e.descansoModo === modo
-                  ? "bg-emerald-600 border-emerald-600 text-white"
-                  : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-              }`}
-          >
-            {modo === "negocio" && "Mismos días que el negocio"}
-            {modo === "1dia" && "+ 1 día libre"}
-            {modo === "2dias" && "+ 2 días libres"}
-            {modo === "diaYMedio" && "1 día y medio (aprox.)"}
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
+  );
 };
 
 // 🔥 PASO 3 SOLO PARA NEGOCIO: Ubicación sin branding
@@ -1900,11 +2144,16 @@ const renderPasoUbicacionNegocioSolo = () => {
 
           {!esNegocio && paso === 2 && renderPasoUbicacionEmprendimiento()}
 
-          {/* PASO 3 = Ubicación */}
-{paso === 3 && (esNegocio ? renderPasoUbicacionNegocioSolo() : renderPasoUbicacionEmprendimiento())}
+{/* PASO 3 */}
+{paso === 3 && (
+  esNegocio
+    ? renderPasoUbicacionNegocioSolo()   // negocio → paso 3 es ubicación
+    : renderPasoUbicacionYBranding()     // emprendimiento → paso 3 es branding
+)}
 
-{/* PASO 4 = Perfil / Branding */}
-{paso === 4 && renderPasoUbicacionYBranding()}
+{/* PASO 4 SOLO PARA NEGOCIO */}
+{paso === 4 && esNegocio && renderPasoUbicacionYBranding()}
+
 
         </div>
       )}
