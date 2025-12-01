@@ -34,6 +34,9 @@ import { useMap } from "react-leaflet";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 
+// 🟢 NUEVO: modal de configuración rápida de agenda
+import ModalConfigAgendaInicial from "../ui/modalConfigAgendaInicial";
+
 const customIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   iconSize: [25, 41],
@@ -98,7 +101,25 @@ export type Negocio = {
     colorFondo: string;
     colorPrimarioOscuro: string;
   };
+
+  // 🟢 UNIFICADO: pagos + agenda
+  configuracionAgenda?: {
+    // ---- Cosas que ya tenías para pagos ----
+    modoPago?: "libre" | "senia";
+    porcentajeSenia?: number;
+    mercadoPago?: {
+      conectado?: boolean;
+      accessToken?: string;
+    };
+
+    // ---- Nuevos campos de agenda ----
+    diasLibres?: string[];
+    modoTurnos?: "jornada" | "personalizado";
+    clientesPorDia?: number | null;
+    onboardingCompletado?: boolean;
+  };
 };
+
 
 type Usuario = {
   nombre?: string;
@@ -137,6 +158,14 @@ export default function AgendaVirtualUIv3({
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
+
+  // 🟢 NUEVO: estado para el modal de configuración de agenda
+  const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] = useState(false);
+  const [configAgendaInicial, setConfigAgendaInicial] = useState<{
+    diasLibres?: string[];
+    modoTurnos?: "jornada" | "personalizado";
+    clientesPorDia?: number | null;
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -271,15 +300,39 @@ export default function AgendaVirtualUIv3({
     return () => unsubscribe();
   }, [negocio.slug]);
 
+  /* --------  ONBOARDING: CONFIGURAR AGENDA LA PRIMERA VEZ -------- */
+
+  useEffect(() => {
+    const cfg: any = negocio.configuracionAgenda || {};
+
+    setConfigAgendaInicial({
+      diasLibres: cfg.diasLibres || [],
+      modoTurnos: cfg.modoTurnos || "jornada",
+      clientesPorDia:
+        typeof cfg.clientesPorDia === "number" ? cfg.clientesPorDia : null,
+    });
+
+    // Solo dueño / admin
+    if (modo === "dueño" || modo === "admin") {
+      // Si NO está explícitamente en true, mostramos el modal
+      if (cfg.onboardingCompletado !== true) {
+        setMostrarModalConfigAgenda(true);
+      } else {
+        setMostrarModalConfigAgenda(false);
+      }
+    } else {
+      setMostrarModalConfigAgenda(false);
+    }
+  }, [negocio, modo]);
+
   /* --------  NAVBAR  -------- */
 
-const navItems = [
-  { id: "agenda", label: "Agenda", icon: IconAgenda },
-  { id: "servicios", label: "Servicios", icon: IconServicios },
-  { id: "empleados", label: "Empleados", icon: IconEmpleados },
-  { id: "ubicacion", label: "Ubicación", icon: IconUbicacion },
-];
-
+  const navItems = [
+    { id: "agenda", label: "Agenda", icon: IconAgenda },
+    { id: "servicios", label: "Servicios", icon: IconServicios },
+    { id: "empleados", label: "Empleados", icon: IconEmpleados },
+    { id: "ubicacion", label: "Ubicación", icon: IconUbicacion },
+  ];
 
   /* -------- RENDERIZAR VISTA -------- */
 
@@ -291,16 +344,15 @@ const navItems = [
             {serviciosState.length > 0 ? (
               serviciosState.map((s) => (
                 <div
-  key={s.id}
-  className="
-    p-4 rounded-2xl text-center
-    bg-[var(--color-primario-oscuro)]
-    text-[var(--color-texto)]
-    shadow-md border border-white/10
-    transition-all duration-300
-  "
->
-
+                  key={s.id}
+                  className="
+                    p-4 rounded-2xl text-center
+                    bg-[var(--color-primario-oscuro)]
+                    text-[var(--color-texto)]
+                    shadow-md border border-white/10
+                    transition-all duration-300
+                  "
+                >
                   <p className="font-semibold">{s.servicio}</p>
                   <p className="text-sm opacity-80">${s.precio}</p>
                   <p className="text-xs opacity-60">{s.duracion} min</p>
@@ -468,273 +520,288 @@ const navItems = [
   /* --------  UI PRINCIPAL -------- */
 
   return (
-    <div
-      className="
-        min-h-screen w-full flex flex-col items-center
-        bg-[var(--color-fondo)]
-        text-[var(--color-texto)]
-        p-4
-        transition-colors duration-300
-      "
-    >
-      {/* HEADER */}
+    <>
+      {/* 🟢 MODAL DE CONFIGURACIÓN INICIAL DE AGENDA */}
+      <ModalConfigAgendaInicial
+  abierto={mostrarModalConfigAgenda}
+  onClose={() => setMostrarModalConfigAgenda(false)}
+  negocioId={negocio.id}
+  configuracionActual={configAgendaInicial ?? undefined}
+  onGuardado={(nuevaConfig) => {
+    // opcional: actualizar estado local si querés
+    setConfigAgendaInicial(nuevaConfig);
+    // abrir paso 2: servicios
+    setModalServicios(true);
+  }}
+/>
+
+
       <div
         className="
-          w-full max-w-3xl 
-          bg-[var(--color-primario)]
-          rounded-3xl p-6 flex flex-col items-center 
-          shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-          hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-          transition-all duration-300
-          relative
+          min-h-screen w-full flex flex-col items-center
+          bg-[var(--color-fondo)]
           text-[var(--color-texto)]
+          p-4
+          transition-colors duration-300
         "
       >
-        {/* ⚙️ Config */}
-        {(modo === "dueño" || modo === "admin") && (
-          <button
-            onClick={() => setModalPerfil(true)}
-            className="absolute top-4 right-4"
-          >
-            <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-          </button>
-        )}
-
-        {/* Foto */}
-        <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
-          {negocio.perfilLogo ? (
-            <img
-              src={negocio.perfilLogo}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-3xl">
-              {negocio.nombre[0]}
-            </div>
-          )}
-        </div>
-
-        {/* Nombre */}
-<h1
-  className="
-    font-euphoria 
-    text-[38px]
-    md:text-[48px]
-    leading-none
-    tracking-wide
-    mt-4
-  "
->
-  {negocio.nombre}
-</h1>
-
-
-        {/* Descripción */}
-        <p className="opacity-80 text-center mt-4 px-4">
-          {negocio.descripcion || "Sin descripción."}
-        </p>
-
-        {/* Redes */}
-        <div className="flex gap-3 justify-center mt-3">
-          <a
-            href={negocio?.redes?.instagram || "#"}
-            target="_blank"
-            className={`p-2 rounded-full border border-white/40 ${
-              negocio?.redes?.instagram
-                ? ""
-                : "opacity-50 pointer-events-none"
-            }`}
-          >
-            <Instagram className="w-4 h-4" />
-          </a>
-
-          <a
-            href={negocio?.redes?.facebook || "#"}
-            target="_blank"
-            className={`p-2 rounded-full border border-white/40 ${
-              negocio?.redes?.facebook
-                ? ""
-                : "opacity-50 pointer-events-none"
-            }`}
-          >
-            <Facebook className="w-4 h-4" />
-          </a>
-
-          <a
-            href={
-              negocio?.redes?.telefono
-                ? `tel:${negocio.redes.telefono}`
-                : "#"
-            }
-            className={`p-2 rounded-full border border-white/40 ${
-              negocio?.redes?.telefono
-                ? ""
-                : "opacity-50 pointer-events-none"
-            }`}
-          >
-            <Phone className="w-4 h-4" />
-          </a>
-
-          <button
-            onClick={() => setModalShare(true)}
-            className="p-2 rounded-full border border-white/40"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* NAV */}
-      <div
-        className="
-          w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
-          bg-[var(--color-primario-oscuro)]
-          text-[var(--color-texto)]
-          shadow-[0_6px_16px_rgba(0,0,0,0.40)]
-          hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
-          transition-all duration-300
-        "
-      >
-    {navItems.map((item) => (
-  <button
-    key={item.id}
-    onClick={() => setVista(item.id)}
-    className={`flex flex-col items-center p-2 min-w-[70px] transition 
-      ${
-        vista === item.id
-          ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
-          : "bg-transparent"
-      }`}
-  >
-    <div className="w-8 h-8 flex items-center justify-center">
-      <img
-        src={item.icon}
-        alt={item.label}
-        className="w-8 h-8 icono-blanco"
-      />
-    </div>
-    <span className="text-xs mt-1 text-center">{item.label}</span>
-  </button>
-))}
-
-      </div>
-
-      {/* CONTENIDO */}
-      <div
-        key={vista}
-        className={`
-          relative
-          w-full max-w-3xl mt-6 p-6 rounded-3xl 
-          bg-[var(--color-primario)]
-          shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-          hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-          transition-all duration-300
-          ${
-            vista === "agenda" && modo === "cliente"
-              ? "min-h-0" 
-              : vista === "ubicacion"
-              ? "min-h-0"
-              : vista === "empleados"
-              ? "min-h-fit"
-              : "min-h-[280px]"
-          }
-        `}
-      >
-        {/* CONFIG PARA EMPLEADOS */}
-        {vista === "empleados" && (modo === "dueño" || modo === "admin") && (
-          <button
-            onClick={() => setModalEmpleados(true)}
-            className="absolute top-4 right-4 z-20"
-            title="Administrar empleados"
-          >
-            <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-          </button>
-        )}
-
-        {/* CONFIG PARA SERVICIOS */}
-        {vista === "servicios" && (modo === "dueño" || modo === "admin") && (
-          <button
-            onClick={() => setModalServicios(true)}
-            className="absolute top-4 right-4 z-20"
-            title="Administrar servicios"
-          >
-            <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-          </button>
-        )}
-
-        {renderVista()}
-      </div>
-
-      {/* FOOTER */}
-      <div
-        className="
-          w-full max-w-3xl bg-black/80 mt-6 p-6 rounded-3xl 
-          text-center text-white 
-          shadow-[0_8px_20px_rgba(0,0,0,0.4)]
-          flex flex-col items-center gap-2
-        "
-      >
-        <p className="text-sm opacity-80 leading-relaxed">
-          © {new Date().getFullYear()} {negocio.nombre} — Todos los derechos reservados.
-          <br />
-          <span className="opacity-70">Powered by AgendateOnline</span>
-        </p>
-
-        <button
-          onClick={() => (window.location.href = "/")}
+        {/* HEADER */}
+        <div
           className="
-            mt-1 px-4 py-2 text-sm rounded-xl font-medium
+            w-full max-w-3xl 
             bg-[var(--color-primario)]
-            hover:bg-[var(--color-primario-oscuro)]
-            transition-colors duration-300
+            rounded-3xl p-6 flex flex-col items-center 
+            shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+            hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+            transition-all duration-300
+            relative
+            text-[var(--color-texto)]
           "
         >
-          Obtener tu agenda
-        </button>
+          {/* ⚙️ Config */}
+          {(modo === "dueño" || modo === "admin") && (
+            <button
+              onClick={() => setModalPerfil(true)}
+              className="absolute top-4 right-4"
+            >
+              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+            </button>
+          )}
+
+          {/* Foto */}
+          <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
+            {negocio.perfilLogo ? (
+              <img
+                src={negocio.perfilLogo}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-3xl">
+                {negocio.nombre[0]}
+              </div>
+            )}
+          </div>
+
+          {/* Nombre */}
+          <h1
+            className="
+              font-euphoria 
+              text-[38px]
+              md:text-[48px]
+              leading-none
+              tracking-wide
+              mt-4
+            "
+          >
+            {negocio.nombre}
+          </h1>
+
+          {/* Descripción */}
+          <p className="opacity-80 text-center mt-4 px-4">
+            {negocio.descripcion || "Sin descripción."}
+          </p>
+
+          {/* Redes */}
+          <div className="flex gap-3 justify-center mt-3">
+            <a
+              href={negocio?.redes?.instagram || "#"}
+              target="_blank"
+              className={`p-2 rounded-full border border-white/40 ${
+                negocio?.redes?.instagram
+                  ? ""
+                  : "opacity-50 pointer-events-none"
+              }`}
+            >
+              <Instagram className="w-4 h-4" />
+            </a>
+
+            <a
+              href={negocio?.redes?.facebook || "#"}
+              target="_blank"
+              className={`p-2 rounded-full border border-white/40 ${
+                negocio?.redes?.facebook
+                  ? ""
+                  : "opacity-50 pointer-events-none"
+              }`}
+            >
+              <Facebook className="w-4 h-4" />
+            </a>
+
+            <a
+              href={
+                negocio?.redes?.telefono
+                  ? `tel:${negocio.redes.telefono}`
+                  : "#"
+              }
+              className={`p-2 rounded-full border border-white/40 ${
+                negocio?.redes?.telefono
+                  ? ""
+                  : "opacity-50 pointer-events-none"
+              }`}
+            >
+              <Phone className="w-4 h-4" />
+            </a>
+
+            <button
+              onClick={() => setModalShare(true)}
+              className="p-2 rounded-full border border-white/40"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* NAV */}
+        <div
+          className="
+            w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
+            bg-[var(--color-primario-oscuro)]
+            text-[var(--color-texto)]
+            shadow-[0_6px_16px_rgba(0,0,0,0.40)]
+            hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
+            transition-all duration-300
+          "
+        >
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setVista(item.id)}
+              className={`flex flex-col items-center p-2 min-w-[70px] transition 
+                ${
+                  vista === item.id
+                    ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
+                    : "bg-transparent"
+                }`}
+            >
+              <div className="w-8 h-8 flex items-center justify-center">
+                <img
+                  src={item.icon}
+                  alt={item.label}
+                  className="w-8 h-8 icono-blanco"
+                />
+              </div>
+              <span className="text-xs mt-1 text-center">{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* CONTENIDO */}
+        <div
+          key={vista}
+          className={`
+            relative
+            w-full max-w-3xl mt-6 p-6 rounded-3xl 
+            bg-[var(--color-primario)]
+            shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+            hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+            transition-all duration-300
+            ${
+              vista === "agenda" && modo === "cliente"
+                ? "min-h-0" 
+                : vista === "ubicacion"
+                ? "min-h-0"
+                : vista === "empleados"
+                ? "min-h-fit"
+                : "min-h-[280px]"
+            }
+          `}
+        >
+          {/* CONFIG PARA EMPLEADOS */}
+          {vista === "empleados" && (modo === "dueño" || modo === "admin") && (
+            <button
+              onClick={() => setModalEmpleados(true)}
+              className="absolute top-4 right-4 z-20"
+              title="Administrar empleados"
+            >
+              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+            </button>
+          )}
+
+          {/* CONFIG PARA SERVICIOS */}
+          {vista === "servicios" && (modo === "dueño" || modo === "admin") && (
+            <button
+              onClick={() => setModalServicios(true)}
+              className="absolute top-4 right-4 z-20"
+              title="Administrar servicios"
+            >
+              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+            </button>
+          )}
+
+          {renderVista()}
+        </div>
+
+        {/* FOOTER */}
+        <div
+          className="
+            w-full max-w-3xl bg-black/80 mt-6 p-6 rounded-3xl 
+            text-center text-white 
+            shadow-[0_8px_20px_rgba(0,0,0,0.4)]
+            flex flex-col items-center gap-2
+          "
+        >
+          <p className="text-sm opacity-80 leading-relaxed">
+            © {new Date().getFullYear()} {negocio.nombre} — Todos los derechos reservados.
+            <br />
+            <span className="opacity-70">Powered by AgendateOnline</span>
+          </p>
+
+          <button
+            onClick={() => (window.location.href = "/")}
+            className="
+              mt-1 px-4 py-2 text-sm rounded-xl font-medium
+              bg-[var(--color-primario)]
+              hover:bg-[var(--color-primario-oscuro)]
+              transition-colors duration-300
+            "
+          >
+            Obtener tu agenda
+          </button>
+        </div>
+
+        {/* MODALES */}
+        {modalShare && (
+          <ModalShare
+            abierto={modalShare}
+            onCerrar={() => setModalShare(false)}
+            slug={negocio.slug}
+          />
+        )}
+
+        {modalAgendarse && (
+          <ModalAgendarse
+            abierto={modalAgendarse}
+            onClose={() => setModalAgendarse(false)}
+            negocio={negocio}
+          />
+        )}
+
+        {modalPerfil && (
+          <ModalPerfil
+            abierto={modalPerfil}
+            onCerrar={() => setModalPerfil(false)}
+            negocio={negocio}
+            onGuardar={() => {}}
+          />
+        )}
+
+        {modalEmpleados && (
+          <ModalEmpleadosUI
+            abierto={modalEmpleados}
+            onCerrar={() => setModalEmpleados(false)}
+            negocioId={negocio.id}
+            modo={modo === "cliente" ? "dueño" : modo}
+          />
+        )}
+
+        {modalServicios && (
+          <ModalAgregarServicios
+            abierto={modalServicios}
+            onCerrar={() => setModalServicios(false)}
+            negocioId={negocio.id}
+          />
+        )}
       </div>
-
-      {/* MODALES */}
-      {modalShare && (
-        <ModalShare
-          abierto={modalShare}
-          onCerrar={() => setModalShare(false)}
-          slug={negocio.slug}
-        />
-      )}
-
-      {modalAgendarse && (
-        <ModalAgendarse
-          abierto={modalAgendarse}
-          onClose={() => setModalAgendarse(false)}
-          negocio={negocio}
-        />
-      )}
-
-      {modalPerfil && (
-        <ModalPerfil
-          abierto={modalPerfil}
-          onCerrar={() => setModalPerfil(false)}
-          negocio={negocio}
-          onGuardar={() => {}}
-        />
-      )}
-
-      {modalEmpleados && (
-        <ModalEmpleadosUI
-          abierto={modalEmpleados}
-          onCerrar={() => setModalEmpleados(false)}
-          negocioId={negocio.id}
-          modo={modo === "cliente" ? "dueño" : modo}
-        />
-      )}
-
-      {modalServicios && (
-        <ModalAgregarServicios
-          abierto={modalServicios}
-          onCerrar={() => setModalServicios(false)}
-          negocioId={negocio.id}
-        />
-      )}
-    </div>
+    </>
   );
 }

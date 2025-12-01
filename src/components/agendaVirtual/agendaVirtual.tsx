@@ -12,6 +12,7 @@ import type { Empleado } from "./backend/modalEmpleadosBackend";
 import { getCache, setCache } from "../../lib/cacheAgenda";
 import AgendaVirtualUI from "./ui/agenda-v2";
 import LoaderAgenda from "../ui/loaderAgenda";
+import ModalConfigAgendaInicial from "./ui/modalConfigAgendaInicial";
 
 type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente" | "admin";
@@ -30,58 +31,70 @@ export default function AgendaVirtual({ slug }: Props) {
     new Date().toISOString().slice(0, 10)
   );
 
+  // 🔹 Estado para el modal de configuración inicial
+  const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] =
+    useState(false);
+  const [configAgendaInicial, setConfigAgendaInicial] = useState<{
+    diasLibres?: string[];
+    modoTurnos?: "jornada" | "personalizado";
+    clientesPorDia?: number | null;
+  } | null>(null);
+
   useEffect(() => {
-    detectarUsuario(slug, async (estado, modo, user, negocio) => {
-      setEstado(estado);
+    detectarUsuario(
+      slug,
+      async (estadoDetectado, _modoDetectado, user, negocioDetectado) => {
+        setEstado(estadoDetectado);
 
-      // 1️⃣ Intentar cargar negocio desde cache
-      const cachedNegocio = getCache<Negocio>(slug, "negocio");
-      if (cachedNegocio) {
-        setNegocio(cachedNegocio);
-      }
-
-      if (estado === "listo" && negocio) {
-        // Actualizar negocio y cachearlo (TTL 1h)
-        setNegocio(negocio);
-        setCache(slug, "negocio", negocio, 60 * 60 * 1000);
-
-        // 2️⃣ Intentar cargar empleados desde cache
-        const cachedEmps = getCache<Empleado[]>(slug, "empleados");
-        if (cachedEmps && cachedEmps.length > 0) {
-          setEmpleados(cachedEmps);
+        // 1️⃣ Intentar cargar negocio desde cache
+        const cachedNegocio = getCache<Negocio>(slug, "negocio");
+        if (cachedNegocio) {
+          setNegocio(cachedNegocio);
         }
 
-        // Firestore siempre para refrescar empleados y turnos
-        const [emps, tns] = await Promise.all([
-          getEmpleados(slug),
-          getTurnos(slug, fechaSeleccionada),
-        ]);
+        if (estadoDetectado === "listo" && negocioDetectado) {
+          // Actualizar negocio y cachearlo (TTL 1h)
+          setNegocio(negocioDetectado);
+          setCache(slug, "negocio", negocioDetectado, 60 * 60 * 1000);
 
-        setEmpleados(emps);
-        setTurnos(tns);
-
-        // Cachear empleados (TTL 30 min)
-        setCache(slug, "empleados", emps, 30 * 60 * 1000);
-
-        // 👑 Detección de rol
-        if (user) {
-          if (user.uid === negocio.id) {
-            setModo("dueño");
-          } else {
-            const esAdmin = emps.find(
-              (e) => e.admin === true && e.adminEmail === user.email
-            );
-            if (esAdmin) {
-              setModo("admin");
-            } else {
-              setModo("cliente");
-            }
+          // 2️⃣ Intentar cargar empleados desde cache
+          const cachedEmps = getCache<Empleado[]>(slug, "empleados");
+          if (cachedEmps && cachedEmps.length > 0) {
+            setEmpleados(cachedEmps);
           }
-        } else {
-          setModo("cliente");
+
+          // Firestore siempre para refrescar empleados y turnos
+          const [emps, tns] = await Promise.all([
+            getEmpleados(slug),
+            getTurnos(slug, fechaSeleccionada),
+          ]);
+
+          setEmpleados(emps);
+          setTurnos(tns);
+
+          // Cachear empleados (TTL 30 min)
+          setCache(slug, "empleados", emps, 30 * 60 * 1000);
+
+          // 👑 Detección de rol
+          if (user) {
+            if (user.uid === negocioDetectado.id) {
+              setModo("dueño");
+            } else {
+              const esAdmin = emps.find(
+                (e) => e.admin === true && e.adminEmail === user.email
+              );
+              if (esAdmin) {
+                setModo("admin");
+              } else {
+                setModo("cliente");
+              }
+            }
+          } else {
+            setModo("cliente");
+          }
         }
       }
-    });
+    );
   }, [slug, fechaSeleccionada]);
 
   // 🔹 👉 ACTUALIZAR <title> dinámicamente
@@ -90,6 +103,33 @@ export default function AgendaVirtual({ slug }: Props) {
       document.title = `${negocio.nombre} | AgendateOnline`;
     }
   }, [negocio]);
+
+  // 🔹 Detectar si debemos mostrar el modal de configuración inicial
+  useEffect(() => {
+    if (!negocio) return;
+
+    const cfg: any = (negocio as any).configuracionAgenda || {};
+
+    // Siempre preparamos la config inicial, aunque el modal no se abra
+    setConfigAgendaInicial({
+      diasLibres: cfg.diasLibres || [],
+      modoTurnos: cfg.modoTurnos || "jornada",
+      clientesPorDia:
+        typeof cfg.clientesPorDia === "number" ? cfg.clientesPorDia : null,
+    });
+
+    // Solo mostrar si es DUEÑO / ADMIN
+    if (modo === "dueño" || modo === "admin") {
+      // 👇 Si NO está explícitamente en true, mostramos el modal
+      if (cfg.onboardingCompletado !== true) {
+        setMostrarModalConfigAgenda(true);
+      } else {
+        setMostrarModalConfigAgenda(false);
+      }
+    } else {
+      setMostrarModalConfigAgenda(false);
+    }
+  }, [negocio, modo]);
 
   // -------------------------
   // 🔵 ESTADO: CARGANDO
@@ -151,14 +191,23 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }
 
- return (
-  <AgendaVirtualUI
-    empleados={empleados}
-    turnos={turnos}
-    negocio={negocio}
-    servicios={negocio.servicios ?? []}   // 👈 AGREGADO
-    modo={modo}
-  />
-);
+  return (
+    <>
+      {/* 🟢 Modal inicial de configuración de agenda (solo dueño/admin) */}
+      <ModalConfigAgendaInicial
+        abierto={mostrarModalConfigAgenda}
+        onClose={() => setMostrarModalConfigAgenda(false)}
+        negocioId={negocio.id}
+        configuracionActual={configAgendaInicial ?? undefined}
+      />
 
+      <AgendaVirtualUI
+        empleados={empleados}
+        turnos={turnos}
+        negocio={negocio}
+        servicios={negocio.servicios ?? []}
+        modo={modo}
+      />
+    </>
+  );
 }
