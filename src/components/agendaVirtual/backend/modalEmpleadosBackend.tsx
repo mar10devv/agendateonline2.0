@@ -1,14 +1,14 @@
 // src/components/agendaVirtual/backend/modalEmpleadosBackend.tsx
 import { db, storage } from "../../../lib/firebase";
-import { 
-  doc, 
-  getDoc, 
-  updateDoc 
+import {
+  doc,
+  getDoc,
+  updateDoc
 } from "firebase/firestore";
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
 } from "firebase/storage";
 import { obtenerConfigNegocio } from "../../../lib/firestore";
 import { compressImageFileToWebP } from "../../../lib/imageUtils";
@@ -21,7 +21,7 @@ export type Empleado = {
   admin?: boolean;
   adminEmail?: string;
   fotoPerfil?: string;
-  foto?: string; 
+  foto?: string;
   nombreArchivo?: string;
   trabajos: string[];
   calendario: {
@@ -29,7 +29,7 @@ export type Empleado = {
     fin: string;
     diasLibres: string[];
   };
-  esEmpleado?: boolean; 
+  esEmpleado?: boolean;
 };
 
 // 🔥 Subida ImgBB → con compresión
@@ -53,7 +53,7 @@ export async function subirImagenImgBB(file: File): Promise<string | null> {
   }
 }
 
-// 📌 Storage (no usado pero lo dejo)
+// 📌 Storage (lo dejo porque puede estar siendo usado en otro lado)
 export async function subirFotoEmpleadoStorage(file: File, empleadoId: string) {
   const storageRef = ref(storage, `empleados/${empleadoId}`);
   await uploadBytes(storageRef, file);
@@ -65,45 +65,51 @@ export async function obtenerEmpleados(uid: string) {
   const data = await obtenerConfigNegocio(uid);
 
   if (data?.empleadosData) {
-  data.empleadosData = data.empleadosData.map((e: any) => ({
-    ...e,
-    esEmpleado: e.esEmpleado === true, // 👈 CLARÍSIMO
-  }));
-}
+    data.empleadosData = data.empleadosData.map((e: any, idx: number) => ({
+      ...e,
+      id: e.id || String(idx),
+      // si está en false lo respetamos, si está undefined asumimos true
+      esEmpleado: e.esEmpleado === false ? false : true,
+    }));
+  }
 
   return data;
 }
 
-// 🟩🟩🟩 **GUARDAR EMPLEADOS — COMPLETAMENTE ARREGLADO**
+// 🟩 GUARDAR EMPLEADOS
 export async function guardarEmpleados(uid: string, config: any) {
   try {
     const negocioRef = doc(db, "Negocios", uid);
 
-    const empleadosNormalizados = (config.empleadosData || []).map((e: any) => ({
-      nombre: e.nombre || "",
-      email: e.email || "",
-      rol: e.rol || "empleado",
-      admin: e.rol === "admin",
-      adminEmail: e.adminEmail || "",
-      fotoPerfil: e.fotoPerfil || "",
-      nombreArchivo: e.nombreArchivo || "",
-      trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
-      calendario: e.calendario || {
-        inicio: "",
-        fin: "",
-        diasLibres: [],
-      },
-      esEmpleado: e.esEmpleado === false ? false : true, // 👈 SIEMPRE SE GUARDA
-    }));
+    const empleadosNormalizados = (config.empleadosData || []).map(
+      (e: any, idx: number) => ({
+        id: e.id || String(idx),
+        nombre: e.nombre || "",
+        email: e.email || "",
+        rol: e.rol || "empleado",
+        admin: e.rol === "admin",
+        adminEmail: e.adminEmail || "",
+        fotoPerfil: e.fotoPerfil || "",
+        nombreArchivo: e.nombreArchivo || "",
+        trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
+        calendario: e.calendario || {
+          inicio: "",
+          fin: "",
+          diasLibres: [],
+        },
+        esEmpleado: e.esEmpleado === false ? false : true,
+      })
+    );
 
     // admins por correo
-    const adminUids = empleadosNormalizados
-      .filter((e: any) => e.rol === "admin" && e.adminEmail)
-      .map((e: any) => e.adminEmail.toLowerCase().trim());
+const adminUids = empleadosNormalizados
+  .filter((e: Empleado) => e.rol === "admin" && e.adminEmail)
+  .map((e: Empleado) => e.adminEmail!.trim().toLowerCase());
 
+
+    // 👇 solo tocamos lo que corresponde a este modal
     await updateDoc(negocioRef, {
-      ...config,
-      empleadosData: empleadosNormalizados, // 👈 GUARDADO CORRECTO
+      empleadosData: empleadosNormalizados,
       adminUids,
     });
 
@@ -129,7 +135,7 @@ export function crearEmpleadoVacio(): Empleado {
       fin: "",
       diasLibres: [],
     },
-    esEmpleado: true, // 👈 default: empleado activo
+    esEmpleado: true, // default: empleado activo
   };
 }
 

@@ -1,5 +1,5 @@
 // src/components/agendaVirtual/ui/modalHorariosEmpleados.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
 
 type Props = {
@@ -24,8 +24,6 @@ export default function ModalHorariosEmpleados({
   horario,
   onGuardar,
 }: Props) {
-  const [tempHorario, setTempHorario] = useState(horario);
-
   const diasSemana = [
     "Lunes",
     "Martes",
@@ -35,6 +33,28 @@ export default function ModalHorariosEmpleados({
     "Sábado",
     "Domingo",
   ];
+
+  // ⭐ Estado local
+  const [tempHorario, setTempHorario] = useState(horario);
+
+  // ⭐ Estado para guardar los días EXACTOS que vienen de Firebase
+  const [diasOriginales, setDiasOriginales] = useState<string[]>([]);
+
+  // ⭐ Se ejecuta al abrir el modal o cambiar de empleado
+  useEffect(() => {
+    const diasNormalizados = Array.isArray(horario.diasLibres)
+      ? horario.diasLibres.map(
+          (d) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()
+        )
+      : [];
+
+    setDiasOriginales(diasNormalizados); // ⬅️ Guardamos los días originales
+
+    setTempHorario({
+      ...horario,
+      diasLibres: diasNormalizados,
+    });
+  }, [horario, abierto]);
 
   if (!abierto) return null;
 
@@ -58,6 +78,7 @@ export default function ModalHorariosEmpleados({
             className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
           />
         </div>
+
         <div>
           <label className="block text-sm mb-1">Fin</label>
           <input
@@ -75,12 +96,17 @@ export default function ModalHorariosEmpleados({
       <div className="mb-6">
         <label className="block text-sm mb-3">Días libres</label>
 
-        {/* Opciones de modo */}
+        {/* Modo de selección */}
         <div className="flex gap-4 mb-4">
+          {/* ⬅️ FIX: restaura diasOriginales cuando volvés a “varios días libres” */}
           <button
             type="button"
             onClick={() =>
-              setTempHorario({ ...tempHorario, diaYMedio: null, diasLibres: [] })
+              setTempHorario({
+                ...tempHorario,
+                diaYMedio: null,
+                diasLibres: diasOriginales, // ⬅️ restaura días guardados
+              })
             }
             className={`px-4 py-2 rounded-lg border transition ${
               !tempHorario.diaYMedio
@@ -114,11 +140,12 @@ export default function ModalHorariosEmpleados({
           </button>
         </div>
 
-        {/* Modo 1: varios días con botones */}
+        {/* Modo 1: varios días */}
         {!tempHorario.diaYMedio && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {diasSemana.map((dia) => {
               const activo = tempHorario.diasLibres.includes(dia);
+
               return (
                 <button
                   key={dia}
@@ -149,7 +176,7 @@ export default function ModalHorariosEmpleados({
           </div>
         )}
 
-        {/* Modo 2: un día y medio libre (se queda igual con selects + input) */}
+        {/* Modo 2: un día y medio */}
         {tempHorario.diaYMedio && (
           <div className="flex flex-col gap-4">
             <div>
@@ -159,7 +186,10 @@ export default function ModalHorariosEmpleados({
                 onChange={(e) =>
                   setTempHorario({
                     ...tempHorario,
-                    diaYMedio: { ...tempHorario.diaYMedio!, diaCompleto: e.target.value },
+                    diaYMedio: {
+                      ...tempHorario.diaYMedio!,
+                      diaCompleto: e.target.value,
+                    },
                   })
                 }
                 className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
@@ -179,7 +209,10 @@ export default function ModalHorariosEmpleados({
                 onChange={(e) =>
                   setTempHorario({
                     ...tempHorario,
-                    diaYMedio: { ...tempHorario.diaYMedio!, medioDia: e.target.value },
+                    diaYMedio: {
+                      ...tempHorario.diaYMedio!,
+                      medioDia: e.target.value,
+                    },
                   })
                 }
                 className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
@@ -193,14 +226,17 @@ export default function ModalHorariosEmpleados({
             </div>
 
             <div>
-              <label className="block text-sm">Hora de entrada en el medio día</label>
+              <label className="block text-sm">Hora de entrada</label>
               <input
                 type="time"
                 value={tempHorario.diaYMedio.horaEntrada}
                 onChange={(e) =>
                   setTempHorario({
                     ...tempHorario,
-                    diaYMedio: { ...tempHorario.diaYMedio!, horaEntrada: e.target.value },
+                    diaYMedio: {
+                      ...tempHorario.diaYMedio!,
+                      horaEntrada: e.target.value,
+                    },
                   })
                 }
                 className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
@@ -210,7 +246,7 @@ export default function ModalHorariosEmpleados({
         )}
       </div>
 
-      {/* Botones de acción */}
+      {/* Botones */}
       <div className="flex justify-end gap-4 pt-4 border-t border-gray-700">
         <button
           onClick={onClose}
@@ -218,6 +254,7 @@ export default function ModalHorariosEmpleados({
         >
           Cancelar
         </button>
+
         <button
           onClick={() => {
             onGuardar(tempHorario);
