@@ -341,16 +341,6 @@ export function combinarConfigCalendario(
   const descansoTurnoMedio =
     calEmp.descansoTurnoMedio ?? empleado?.descansoTurnoMedio ?? null;
 
-  console.log("[combinarConfigCalendario] empleado:", empleado?.nombre, {
-    inicio,
-    fin,
-    diasNegocioRaw,
-    diasEmpleadoRaw,
-    diasLibresNegocioNorm,
-    diasLibresEmpleadoNorm,
-    modoTurnos,
-  });
-
   return {
     inicio,
     fin,
@@ -439,7 +429,6 @@ export function generarHorariosBase(
   const totalMinutes = end - start;
 
   if (totalMinutes <= 0) {
-    console.warn("⚠️ Rango horario inválido:", config.inicio, config.fin);
     return [];
   }
 
@@ -563,20 +552,11 @@ function calcularInicioFinDesdeTurno(
     null;
 
   if (!rawFecha || !rawHora) {
-    console.warn(
-      "[calcularInicioFinDesdeTurno] turno sin fecha/hora reconocible:",
-      t
-    );
     return null;
   }
 
   const f = toDateSafe(rawFecha);
   if (isNaN(+f)) {
-    console.warn(
-      "[calcularInicioFinDesdeTurno] fecha inválida tras toDateSafe:",
-      rawFecha,
-      t
-    );
     return null;
   }
 
@@ -594,21 +574,11 @@ function calcularInicioFinDesdeTurno(
 }
 
 export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
-  console.log(
-    "[normalizarTurnos] recibidos brutos (cantidad):",
-    lista.length,
-    lista
-  );
-
   const out: TurnoExistente[] = [];
 
   for (const t of lista) {
     const par = calcularInicioFinDesdeTurno(t);
     if (!par) {
-      console.warn(
-        "[normalizarTurnos] turno DESCARTADO por no poder calcular inicio/fin:",
-        t
-      );
       continue;
     }
 
@@ -628,12 +598,6 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
   }
 
   out.sort((a, b) => +a.inicio - +b.inicio);
-
-  console.log(
-    "[normalizarTurnos] normalizados (cantidad):",
-    out.length,
-    out
-  );
 
   return out;
 }
@@ -672,11 +636,6 @@ export function generarSlotsDelDia(
   let totalMinutes = finJ - inicioJ;
 
   if (totalMinutes <= 0) {
-    console.warn(
-      "[calendario] Rango horario inválido:",
-      config.inicio,
-      config.fin
-    );
     return [];
   }
 
@@ -827,9 +786,6 @@ export function assertDuenoOAdmin(
 
   // si el negocio no trae info de owner/admin en memoria, dejamos pasar
   if (!anyNeg.ownerUid && !(anyNeg.adminUids && anyNeg.adminUids.length)) {
-    console.warn(
-      "[assertDuenoOAdmin] negocio sin ownerUid/adminUids en memoria, permitiendo por compatibilidad."
-    );
     return;
   }
 
@@ -1064,14 +1020,6 @@ export function escucharTurnosEmpleadoTiempoReal(opts: {
 }) {
   const { negocioId, empleadoNombre, onUpdate } = opts;
 
-  console.log(
-    "[escucharTurnosEmpleadoTiempoReal] listener →",
-    "negocioId:",
-    negocioId,
-    "empleadoNombre:",
-    empleadoNombre
-  );
-
   const refNeg = collection(db, "Negocios", negocioId, "Turnos");
 
   const qTurnos =
@@ -1080,12 +1028,6 @@ export function escucharTurnosEmpleadoTiempoReal(opts: {
       : query(refNeg);
 
   const unsub = onSnapshot(qTurnos, (snap) => {
-    console.log(
-      "[escucharTurnosEmpleadoTiempoReal] snapshot:",
-      snap.size,
-      "docs"
-    );
-
     const brutos: TurnoFuente[] = [];
 
     snap.forEach((d) => {
@@ -1095,21 +1037,10 @@ export function escucharTurnosEmpleadoTiempoReal(opts: {
       });
     });
 
-    console.log(
-      "[escucharTurnosEmpleadoTiempoReal] primeros turnos:",
-      brutos.slice(0, 3)
-    );
-
     onUpdate(brutos);
   });
 
   return () => {
-    console.log(
-      "[escucharTurnosEmpleadoTiempoReal] unsubscribe negocioId:",
-      negocioId,
-      "empleadoNombre:",
-      empleadoNombre
-    );
     unsub();
   };
 }

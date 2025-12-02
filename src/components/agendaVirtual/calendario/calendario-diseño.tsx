@@ -176,7 +176,7 @@ export default function CalendarioBase({
 
   const empleadoNombreRef = empleadoActual?.nombre?.trim() || "empleado";
 
-  // ⬇️ En modo "negocio" asumimos que ya está en contexto de dueño/admin.
+  // En modo "negocio" asumimos que ya está en contexto de dueño/admin.
   const usuarioEsDuenoAdmin =
     modo === "negocio" ? true : esDuenoOAdmin(usuarioActual, negocio);
 
@@ -187,34 +187,12 @@ export default function CalendarioBase({
   );
 
   useEffect(() => {
-    if (!negocio?.id) {
-      console.warn(
-        "[CalendarioBase] negocio.id vacío, no se puede escuchar Turnos"
-      );
-      return;
-    }
-
-    if (!empleadoActual || !empleadoActual.nombre) {
-      console.warn(
-        "[CalendarioBase] empleadoActual vacío, usando listener sin filtro de empleado"
-      );
-    } else {
-      console.log(
-        "[CalendarioBase] escuchando turnos de empleado:",
-        empleadoActual.nombre,
-        "negocioId:",
-        negocio.id
-      );
-    }
+    if (!negocio?.id) return;
 
     const unsub = escucharTurnosEmpleadoTiempoReal({
       negocioId: negocio.id,
       empleadoNombre: empleadoActual?.nombre || undefined,
       onUpdate: (lista) => {
-        console.log(
-          "[CalendarioBase] turnosTiempoReal actualizados, total:",
-          lista.length
-        );
         setTurnosTiempoReal(lista);
       },
     });
@@ -231,17 +209,10 @@ export default function CalendarioBase({
 
   // ======================= CONFIG + TURNOS =======================
 
-  const config = useMemo(() => {
-    const cfg = combinarConfigCalendario(negocio, empleadoActual);
-    console.log(
-      "[CalendarioBase] empleadoActual:",
-      empleadoActual?.nombre,
-      "config.inicio/fin:",
-      cfg.inicio,
-      cfg.fin
-    );
-    return cfg;
-  }, [negocio, empleadoActual]);
+  const config = useMemo(
+    () => combinarConfigCalendario(negocio, empleadoActual),
+    [negocio, empleadoActual]
+  );
 
   const turnosFiltrados = useMemo(() => {
     if (!empleadoActual) return turnosOrigen;
@@ -255,7 +226,7 @@ export default function CalendarioBase({
     [turnosFiltrados]
   );
 
-  // ========= 💡 DIAS LIBRES NEGOCIO + EMPLEADO POR SEPARADO =========
+  // ========= DIAS LIBRES NEGOCIO + EMPLEADO POR SEPARADO =========
 
   // Días libres del negocio → configuracionAgenda.diasLibres
   const diasLibresNegocioNorm: string[] = useMemo(() => {
@@ -284,11 +255,6 @@ export default function CalendarioBase({
         return "";
       })
       .filter(Boolean);
-
-    console.log(
-      "[CalendarioBase] diasLibresNegocioNorm (desde configuracionAgenda) →",
-      normalizados
-    );
 
     return normalizados;
   }, [negocio]);
@@ -321,13 +287,6 @@ export default function CalendarioBase({
         return "";
       })
       .filter(Boolean);
-
-    console.log(
-      "[CalendarioBase] diasLibresEmpleadoNorm para",
-      empleadoActual?.nombre,
-      "→",
-      normalizados
-    );
 
     return normalizados;
   }, [empleadoActual]);

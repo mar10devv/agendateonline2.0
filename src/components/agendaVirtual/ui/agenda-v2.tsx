@@ -153,8 +153,6 @@ export default function AgendaVirtualUIv3({
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] =
     useState<"idle" | "cargando" | "exito">("idle");
-      const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
-
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
@@ -194,14 +192,14 @@ export default function AgendaVirtualUIv3({
 
   /* -------- EMPLEADOS ACTIVOS (DUEÑO SOLO SI ES EMPLEADO) -------- */
 
-const empleadosFuente = useMemo<Empleado[]>(() => {
-  const lista = empleados && empleados.length > 0
-    ? empleados
-    : negocio.empleadosData ?? [];
+  const empleadosFuente = useMemo<Empleado[]>(() => {
+    const lista =
+      empleados && empleados.length > 0
+        ? empleados
+        : negocio.empleadosData ?? [];
 
-  return Array.isArray(lista) ? lista : [];
-}, [empleados, negocio.empleadosData]);
-
+    return Array.isArray(lista) ? lista : [];
+  }, [empleados, negocio.empleadosData]);
 
   // Ocultamos:
   // - Dueño: solo se muestra si esEmpleado === true
@@ -218,26 +216,6 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
   // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
-
-      useEffect(() => {
-    if (!empleadosParaAgenda || empleadosParaAgenda.length === 0) {
-      setEmpleadoSeleccionado(null);
-      return;
-    }
-
-    setEmpleadoSeleccionado((prev) => {
-      if (!prev) return empleadosParaAgenda[0];
-
-      const mismo = empleadosParaAgenda.find(
-        (e) =>
-          (prev.id && e.id === prev.id) ||
-          (prev.email && e.email === prev.email)
-      );
-
-      return mismo || empleadosParaAgenda[0];
-    });
-  }, [empleadosParaAgenda]);
-
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -303,7 +281,10 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
   useEffect(() => {
     if (!negocio?.slug) return;
 
-    const q = query(collection(db, "Negocios"), where("slug", "==", negocio.slug));
+    const q = query(
+      collection(db, "Negocios"),
+      where("slug", "==", negocio.slug)
+    );
 
     const unsubscribe = onSnapshot(q, (snap) => {
       if (snap.empty) return;
@@ -325,16 +306,28 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
             "--color-primario-oscuro",
             tema.colorPrimarioOscuro || "#0a0a0a"
           );
-          document.documentElement.style.setProperty("--color-texto", "#ffffff");
+          document.documentElement.style.setProperty(
+            "--color-texto",
+            "#ffffff"
+          );
         });
       } else {
-        document.documentElement.style.setProperty("--color-primario", "#262626");
-        document.documentElement.style.setProperty("--color-fondo", "#171717");
+        document.documentElement.style.setProperty(
+          "--color-primario",
+          "#262626"
+        );
+        document.documentElement.style.setProperty(
+          "--color-fondo",
+          "#171717"
+        );
         document.documentElement.style.setProperty(
           "--color-primario-oscuro",
           "#0a0a0a"
         );
-        document.documentElement.style.setProperty("--color-texto", "#ffffff");
+        document.documentElement.style.setProperty(
+          "--color-texto",
+          "#ffffff"
+        );
       }
     });
 
@@ -462,9 +455,8 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
           );
         }
 
-        // 📌 Vista dueño/admin: selector de empleado + CalendarioBase
-        const empleadoActual =
-          empleadoSeleccionado || empleadosParaAgenda[0] || null;
+        // 📌 Vista dueño/admin: CalendarioBase con selector interno
+        const empleadoActual = empleadosParaAgenda[0] || null;
 
         if (!empleadoActual) {
           return (
@@ -497,38 +489,8 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
 
         return (
           <div className="space-y-4">
-            {/* Selector de empleados (chips) */}
-            {empleadosParaAgenda.length > 1 && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {empleadosParaAgenda.map((e, idx) => {
-                  const isActive =
-                    (empleadoActual?.id && e.id === empleadoActual.id) ||
-                    (empleadoActual?.email &&
-                      e.email === empleadoActual.email) ||
-                    (!empleadoActual && idx === 0);
-
-                  return (
-                    <button
-                      key={e.id || e.email || e.nombre || idx}
-                      type="button"
-                      onClick={() => setEmpleadoSeleccionado(e)}
-                      className={`px-3 py-1.5 rounded-full text-xs border transition
-                        ${
-                          isActive
-                            ? "bg-[var(--color-texto)] text-[var(--color-primario)] border-[var(--color-texto)]"
-                            : "bg-transparent text-[var(--color-texto)] border-white/20 hover:bg-white/10"
-                        }`}
-                    >
-                      {e.nombre || "Sin nombre"}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* CalendarioBase conectado al empleado seleccionado */}
             <CalendarioBase
-              modo={modoAgenda}                    // "negocio"
+              modo={modoAgenda} // "negocio"
               usuarioActual={usuarioActualCalendario}
               negocio={negocioAgenda}
               empleado={empleadoActual as any}
