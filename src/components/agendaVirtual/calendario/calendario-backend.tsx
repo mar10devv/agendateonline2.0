@@ -14,25 +14,44 @@ import { db } from "../../../lib/firebase";
    Tipos base (negocio, empleado, turnos, slots)
    ===================================================== */
 
+/**
+ * Modo en que se generan los turnos:
+ * - "personalizado": se reparten X clientes por día en forma equidistante.
+ * - "jornada": se generan slots cada X minutos.
+ */
 export type ModoTurnos = "personalizado" | "jornada";
 
+/**
+ * Configuración general de la agenda del negocio.
+ * (lo que está guardado en Negocios/{id}.configuracionAgenda)
+ */
 export type NegocioAgendaConfig = {
   diasLibres?: (string | number)[];
   modoTurnos?: ModoTurnos;
   clientesPorDia?: number | null;
-  horaInicio?: string; // en Firestore viene como "inicio"
-  horaFin?: string; // en Firestore viene como "fin"
+  horaInicio?: string; // en Firestore puede venir como "inicio"
+  horaFin?: string; // en Firestore puede venir como "fin"
   horasSeparacion?: number | null;
 };
 
+/**
+ * Configuración de calendario de un empleado.
+ * Normalmente está dentro de empleado.calendario
+ */
 export type EmpleadoAgendaConfig = {
   inicio?: string; // "HH:mm"
   fin?: string; // "HH:mm"
   diasLibres?: (string | number)[];
-  descansoDiaMedio?: string | null;
+  descansoDiaMedio?: string | null; // ej: "sabado" (medio turno)
+  descansoDiaLibre?: string | null; // ej: "viernes" (día libre completo principal)
   descansoTurnoMedio?: "manana" | "tarde" | null;
 };
 
+/**
+ * Estructura genérica de empleado que usamos para mapear
+ * tanto lo que viene en memoria (empleados / empleadosData)
+ * como lo que pueda estar guardado en Firestore.
+ */
 export type EmpleadoAgendaSource = {
   id?: string;
   nombre?: string;
@@ -43,11 +62,16 @@ export type EmpleadoAgendaSource = {
   fin?: string;
   diasLibres?: (string | number)[];
   descansoDiaMedio?: string | null;
+  descansoDiaLibre?: string | null;
   descansoTurnoMedio?: "manana" | "tarde" | null;
 
   [key: string]: any;
 };
 
+/**
+ * Estructura del negocio que usa la agenda.
+ * Incluye config de agenda, roles y empleados.
+ */
 export type NegocioAgendaSource = {
   id: string;
   nombre: string;
@@ -64,6 +88,10 @@ export type NegocioAgendaSource = {
   [key: string]: any;
 };
 
+/**
+ * Configuración unificada NEGOCIO + EMPLEADO ya procesada
+ * para usar directamente en la generación de slots.
+ */
 export type ConfigCalendarioUnificado = {
   inicio: string;
   fin: string;
@@ -77,11 +105,15 @@ export type ConfigCalendarioUnificado = {
   diasLibresCombinadosNorm: string[];
 
   descansoDiaMedio?: string | null;
+  descansoDiaLibre?: string | null;
   descansoTurnoMedio?: "manana" | "tarde" | null;
 };
 
 /* -------- Turnos ya guardados en Firestore (normalizados) -------- */
 
+/**
+ * Turno normalizado y listo para usar en el calendario (Date reales).
+ */
 export type TurnoExistente = {
   id: string;
   inicio: Date;
@@ -96,9 +128,12 @@ export type TurnoExistente = {
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
 
-  raw?: any;
+  raw?: any; // documento original (para debug o uso avanzado)
 };
 
+/**
+ * Estados posibles de un slot de agenda.
+ */
 export type SlotEstado =
   | "libre"
   | "ocupado"
@@ -107,6 +142,9 @@ export type SlotEstado =
   | "cerradoNegocio"
   | "descansoEmpleado";
 
+/**
+ * Representa un slot específico de la grilla de calendario.
+ */
 export type SlotCalendario = {
   fecha: Date;
   hora: string;
@@ -145,6 +183,12 @@ const MAP_DIA_NUM_A_STR = [
   "sabado",
 ];
 
+/**
+ * Normaliza un nombre de día/cadena:
+ * - Pasa a minúsculas
+ * - Quita tildes
+ * - Quita espacios extras
+ */
 export function normalizarDia(str: any): string {
   if (!str) return "";
   return String(str)
@@ -154,6 +198,9 @@ export function normalizarDia(str: any): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * Convierte un número de día (0-6) o string a un nombre de día normalizado.
+ */
 function mapDiaGeneric(d: string | number): string {
   if (typeof d === "number") {
     return MAP_DIA_NUM_A_STR[d] || "";
@@ -161,6 +208,9 @@ function mapDiaGeneric(d: string | number): string {
   return normalizarDia(String(d));
 }
 
+/**
+ * Verifica si dos fechas corresponden al mismo día (año/mes/día).
+ */
 export function esMismoDia(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -169,17 +219,26 @@ export function esMismoDia(a: Date, b: Date): boolean {
   );
 }
 
+/**
+ * Convierte "HH:mm" a minutos totales desde las 00:00.
+ */
 export function toMin(hhmm: string): number {
   const [h, m] = (hhmm || "00:00").split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 
+/**
+ * Convierte minutos totales desde 00:00 a string "HH:mm".
+ */
 export function minToHHMM(minutos: number): string {
   const h = Math.floor(minutos / 60);
   const mm = minutos % 60;
   return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+/**
+ * Combina una fecha (Date) con una hora "HH:mm" y devuelve un nuevo Date.
+ */
 export function combinarFechaHora(fecha: Date, hhmm: string): Date {
   const [h, m] = (hhmm || "00:00").split(":").map((n) => Number(n || 0));
   const d = new Date(fecha);
@@ -187,6 +246,13 @@ export function combinarFechaHora(fecha: Date, hhmm: string): Date {
   return d;
 }
 
+/**
+ * Intenta interpretar una duración en minutos:
+ * - number: se devuelve tal cual
+ * - "HH:mm": se convierte a minutos
+ * - "30": se convierte a número
+ * - default: 30 min
+ */
 export function parseDuracionMin(d: any): number {
   if (typeof d === "number") return d;
   if (typeof d === "string") {
@@ -200,6 +266,13 @@ export function parseDuracionMin(d: any): number {
   return 30;
 }
 
+/**
+ * Convierte distintos formatos a Date:
+ * - Date: se devuelve tal cual
+ * - Firestore Timestamp (tiene .toDate()): se convierte
+ * - string: new Date(string)
+ * - number/otros: new Date(v)
+ */
 export function toDateSafe(v: any): Date {
   if (!v) return new Date(NaN);
   if (v instanceof Date) return v;
@@ -208,6 +281,10 @@ export function toDateSafe(v: any): Date {
   return new Date(v);
 }
 
+/**
+ * Indica si dos rangos [aStart, aEnd) y [bStart, bEnd) se solapan.
+ * Los parámetros son timestamps numéricos (ej: +Date).
+ */
 export function solapan(
   aStart: number,
   aEnd: number,
@@ -217,10 +294,115 @@ export function solapan(
   return aStart < bEnd && aEnd > bStart;
 }
 
+/**
+ * Calcula la ventana de trabajo (en minutos) para un día de medio turno.
+ *
+ * Regla:
+ * - Si el medio día es el día ANTERIOR al día libre principal  => trabaja MAÑANA (inicio -> mitad).
+ * - Si el medio día es el día POSTERIOR al día libre principal => trabaja TARDE (mitad -> fin).
+ * - Si no se puede inferir por descansoDiaLibre, se mira diasLibresEmpleado/Negocio.
+ * - Si aún así no alcanza, se usa descansoTurnoMedio ("manana" / "tarde") como fallback.
+ */
+function calcularVentanaMedioDia(
+  config: ConfigCalendarioUnificado,
+  diaNormActual: string,
+  jornadaInicioMin: number,
+  jornadaFinMin: number
+): { inicioMin: number; finMin: number } | null {
+  const medioNorm = normalizarDia(config.descansoDiaMedio || "");
+  if (!medioNorm || medioNorm !== diaNormActual) return null;
+
+  const total = jornadaFinMin - jornadaInicioMin;
+  if (total <= 0) return null;
+
+  // Mitad de la jornada (no asumimos 4h fijas, usamos 50% real del rango)
+  const mitad = jornadaInicioMin + Math.floor(total / 2);
+
+  // Helper: nombre de día normalizado -> índice (0..6)
+  const getDiaIndex = (nombre: string) =>
+    MAP_DIA_NUM_A_STR.indexOf(normalizarDia(nombre));
+
+  let relacion: "antes" | "despues" | null = null;
+
+  // 1) Intentar con el día libre principal del empleado (descansoDiaLibre)
+  const librePrincipalNorm = normalizarDia(config.descansoDiaLibre || "");
+  if (librePrincipalNorm) {
+    const idxMedio = getDiaIndex(medioNorm);
+    const idxLibre = getDiaIndex(librePrincipalNorm);
+
+    if (idxMedio !== -1 && idxLibre !== -1) {
+      // medio = día ANTERIOR al libre  -> "antes"
+      if (idxMedio === (idxLibre + 6) % 7) {
+        relacion = "antes";
+      }
+      // medio = día POSTERIOR al libre -> "despues"
+      else if (idxMedio === (idxLibre + 1) % 7) {
+        relacion = "despues";
+      }
+    }
+  }
+
+  // 2) Si no se pudo con descansoDiaLibre, usamos los días libres conocidos
+  if (!relacion) {
+    // Usamos primero días libres del empleado; si no tiene, usamos los del negocio.
+    const diasLibresBase =
+      config.diasLibresEmpleadoNorm.length > 0
+        ? config.diasLibresEmpleadoNorm
+        : config.diasLibresNegocioNorm;
+
+    const idxMedio = getDiaIndex(medioNorm);
+
+    if (idxMedio !== -1) {
+      for (const diaLibre of diasLibresBase) {
+        const idxLibre = getDiaIndex(diaLibre);
+        if (idxLibre === -1) continue;
+
+        if (idxMedio === (idxLibre + 6) % 7) {
+          relacion = "antes";
+          break;
+        }
+        if (idxMedio === (idxLibre + 1) % 7) {
+          relacion = "despues";
+          break;
+        }
+      }
+    }
+  }
+
+  if (relacion === "antes") {
+    // trabaja de inicio -> mitad (mañana)
+    return { inicioMin: jornadaInicioMin, finMin: mitad };
+  }
+  if (relacion === "despues") {
+    // trabaja de mitad -> fin (tarde)
+    return { inicioMin: mitad, finMin: jornadaFinMin };
+  }
+
+  // 3) 🔁 Fallback: si no pudimos deducir por días libres, usamos descansoTurnoMedio
+  if (config.descansoTurnoMedio === "manana") {
+    return { inicioMin: jornadaInicioMin, finMin: mitad };
+  }
+  if (config.descansoTurnoMedio === "tarde") {
+    return { inicioMin: mitad, finMin: jornadaFinMin };
+  }
+
+  return null;
+}
+
 /* =====================================================
    1) Unificar configuración NEGOCIO + EMPLEADO
    ===================================================== */
 
+/**
+ * Combina la configuración del NEGOCIO y del EMPLEADO para generar
+ * un solo objeto de configuración que se usa al construir el calendario.
+ *
+ * Reglas principales:
+ * - Se buscan los datos "full" del empleado en negocio.empleadosData / empleados.
+ * - El horario del empleado tiene prioridad sobre el horario del negocio.
+ * - Los días libres se combinan (negocio + empleado) y se normalizan.
+ * - Se respetan modos de turnos ("jornada" / "personalizado") y descansos de medio día.
+ */
 export function combinarConfigCalendario(
   negocio: NegocioAgendaSource,
   empleado: EmpleadoAgendaSource | null
@@ -241,7 +423,7 @@ export function combinarConfigCalendario(
   // 1) calendario del empleado que viene por props
   let calEmp: EmpleadoAgendaConfig = empleado?.calendario || {};
 
-  // 2) si viene SIN horarios, usamos el del empFull
+  // 2) si viene SIN horarios, usamos el del empFull (fallback a lo guardado en Firestore)
   if ((!calEmp.inicio && !calEmp.fin) && empFull) {
     if (empFull.calendario) {
       calEmp = {
@@ -253,6 +435,7 @@ export function combinarConfigCalendario(
         fin: empFull.fin,
         diasLibres: empFull.diasLibres,
         descansoDiaMedio: empFull.descansoDiaMedio ?? null,
+        descansoDiaLibre: empFull.descansoDiaLibre ?? null,
         descansoTurnoMedio: empFull.descansoTurnoMedio ?? null,
       };
     }
@@ -260,8 +443,8 @@ export function combinarConfigCalendario(
 
   // horarios negocio en firestore: "inicio"/"fin"
   const horaInicioNeg =
-    (confNeg as any).inicio || confNeg.horaInicio || "09:00";
-  const horaFinNeg = (confNeg as any).fin || confNeg.horaFin || "18:00";
+    (confNeg as any).inicio || confNeg.horaInicio || "07:00";
+  const horaFinNeg = (confNeg as any).fin || confNeg.horaFin || "20:00";
 
   // ---------- DIAS LIBRES NEGOCIO ----------
   const diasNegocioRaw = (confNeg.diasLibres || []) as (string | number)[];
@@ -336,10 +519,17 @@ export function combinarConfigCalendario(
   const fin = calEmp.fin || horaFinNeg;
 
   const descansoDiaMedio =
-    calEmp.descansoDiaMedio ?? empleado?.descansoDiaMedio ?? null;
+    calEmp.descansoDiaMedio ?? empleado?.descansoDiaMedio ?? empFull?.calendario?.descansoDiaMedio ?? empFull?.descansoDiaMedio ?? null;
+
+  const descansoDiaLibre =
+    calEmp.descansoDiaLibre ?? empleado?.descansoDiaLibre ?? empFull?.calendario?.descansoDiaLibre ?? empFull?.descansoDiaLibre ?? null;
 
   const descansoTurnoMedio =
-    calEmp.descansoTurnoMedio ?? empleado?.descansoTurnoMedio ?? null;
+    calEmp.descansoTurnoMedio ??
+    empleado?.descansoTurnoMedio ??
+    empFull?.calendario?.descansoTurnoMedio ??
+    empFull?.descansoTurnoMedio ??
+    null;
 
   return {
     inicio,
@@ -351,6 +541,7 @@ export function combinarConfigCalendario(
     diasLibresEmpleadoNorm,
     diasLibresCombinadosNorm,
     descansoDiaMedio,
+    descansoDiaLibre,
     descansoTurnoMedio,
   };
 }
@@ -359,15 +550,26 @@ export function combinarConfigCalendario(
    2) Generar días del rango
    ===================================================== */
 
+/**
+ * Representa un día en la tira de días del calendario.
+ */
 export type DiaCalendario = {
   date: Date;
-  label: string;
-  value: string;
+  label: string; // ejemplo: "Lun 02/Ene"
+  value: string; // yyyy-mm-dd
   disabledNegocio: boolean;
   disabledEmpleado: boolean;
   disabled: boolean;
 };
 
+/**
+ * Genera una lista de días a partir de hoy (o desde una fecha dada)
+ * respetando días libres de negocio y empleado.
+ *
+ * IMPORTANTE: el día de medio turno (descansoDiaMedio) SIEMPRE aparece
+ * como día disponible, aunque esté listado en diasLibres, porque se trabaja
+ * media jornada.
+ */
 export function generarDiasRango(
   config: ConfigCalendarioUnificado,
   diasAdelante: number = 14,
@@ -377,6 +579,9 @@ export function generarDiasRango(
   hoy.setHours(0, 0, 0, 0);
 
   const lista: DiaCalendario[] = [];
+
+  const diaMedioNormConfig = normalizarDia(config.descansoDiaMedio || "");
+  const tieneMedioDia = !!diaMedioNormConfig;
 
   for (let i = 0; i < diasAdelante; i++) {
     const d = new Date(hoy);
@@ -391,8 +596,17 @@ export function generarDiasRango(
 
     const diaNorm = normalizarDia(dayNameLong);
 
-    const disabledNegocio = config.diasLibresNegocioNorm.includes(diaNorm);
-    const disabledEmpleado = config.diasLibresEmpleadoNorm.includes(diaNorm);
+    // ¿Este día es el configurado como medio turno?
+    const esDiaMedio = tieneMedioDia && diaMedioNormConfig === diaNorm;
+
+    // Valores crudos según diasLibres negocio/empleado
+    const disabledNegocioRaw = config.diasLibresNegocioNorm.includes(diaNorm);
+    const disabledEmpleadoRaw = config.diasLibresEmpleadoNorm.includes(diaNorm);
+
+    // ⚠️ Si es medio día, NO lo marcamos como disabled total,
+    // aunque esté en diasLibres por error o por compatibilidad vieja.
+    const disabledNegocio = esDiaMedio ? false : disabledNegocioRaw;
+    const disabledEmpleado = esDiaMedio ? false : disabledEmpleadoRaw;
 
     const disabled = disabledNegocio || disabledEmpleado;
 
@@ -415,6 +629,17 @@ export function generarDiasRango(
    3) Generar horarios base
    ===================================================== */
 
+/**
+ * Genera los horarios base (lista de "HH:mm") para un día:
+ *
+ * - Si modoTurnos = "personalizado": reparte clientesPorDia en el rango.
+ * - Si modoTurnos = "jornada": genera slots cada horasSeparacion minutos.
+ * - Si hay descanso de medio día: limita los horarios a solo media jornada
+ *   (mañana o tarde) según la relación con el día libre.
+ *
+ * @param config Configuración unificada negocio+empleado.
+ * @param fechaSeleccionada Fecha concreta (para validar medio día).
+ */
 export function generarHorariosBase(
   config: ConfigCalendarioUnificado,
   fechaSeleccionada?: Date | null
@@ -432,6 +657,7 @@ export function generarHorariosBase(
     return [];
   }
 
+  // ---- MODO PERSONALIZADO: dividir la jornada entre N clientesPorDia ----
   if (config.modoTurnos === "personalizado" && config.clientesPorDia) {
     const step = Math.floor(totalMinutes / config.clientesPorDia);
     for (let i = 0; i < config.clientesPorDia; i++) {
@@ -440,7 +666,9 @@ export function generarHorariosBase(
       const mm = String(t % 60).padStart(2, "0");
       horariosBase.push(`${hh}:${mm}`);
     }
-  } else if (config.modoTurnos === "jornada" && config.horasSeparacion) {
+  }
+  // ---- MODO JORNADA: slots cada horasSeparacion minutos ----
+  else if (config.modoTurnos === "jornada" && config.horasSeparacion) {
     let t = start;
     while (t + config.horasSeparacion <= end) {
       const hh = String(Math.floor(t / 60)).padStart(2, "0");
@@ -450,46 +678,39 @@ export function generarHorariosBase(
     }
   }
 
+  // si no hay fecha concreta, devolvemos los horarios base sin filtrar
   if (!fechaSeleccionada) return horariosBase;
 
   let horariosDisponibles = [...horariosBase];
 
-  if (
-    config.descansoDiaMedio &&
-    config.descansoTurnoMedio &&
-    horariosBase.length > 0
-  ) {
+  // ---- Ajustar por día de medio turno (medio día de trabajo) ----
+  if (config.descansoDiaMedio && horariosBase.length > 0) {
     const diaSeleccionadoNombre = fechaSeleccionada.toLocaleDateString(
       "es-ES",
       { weekday: "long" }
     );
     const diaSeleccionadoNorm = normalizarDia(diaSeleccionadoNombre);
-    const diaMedioNorm = normalizarDia(config.descansoDiaMedio);
 
-    if (diaSeleccionadoNorm === diaMedioNorm) {
-      const CUATRO_HORAS = 4 * 60;
+    const ventana = calcularVentanaMedioDia(
+      config,
+      diaSeleccionadoNorm,
+      start,
+      end
+    );
 
-      if (totalMinutes > CUATRO_HORAS) {
-        let ventanaInicio = start;
-        let ventanaFin = end;
+    if (ventana) {
+      const { inicioMin, finMin } = ventana;
 
-        if (config.descansoTurnoMedio === "manana") {
-          ventanaInicio = start;
-          ventanaFin = start + CUATRO_HORAS;
-        } else {
-          ventanaInicio = end - CUATRO_HORAS;
-          ventanaFin = end;
-        }
+      // Filtramos slots que caen dentro de esa ventana
+      horariosDisponibles = horariosBase.filter((hora) => {
+        const [hh, mm] = hora.split(":").map(Number);
+        const t = hh * 60 + mm;
+        return t >= inicioMin && t < finMin;
+      });
 
-        horariosDisponibles = horariosBase.filter((hora) => {
-          const [hh, mm] = hora.split(":").map(Number);
-          const t = hh * 60 + mm;
-          return t >= ventanaInicio && t < ventanaFin;
-        });
-
-        if (horariosDisponibles.length === 0) {
-          horariosDisponibles = [...horariosBase];
-        }
+      // seguridad: si por algún motivo no queda ninguno, devolvemos todos
+      if (horariosDisponibles.length === 0) {
+        horariosDisponibles = [...horariosBase];
       }
     }
   }
@@ -501,6 +722,10 @@ export function generarHorariosBase(
    4) Normalizar turnos
    ===================================================== */
 
+/**
+ * Forma cruda de turno que viene de Firestore
+ * (o de distintos formatos históricos).
+ */
 export type TurnoFuente = {
   id: string;
   inicioTs?: any;
@@ -520,6 +745,12 @@ export type TurnoFuente = {
   [key: string]: any;
 };
 
+/**
+ * Intenta deducir inicio y fin de un turno dado (TurnoFuente),
+ * soportando múltiples nombres de campos usados en el historial del sistema.
+ *
+ * Devuelve null si no puede determinar correctamente las fechas.
+ */
 function calcularInicioFinDesdeTurno(
   t: TurnoFuente
 ): { inicio: Date; fin: Date } | null {
@@ -573,6 +804,11 @@ function calcularInicioFinDesdeTurno(
   return { inicio, fin };
 }
 
+/**
+ * Convierte una lista de TurnoFuente a TurnoExistente:
+ * - Calcula inicio/fin como Date.
+ * - Ordena por fecha/hora de inicio.
+ */
 export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
   const out: TurnoExistente[] = [];
 
@@ -597,6 +833,7 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
     });
   }
 
+  // Ordenamos por fecha/hora de inicio (menor a mayor)
   out.sort((a, b) => +a.inicio - +b.inicio);
 
   return out;
@@ -606,11 +843,24 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
    5) Generar SLOTS de un día
    ===================================================== */
 
+/**
+ * Opciones al generar slots de un día concreto.
+ */
 export type GenerarSlotsOpciones = {
-  ahora?: Date;
-  minutosPorSlot?: number;
+  ahora?: Date; // para testear o simular "hoy"
+  minutosPorSlot?: number; // tamaño de cada slot (default 30)
 };
 
+/**
+ * Genera la grilla de slots de un día específico para un empleado:
+ * - Respeta días libres, medio día, horarios, etc.
+ * - Marca slots como libre / ocupado / bloqueado / pasado.
+ *
+ * @param config Configuración unificada (negocio+empleado).
+ * @param fecha Día a generar.
+ * @param turnosDelEmpleado Turnos ya cargados de ese empleado.
+ * @param opciones Tamaño de slot y referencia de "ahora".
+ */
 export function generarSlotsDelDia(
   config: ConfigCalendarioUnificado,
   fecha: Date,
@@ -620,47 +870,62 @@ export function generarSlotsDelDia(
   const ahora = opciones.ahora ? new Date(opciones.ahora) : new Date();
   const minutosPorSlot = opciones.minutosPorSlot || 30;
 
+  // Nombre de día normalizado del día a generar (lunes, martes, etc.)
   const diaNombreLong = fecha.toLocaleDateString("es-ES", {
     weekday: "long",
   });
   const diaNorm = normalizarDia(diaNombreLong);
 
-  if (config.diasLibresNegocioNorm.includes(diaNorm)) return [];
-  if (config.diasLibresEmpleadoNorm.includes(diaNorm)) return [];
+  // Jornada completa del empleado/negocio en minutos
+  const jornadaInicioMin = toMin(config.inicio);
+  const jornadaFinMin = toMin(config.fin);
 
-  const [hIni, mIni] = config.inicio.split(":").map(Number);
-  const [hFin, mFin] = config.fin.split(":").map(Number);
-
-  let inicioJ = hIni * 60 + mIni;
-  let finJ = hFin * 60 + mFin;
-  let totalMinutes = finJ - inicioJ;
-
-  if (totalMinutes <= 0) {
+  if (jornadaFinMin <= jornadaInicioMin) {
     return [];
   }
 
-  const descansoDiaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
-  const esDiaMedio =
-    descansoDiaMedioNorm &&
-    descansoDiaMedioNorm === diaNorm &&
-    !!config.descansoTurnoMedio;
+  // ¿Este día es el configurado como medio turno?
+  const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+  const esDiaMedio = !!diaMedioNorm && diaMedioNorm === diaNorm;
 
-  if (esDiaMedio && totalMinutes > 4 * 60) {
-    const CUATRO_HORAS = 4 * 60;
+  // ⚠️ Si NO es día de medio turno:
+  //     aplicamos la lógica normal de días libres negocio + empleado.
+  //    (si es medio día, no lo tratamos como día libre completo).
+  if (!esDiaMedio) {
+    if (config.diasLibresNegocioNorm.includes(diaNorm)) return [];
+    if (config.diasLibresEmpleadoNorm.includes(diaNorm)) return [];
+  }
 
-    if (config.descansoTurnoMedio === "manana") {
-      finJ = inicioJ + CUATRO_HORAS;
-    } else {
-      inicioJ = finJ - CUATRO_HORAS;
-    }
+  // ==========================
+  //   VENTANA DE TRABAJO REAL
+  // ==========================
+  let inicioJ = jornadaInicioMin;
+  let finJ = jornadaFinMin;
 
-    totalMinutes = finJ - inicioJ;
-    if (totalMinutes <= 0) {
-      inicioJ = hIni * 60 + mIni;
-      finJ = hFin * 60 + mFin;
+  // Usamos SIEMPRE la misma lógica que generarHorariosBase
+  const ventanaMedio = calcularVentanaMedioDia(
+    config,
+    diaNorm,
+    jornadaInicioMin,
+    jornadaFinMin
+  );
+
+  // Si calcularVentanaMedioDia devuelve algo y el día es el medio,
+  // recortamos la jornada a esa ventana (mañana o tarde)
+  if (esDiaMedio && ventanaMedio) {
+    inicioJ = ventanaMedio.inicioMin;
+    finJ = ventanaMedio.finMin;
+
+    // Seguridad: si algo quedó raro, volvemos a jornada completa
+    if (finJ <= inicioJ) {
+      inicioJ = jornadaInicioMin;
+      finJ = jornadaFinMin;
     }
   }
 
+  // ==========================
+  //   TURNOS EXISTENTES DEL DÍA
+  // ==========================
   const reservasDia = turnosDelEmpleado
     .filter((t) => esMismoDia(t.inicio, fecha))
     .map((t) => ({
@@ -669,13 +934,17 @@ export function generarSlotsDelDia(
       f: +t.fin,
     }));
 
-  const out: SlotCalendario[] = [];
+  const slots: SlotCalendario[] = [];
 
+  // ==========================
+  //   GENERAR SLOT POR SLOT
+  // ==========================
   for (let m = inicioJ; m < finJ; m += minutosPorSlot) {
     const hora = minToHHMM(m);
     const inicio = combinarFechaHora(fecha, hora);
-    const fin = new Date(+inicio + minutosPorSlot * 60000);
+    const fin = new Date(inicio.getTime() + minutosPorSlot * 60000);
 
+    // ¿Algún turno cubre este rango?
     const covering = reservasDia.find((t) => solapan(+inicio, +fin, t.i, t.f));
     const esPasado = inicio < ahora;
 
@@ -689,7 +958,7 @@ export function generarSlotsDelDia(
       estado = "pasado";
     }
 
-    out.push({
+    slots.push({
       fecha,
       hora,
       inicio,
@@ -699,18 +968,27 @@ export function generarSlotsDelDia(
     });
   }
 
-  return out;
+  return slots;
 }
 
 /* =====================================================
    6) Calendario de rango completo
    ===================================================== */
 
+/**
+ * Estructura del calendario de un empleado para un rango de días.
+ */
 export type CalendarioEmpleadoRango = {
   dias: DiaCalendario[];
-  slotsPorDia: Record<string, SlotCalendario[]>;
+  slotsPorDia: Record<string, SlotCalendario[]>; // key = "yyyy-mm-dd"
 };
 
+/**
+ * Genera el calendario completo para un empleado en un rango de días:
+ * - Combina config del negocio + empleado.
+ * - Genera lista de días.
+ * - Para cada día, genera slots según turnos existentes.
+ */
 export function generarCalendarioEmpleadoRango(
   negocio: NegocioAgendaSource,
   empleado: EmpleadoAgendaSource | null,
@@ -734,6 +1012,7 @@ export function generarCalendarioEmpleadoRango(
     const fecha = dia.date;
     const key = dia.value;
 
+    // días deshabilitados no tienen slots
     if (dia.disabled) {
       slotsPorDia[key] = [];
       continue;
@@ -752,10 +1031,17 @@ export function generarCalendarioEmpleadoRango(
    7) Backend: permisos y acciones
    ===================================================== */
 
+/**
+ * Representa al usuario logueado (solo necesitamos el uid).
+ */
 export type UsuarioActual = {
   uid: string | null;
 };
 
+/**
+ * Verifica si el usuario es dueño o admin del negocio.
+ * Usa distintos posibles nombres de campos (compatibilidad histórica).
+ */
 export function esDuenoOAdmin(
   usuario: UsuarioActual,
   negocio: NegocioAgendaSource
@@ -776,6 +1062,10 @@ export function esDuenoOAdmin(
   return esOwner || esAdmin;
 }
 
+/**
+ * Lanza un error si el usuario NO es dueño ni admin del negocio.
+ * Si el negocio no tiene info de owner/admin en memoria, deja pasar.
+ */
 export function assertDuenoOAdmin(
   usuario: UsuarioActual,
   negocio: NegocioAgendaSource
@@ -794,6 +1084,9 @@ export function assertDuenoOAdmin(
 
 /**
  * 7.1 Bloquear un slot individual
+ *
+ * Crea un documento en Negocios/{id}/Turnos con bloqueado = true
+ * para la fecha/hora indicada (no asocia cliente).
  */
 export async function bloquearSlotBackend(opts: {
   usuario: UsuarioActual;
@@ -814,6 +1107,7 @@ export async function bloquearSlotBackend(opts: {
     duracionMin = 30,
   } = opts;
 
+  // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
 
   const inicio = combinarFechaHora(fecha, hora);
@@ -838,6 +1132,9 @@ export async function bloquearSlotBackend(opts: {
 
 /**
  * 7.2 Crear turno manual
+ *
+ * Crea un turno directamente (como si la agenda lo hubiera agendado):
+ * - Asigna servicio, cliente y empleado.
  */
 export async function crearTurnoManualBackend(opts: {
   usuario: UsuarioActual;
@@ -868,6 +1165,7 @@ export async function crearTurnoManualBackend(opts: {
     clienteTelefono,
   } = opts;
 
+  // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
 
   const durMin = parseDuracionMin(duracion);
@@ -898,6 +1196,9 @@ export async function crearTurnoManualBackend(opts: {
 
 /**
  * 7.3 Bloquear día completo
+ *
+ * Genera múltiples documentos bloqueados en Negocios/{id}/Turnos
+ * para cubrir un rango [horaInicio, horaFin) cada X minutos.
  */
 export async function bloquearDiaCompletoBackend(opts: {
   usuario: UsuarioActual;
@@ -920,6 +1221,7 @@ export async function bloquearDiaCompletoBackend(opts: {
     minutosPaso = 30,
   } = opts;
 
+  // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
 
   const inicioMin = toMin(horaInicio);
@@ -961,6 +1263,9 @@ export async function bloquearDiaCompletoBackend(opts: {
 
 /**
  * 7.4 Liberar día completo
+ *
+ * Elimina todos los turnos bloqueados de un empleado
+ * para una fecha concreta.
  */
 export async function liberarDiaCompletoBackend(opts: {
   usuario: UsuarioActual;
@@ -970,6 +1275,7 @@ export async function liberarDiaCompletoBackend(opts: {
 }) {
   const { usuario, negocio, empleadoNombre, fecha } = opts;
 
+  // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
 
   const fechaStr = fecha.toISOString().split("T")[0];
@@ -994,6 +1300,10 @@ export async function liberarDiaCompletoBackend(opts: {
    8) Cargar / escuchar turnos desde Firestore
    ===================================================== */
 
+/**
+ * Carga una sola vez todos los turnos de un empleado
+ * para un negocio específico y los devuelve normalizados.
+ */
 export async function cargarTurnosEmpleadoUnaVez(opts: {
   negocioId: string;
   empleadoNombre: string;
@@ -1013,6 +1323,17 @@ export async function cargarTurnosEmpleadoUnaVez(opts: {
   return normalizarTurnos(brutos);
 }
 
+/**
+ * Escucha en tiempo real los turnos de un empleado (o todos los turnos del negocio).
+ *
+ * - Si se pasa empleadoNombre, filtra por ese empleado.
+ * - Si no se pasa, escucha todos los turnos del negocio.
+ *
+ * onUpdate recibe la lista cruda de TurnoFuente (para que el caller
+ * decida cómo normalizar o filtrar).
+ *
+ * Devuelve una función para desuscribirse del listener.
+ */
 export function escucharTurnosEmpleadoTiempoReal(opts: {
   negocioId: string;
   empleadoNombre?: string;
@@ -1040,6 +1361,7 @@ export function escucharTurnosEmpleadoTiempoReal(opts: {
     onUpdate(brutos);
   });
 
+  // devolvemos función de cleanup para usar en useEffect
   return () => {
     unsub();
   };

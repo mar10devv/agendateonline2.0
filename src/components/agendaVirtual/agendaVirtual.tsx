@@ -11,7 +11,6 @@ import type { Empleado } from "./backend/modalEmpleadosBackend";
 
 import AgendaVirtualUI from "./ui/agenda-v2";
 import LoaderAgenda from "../ui/loaderAgenda";
-import ModalConfigAgendaInicial from "./ui/modalConfigAgendaInicial";
 
 type Estado = "cargando" | "no-sesion" | "listo";
 type Modo = "dueño" | "cliente" | "admin";
@@ -136,12 +135,6 @@ export default function AgendaVirtual({ slug }: Props) {
 
   return (
     <>
-      <ModalConfigAgendaInicial
-        abierto={mostrarModalConfigAgenda}
-        onClose={() => setMostrarModalConfigAgenda(false)}
-        negocioId={negocio.id}
-        configuracionActual={configAgendaInicial ?? undefined}
-      />
 
       <AgendaVirtualUI
         empleados={empleados}

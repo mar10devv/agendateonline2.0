@@ -338,13 +338,37 @@ export default function CalendarioBase({
     year: "numeric",
   });
 
+  
+
   // -------- Slots del día seleccionado --------
-  const slotsDelDia: SlotCalendario[] = useMemo(() => {
-    if (!diaSeleccionado) return [];
-    return generarSlotsDelDia(config, diaSeleccionado, turnosNormalizados, {
-      minutosPorSlot,
-    });
-  }, [config, diaSeleccionado, turnosNormalizados, minutosPorSlot]);
+const slotsDelDia: SlotCalendario[] = useMemo(() => {
+  if (!diaSeleccionado) return [];
+
+  const nombreDiaLong = diaSeleccionado.toLocaleDateString("es-ES", {
+    weekday: "long",
+  });
+  const diaNorm = normalizarDia(nombreDiaLong);
+
+  // Validación del día medio (lógica backend reflejada en el front)
+  const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+  const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
+
+  // Día libre completo (negocio o empleado)
+  const esDiaLibre =
+    config.diasLibresNegocioNorm.includes(diaNorm) ||
+    config.diasLibresEmpleadoNorm.includes(diaNorm);
+
+  // 👉 Si es día libre TOTAL → ningún slot
+  if (!esDiaMedio && esDiaLibre) {
+    return [];
+  }
+
+  // 👉 Si es medio turno o día laboral normal → backend se encarga de la ventana
+  return generarSlotsDelDia(config, diaSeleccionado, turnosNormalizados, {
+    minutosPorSlot,
+  });
+}, [config, diaSeleccionado, turnosNormalizados, minutosPorSlot]);
+
 
   // ======================= HANDLERS =======================
 
@@ -533,74 +557,82 @@ export default function CalendarioBase({
           ))}
         </div>
 
-        {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
-          {dias.map((d, idx) => {
-            if (!d) return <div key={idx} className="w-10 h-8" />;
+{/* Días del mes */}
+<div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
+  {dias.map((d, idx) => {
+    if (!d) return <div key={idx} className="w-10 h-8" />;
 
-            const esHoy = esMismoDia(d, hoy);
-            const esPasado =
-              d <
-              new Date(
-                hoy.getFullYear(),
-                hoy.getMonth(),
-                hoy.getDate()
-              );
+    const esHoy = esMismoDia(d, hoy);
+    const esPasado =
+      d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
-            const nombreDiaLong = d.toLocaleDateString("es-ES", {
-              weekday: "long",
-            });
-            const diaNorm = normalizarDia(nombreDiaLong);
+    const nombreDiaLong = d.toLocaleDateString("es-ES", {
+      weekday: "long",
+    });
+    const diaNorm = normalizarDia(nombreDiaLong);
 
-            const esLibreNegocio = diasLibresNegocioNorm.includes(diaNorm);
-            const esLibreEmpleado = diasLibresEmpleadoNorm.includes(diaNorm);
+    // ======= USAMOS LO MISMO QUE EL BACKEND =======
+    const diaMedioNormConfig = normalizarDia(config.descansoDiaMedio || "");
+    const esDiaMedio = diaMedioNormConfig && diaMedioNormConfig === diaNorm;
 
-            const esDiaLibre = esLibreNegocio || esLibreEmpleado;
-            const seleccionado =
-              diaSeleccionado && esMismoDia(d, diaSeleccionado);
-            const disabled = esPasado || esDiaLibre;
+    const diasNegocio = (config as any).diasLibresNegocioNorm || [];
+    const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
 
-            let clases =
-              "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+    const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
+    const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
 
-            if (esDiaLibre) {
-              clases +=
-                "text-red-400 line-through cursor-not-allowed opacity-70";
-            } else if (esHoy) {
-              clases += "bg-white text-black font-bold";
-            } else if (esPasado) {
-              clases +=
-                "text-gray-500 line-through cursor-not-allowed";
-            } else if (seleccionado) {
-              clases += "bg-indigo-600 text-white font-bold";
-            } else {
-              clases += "hover:bg-neutral-700";
-            }
+    // Si es medio día, NO lo tratamos como libre completo
+    const esLibreNegocio = esDiaMedio ? false : esLibreNegocioRaw;
+    const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
 
-            return (
-              <button
-                key={idx}
-                disabled={disabled}
-                onClick={() =>
-                  manejarClickDia(d, {
-                    esPasado,
-                    esDiaLibre,
-                  })
-                }
-                className={clases}
-                title={
-                  esDiaLibre
-                    ? esLibreNegocio
-                      ? "Día cerrado por el negocio"
-                      : "Día libre del empleado"
-                    : ""
-                }
-              >
-                {d.getDate()}
-              </button>
-            );
-          })}
-        </div>
+    const esDiaLibre = esLibreNegocio || esLibreEmpleado;
+
+    const seleccionado =
+      diaSeleccionado && esMismoDia(d, diaSeleccionado);
+    const disabled = esPasado || esDiaLibre;
+
+    let clases =
+      "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+
+    if (esDiaLibre) {
+      clases +=
+        "text-red-400 line-through cursor-not-allowed opacity-70";
+    } else if (esHoy) {
+      clases += "bg-white text-black font-bold";
+    } else if (esPasado) {
+      clases +=
+        "text-gray-500 line-through cursor-not-allowed";
+    } else if (seleccionado) {
+      clases += "bg-indigo-600 text-white font-bold";
+    } else {
+      clases += "hover:bg-neutral-700";
+    }
+
+    return (
+      <button
+        key={idx}
+        disabled={disabled}
+        onClick={() =>
+          manejarClickDia(d, {
+            esPasado,
+            esDiaLibre,
+          })
+        }
+        className={clases}
+        title={
+          esDiaLibre
+            ? esLibreNegocio
+              ? "Día cerrado por el negocio"
+              : "Día libre del empleado"
+            : ""
+        }
+      >
+        {d.getDate()}
+      </button>
+    );
+  })}
+</div>
+
 
         {/* Slots del día */}
         {diaSeleccionado ? (

@@ -33,8 +33,7 @@ import { useMap } from "react-leaflet";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 
-// 🟢 NUEVO: modal de configuración rápida de agenda
-import ModalConfigAgendaInicial from "../ui/modalConfigAgendaInicial";
+
 
 const customIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
@@ -214,8 +213,38 @@ export default function AgendaVirtualUIv3({
   }, [empleadosFuente]);
 
   // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
+  // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
+
+  // 🟡 ¿Hay empleados sin configurar del todo?
+  const hayEmpleadosIncompletos = useMemo(() => {
+    // Tomamos solo los que realmente trabajan
+    const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
+
+    // Si no hay nadie configurado todavía, consideramos "incompleto"
+    if (lista.length === 0) return true;
+
+    return lista.some((e) => {
+      const cal: any = e.calendario || {};
+      const inicio = cal.inicio as string | undefined;
+      const fin = cal.fin as string | undefined;
+      const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
+      const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
+
+      const horarioOk =
+        typeof inicio === "string" &&
+        typeof fin === "string" &&
+        inicio < fin;
+
+      const diasOk = diasLibres.length > 0;
+      const trabajosOk = trabajos.length > 0;
+
+      // Si le falta alguna de las 3 cosas → empleado incompleto
+      return !(horarioOk && diasOk && trabajosOk);
+    });
+  }, [empleadosParaAgenda]);
+
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -365,6 +394,11 @@ export default function AgendaVirtualUIv3({
     { id: "empleados", label: "Empleados", icon: IconEmpleados },
     { id: "ubicacion", label: "Ubicación", icon: IconUbicacion },
   ];
+
+  // 🔴 ¿Falta terminar el onboarding?
+  const onboardingPendiente =
+    (modo === "dueño" || modo === "admin") &&
+    negocio?.configuracionAgenda?.onboardingCompletado !== true;
 
   /* -------- RENDERIZAR VISTA -------- */
 
@@ -606,17 +640,7 @@ export default function AgendaVirtualUIv3({
 
   return (
     <>
-      {/* 🟢 MODAL DE CONFIGURACIÓN INICIAL DE AGENDA */}
-      <ModalConfigAgendaInicial
-        abierto={mostrarModalConfigAgenda}
-        onClose={() => setMostrarModalConfigAgenda(false)}
-        negocioId={negocio.id}
-        configuracionActual={configAgendaInicial ?? undefined}
-        onGuardado={(nuevaConfig) => {
-          setConfigAgendaInicial(nuevaConfig);
-          setModalServicios(true);
-        }}
-      />
+
 
       <div
         className="
@@ -732,39 +756,75 @@ export default function AgendaVirtualUIv3({
           </div>
         </div>
 
-        {/* NAV */}
-        <div
-          className="
-            w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
-            bg-[var(--color-primario-oscuro)]
-            text-[var(--color-texto)]
-            shadow-[0_6px_16px_rgba(0,0,0,0.40)]
-            hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
-            transition-all duration-300
-          "
-        >
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setVista(item.id)}
-              className={`flex flex-col items-center p-2 min-w-[70px] transition 
-                ${
-                  vista === item.id
-                    ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
-                    : "bg-transparent"
-                }`}
-            >
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img
-                  src={item.icon}
-                  alt={item.label}
-                  className="w-8 h-8 icono-blanco"
-                />
-              </div>
-              <span className="text-xs mt-1 text-center">{item.label}</span>
-            </button>
-          ))}
+{/* NAV */}
+<div
+  className="
+    w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
+    bg-[var(--color-primario-oscuro)]
+    text-[var(--color-texto)]
+    shadow-[0_6px_16px_rgba(0,0,0,0.40)]
+    hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
+    transition-all duration-300
+  "
+>
+  {navItems.map((item) => {
+    const onboardingIncompleto =
+      (modo === "dueño" || modo === "admin") &&
+      negocio.configuracionAgenda?.onboardingCompletado !== true;
+
+    let mostrarAlerta = false;
+
+    if (onboardingIncompleto) {
+      if (item.id === "servicios") {
+        // 👉 Punto solo si NO hay servicios cargados
+        mostrarAlerta = serviciosState.length === 0;
+      } else if (item.id === "ubicacion") {
+        // 👉 Punto solo si todavía NO hay ubicación guardada
+        mostrarAlerta = !ubicacion;
+      } else if (item.id === "empleados") {
+        // 👉 Punto si HAY al menos un empleado incompleto
+        mostrarAlerta = hayEmpleadosIncompletos;
+      }
+      // En "agenda" nunca mostramos punto
+    }
+
+    return (
+      <button
+        key={item.id}
+        onClick={() => setVista(item.id)}
+        className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
+          ${
+            vista === item.id
+              ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
+              : "bg-transparent"
+          }`}
+      >
+        {/* PUNTO AMARILLO PARPADEANDO */}
+        {mostrarAlerta && (
+          <span
+            className="
+              absolute -top-1 right-4
+              h-2.5 w-2.5 rounded-full
+              bg-yellow-400
+              shadow-[0_0_10px_rgba(250,204,21,0.9)]
+              animate-pulse
+            "
+          />
+        )}
+
+        <div className="w-8 h-8 flex items-center justify-center">
+          <img
+            src={item.icon}
+            alt={item.label}
+            className="w-8 h-8 icono-blanco"
+          />
         </div>
+        <span className="text-xs mt-1 text-center">{item.label}</span>
+      </button>
+    );
+  })}
+</div>
+
 
         {/* CONTENIDO */}
         <div

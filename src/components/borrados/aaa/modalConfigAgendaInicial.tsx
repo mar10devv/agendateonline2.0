@@ -1,7 +1,7 @@
 // src/components/agendaVirtual/ui/modalConfigAgendaInicial.tsx
 import { useState, useEffect } from "react";
-import ModalBase from "../../ui/modalGenerico";
-import { db } from "../../../lib/firebase";
+import ModalBase from "../ui/modalGenerico";
+import { db } from "../../lib/firebase";
 import {
   doc,
   getDoc,
@@ -10,9 +10,9 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { subirImagenImgBB } from "../backend/modalEmpleadosBackend";
-import { obtenerDireccion } from "../../../lib/geocoding";
-import { guardarUbicacionNegocio } from "../backend/agenda-backend";
+import { subirImagenImgBB } from "../agendaVirtual/backend/modalEmpleadosBackend";
+import { obtenerDireccion } from "../../lib/geocoding";
+import { guardarUbicacionNegocio } from "../agendaVirtual/backend/agenda-backend";
 
 // 🌍 Leaflet
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
