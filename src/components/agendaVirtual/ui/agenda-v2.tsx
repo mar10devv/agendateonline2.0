@@ -20,6 +20,7 @@ import { obtenerDireccion } from "../../../lib/geocoding";
 import { guardarUbicacionNegocio, escucharServicios } from "../backend/agenda-backend";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
+import CardServicio from "../../ui/cardServicio";
 
 import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
 import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
@@ -404,31 +405,25 @@ export default function AgendaVirtualUIv3({
 
   const renderVista = () => {
     switch (vista) {
-      case "servicios":
-        return (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {serviciosState.length > 0 ? (
-              serviciosState.map((s) => (
-                <div
-                  key={s.id || s.servicio}
-                  className="
-                    p-4 rounded-2xl text-center
-                    bg-[var(--color-primario-oscuro)]
-                    text-[var(--color-texto)]
-                    shadow-md border border-white/10
-                    transition-all duration-300
-                  "
-                >
-                  <p className="font-semibold">{s.servicio}</p>
-                  <p className="text-sm opacity-80">${s.precio}</p>
-                  <p className="text-xs opacity-60">{s.duracion} min</p>
-                </div>
-              ))
-            ) : (
-              <p className="opacity-80">No hay servicios cargados.</p>
-            )}
-          </div>
-        );
+case "servicios":
+  return (
+<div className="flex flex-wrap gap-6 justify-start">
+  {serviciosState.length > 0 ? (
+    serviciosState.map((s) => (
+      <CardServicio
+        key={s.id || s.servicio}
+        nombre={s.servicio}
+        precio={s.precio}
+        duracion={s.duracion}
+      />
+    ))
+  ) : (
+    <p className="opacity-80">No hay servicios cargados.</p>
+  )}
+</div>
+
+  );
+
 
       case "empleados": {
         const listaEmpleados =
