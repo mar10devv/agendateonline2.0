@@ -8,7 +8,7 @@ import {
   Share2
 } from "lucide-react";
 
-import AgendaNegocio from "../ui/agendaNegocio";
+import CalendarioBase from "../calendario/calendario-diseño";
 import ModalAgendarse from "./modalAgendarse";
 import ModalShare from "./share";
 import ModalPerfil from "../ui/modalPerfil";
@@ -26,7 +26,6 @@ import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
 import IconUbicacion from "../../../assets/icon-navbar/map.svg?url";
 
-import SocialMedia from "../../ui/social-media";
 import { db } from "../../../lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 
@@ -154,6 +153,8 @@ export default function AgendaVirtualUIv3({
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] =
     useState<"idle" | "cargando" | "exito">("idle");
+      const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
+
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
@@ -217,6 +218,26 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
   // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
+
+      useEffect(() => {
+    if (!empleadosParaAgenda || empleadosParaAgenda.length === 0) {
+      setEmpleadoSeleccionado(null);
+      return;
+    }
+
+    setEmpleadoSeleccionado((prev) => {
+      if (!prev) return empleadosParaAgenda[0];
+
+      const mismo = empleadosParaAgenda.find(
+        (e) =>
+          (prev.id && e.id === prev.id) ||
+          (prev.email && e.email === prev.email)
+      );
+
+      return mismo || empleadosParaAgenda[0];
+    });
+  }, [empleadosParaAgenda]);
+
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -420,30 +441,104 @@ const empleadosFuente = useMemo<Empleado[]>(() => {
         );
       }
 
-      case "agenda":
-        return modo === "cliente" ? (
-          <div className="flex justify-center">
-            <button
-              onClick={() => setModalAgendarse(true)}
-              className="
-                px-6 py-3 rounded-2xl transition
-                bg-[var(--color-primario)]
-                hover:bg-[var(--color-primario-oscuro)]
-              "
-            >
-              Reservar Turno
-            </button>
+      case "agenda": {
+        const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
+
+        // 📌 Vista cliente: solo botón de reservar (se abre ModalAgendarse)
+        if (modoAgenda === "cliente") {
+          return (
+            <div className="flex justify-center">
+              <button
+                onClick={() => setModalAgendarse(true)}
+                className="
+                  px-6 py-3 rounded-2xl transition
+                  bg-[var(--color-primario)]
+                  hover:bg-[var(--color-primario-oscuro)]
+                "
+              >
+                Reservar Turno
+              </button>
+            </div>
+          );
+        }
+
+        // 📌 Vista dueño/admin: selector de empleado + CalendarioBase
+        const empleadoActual =
+          empleadoSeleccionado || empleadosParaAgenda[0] || null;
+
+        if (!empleadoActual) {
+          return (
+            <p className="text-sm text-gray-400">
+              No hay empleados configurados en la agenda.
+            </p>
+          );
+        }
+
+        // 👇 Adaptamos el negocio al formato esperado por calendario-backend
+        const negocioAgenda: any = {
+          id: negocio.id,
+          nombre: negocio.nombre,
+          slug: negocio.slug,
+          ownerUid: negocio.id,
+          adminUids: empleadosParaAgenda
+            .filter((e) => e.admin === true)
+            .map((e) => e.email || ""),
+          configuracionAgenda: negocio.configuracionAgenda || {},
+          empleados: empleadosParaAgenda,
+          empleadosData: empleadosParaAgenda,
+        };
+
+        // 👇 Usuario actual para esDuenoOAdmin (simple por ahora)
+        const usuarioActualCalendario: any = {
+          uid: usuario?.email || "anon",
+          email: usuario?.email || null,
+          rol: modo,
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* Selector de empleados (chips) */}
+            {empleadosParaAgenda.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {empleadosParaAgenda.map((e, idx) => {
+                  const isActive =
+                    (empleadoActual?.id && e.id === empleadoActual.id) ||
+                    (empleadoActual?.email &&
+                      e.email === empleadoActual.email) ||
+                    (!empleadoActual && idx === 0);
+
+                  return (
+                    <button
+                      key={e.id || e.email || e.nombre || idx}
+                      type="button"
+                      onClick={() => setEmpleadoSeleccionado(e)}
+                      className={`px-3 py-1.5 rounded-full text-xs border transition
+                        ${
+                          isActive
+                            ? "bg-[var(--color-texto)] text-[var(--color-primario)] border-[var(--color-texto)]"
+                            : "bg-transparent text-[var(--color-texto)] border-white/20 hover:bg-white/10"
+                        }`}
+                    >
+                      {e.nombre || "Sin nombre"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* CalendarioBase conectado al empleado seleccionado */}
+            <CalendarioBase
+              modo={modoAgenda}                    // "negocio"
+              usuarioActual={usuarioActualCalendario}
+              negocio={negocioAgenda}
+              empleado={empleadoActual as any}
+              empleados={empleadosParaAgenda as any}
+              turnos={turnos as any}
+              minutosPorSlot={30}
+            />
           </div>
-        ) : (
-          <AgendaNegocio
-            negocio={{
-              id: negocio.id,
-              nombre: negocio.nombre,
-              empleadosData: empleadosParaAgenda, // 👈 solo empleados activos (dueño solo si esEmpleado === true)
-              slug: negocio.slug,
-            }}
-          />
         );
+      }
 
       case "ubicacion":
         return (

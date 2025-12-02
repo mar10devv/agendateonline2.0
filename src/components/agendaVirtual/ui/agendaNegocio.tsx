@@ -21,14 +21,22 @@ type Empleado = {
   nombre: string;
   calendario?: {
     inicio?: string; // "HH:mm"
-    fin?: string;    // "HH:mm"
+    fin?: string; // "HH:mm"
     // puede venir como números (0-6) o como strings ("lunes", etc.)
     diasLibres?: (number | string)[];
-  };
-  esEmpleado?: boolean; // true si trabaja atendiendo
-  rol?: string;         // "dueño" | "empleado" etc.
-};
 
+    // 🆕 medio día guardado dentro del calendario
+    descansoDiaMedio?: string | null;
+    descansoTurnoMedio?: "manana" | "tarde" | null;
+  };
+
+  // 🆕 por si en algún momento los guardamos al nivel del empleado
+  descansoDiaMedio?: string | null;
+  descansoTurnoMedio?: "manana" | "tarde" | null;
+
+  esEmpleado?: boolean; // true si trabaja atendiendo
+  rol?: string; // "dueño" | "empleado" etc.
+};
 
 type Negocio = {
   id: string;
@@ -36,7 +44,7 @@ type Negocio = {
   empleadosData?: Empleado[];
   slug?: string;
   configuracionAgenda?: {
-    diasLibres?: string[]; // días libres del negocio
+    diasLibres?: (string | number)[]; // días libres del negocio
     modoTurnos?: "personalizado" | "jornada";
     clientesPorDia?: number | null;
     horaInicio?: string;
@@ -63,7 +71,12 @@ type TurnoNegocio = {
   bloqueado?: boolean;
 };
 
-type Servicio = { id: string; servicio: string; precio: number; duracion: number | string };
+type Servicio = {
+  id: string;
+  servicio: string;
+  precio: number;
+  duracion: number | string;
+};
 
 /* =============== Helpers fecha/hora =============== */
 const esMismoDia = (a: Date, b: Date) =>
@@ -134,24 +147,56 @@ const solapan = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
 /* ==== Helpers para días libres negocio + empleado ==== */
 const normalize = (str: string) =>
   (str || "")
+    .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-function getDiasLibresNorm(negocio: Negocio, empleadoSel: Empleado | null): string[] {
-  const diasNegocio: string[] = negocio?.configuracionAgenda?.diasLibres || [];
-  const diasEmpleado: string[] = (empleadoSel?.calendario?.diasLibres || []) as string[];
+const MAP_DIA_NUM_A_STR = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+  "sabado",
+];
+
+function mapDiaGeneric(d: string | number): string {
+  if (typeof d === "number") {
+    return MAP_DIA_NUM_A_STR[d] || "";
+  }
+  return normalize(String(d));
+}
+
+/**
+ * Junta días libres de negocio (configuracionAgenda.diasLibres)
+ * y días libres del empleado (calendario.diasLibres).
+ * Los devuelve normalizados (sin acentos, minúsculas, sin espacios).
+ *
+ * Jerarquía: si el NEGOCIO marca un día como libre, ya queda bloqueado
+ * para todos los empleados, sin importar medio día, etc.
+ */
+function getDiasLibresNorm(
+  negocio: Negocio,
+  empleadoSel: Empleado | null
+): string[] {
+  const diasNegocioRaw =
+    (negocio?.configuracionAgenda?.diasLibres || []) as (string | number)[];
+  const diasEmpleadoRaw =
+    (empleadoSel?.calendario?.diasLibres || []) as (string | number)[];
+
+  const diasNegocio = diasNegocioRaw.map(mapDiaGeneric).filter(Boolean);
+  const diasEmpleado = diasEmpleadoRaw.map(mapDiaGeneric).filter(Boolean);
 
   const mezclados = [...new Set([...diasNegocio, ...diasEmpleado])];
-  return mezclados.map(normalize);
+  return mezclados;
 }
 
 function esDiaLibreFecha(fecha: Date, diasLibresNorm: string[]): boolean {
-  const nombreDia = fecha
-    .toLocaleDateString("es-ES", { weekday: "long" })
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  const nombreDia = normalize(
+    fecha.toLocaleDateString("es-ES", { weekday: "long" })
+  );
   return diasLibresNorm.includes(nombreDia);
 }
 
@@ -160,7 +205,10 @@ const esTrabajadorReal = (e: Empleado): boolean => {
   const rolNorm = (e.rol || "").toLowerCase();
 
   // Si es dueño y NO está marcado explícitamente como empleado, NO trabaja
-  if ((rolNorm === "dueño" || rolNorm === "dueno" || rolNorm === "owner") && e.esEmpleado !== true) {
+  if (
+    (rolNorm === "dueño" || rolNorm === "dueno" || rolNorm === "owner") &&
+    e.esEmpleado !== true
+  ) {
     return false;
   }
 
@@ -227,10 +275,14 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
   // Modales
   const [detalles, setDetalles] = useState<TurnoNegocio | null>(null);
-  const [clienteExtra, setClienteExtra] = useState<{ nombre?: string; fotoPerfil?: string } | null>(
-    null
-  );
-  const [modalOpciones, setModalOpciones] = useState<{ visible: boolean; hora?: string | null }>({
+  const [clienteExtra, setClienteExtra] = useState<{
+    nombre?: string;
+    fotoPerfil?: string;
+  } | null>(null);
+  const [modalOpciones, setModalOpciones] = useState<{
+    visible: boolean;
+    hora?: string | null;
+  }>({
     visible: false,
   });
 
@@ -274,8 +326,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   const puedeIrAnterior = hayDiasEnMes(year, month - 1);
   const puedeIrSiguiente = hayDiasEnMes(year, month + 1);
 
-  const irMesAnterior = () => puedeIrAnterior && setMesVisible(new Date(year, month - 1, 1));
-  const irMesSiguiente = () => puedeIrSiguiente && setMesVisible(new Date(year, month + 1, 1));
+  const irMesAnterior = () =>
+    puedeIrAnterior && setMesVisible(new Date(year, month - 1, 1));
+  const irMesSiguiente = () =>
+    puedeIrSiguiente && setMesVisible(new Date(year, month + 1, 1));
 
   /* ---------- Días libres negocio + empleado NORMALIZADOS ---------- */
   const diasLibresNorm = useMemo(
@@ -290,7 +344,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
       try {
         const ref = collection(db, "Negocios", negocio.id, "Precios");
         const snap = await getDocs(ref);
-        const lista = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Servicio[];
+        const lista = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        })) as Servicio[];
         setServicios(lista);
       } catch {
         setServicios([]);
@@ -306,10 +363,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     const trabajadores = lista.filter(esTrabajadorReal);
 
     // si el seleccionado sigue existiendo y además trabaja, lo dejamos
-    if (
-      empleadoSel &&
-      trabajadores.some((e) => e.nombre === empleadoSel.nombre)
-    ) {
+    if (empleadoSel && trabajadores.some((e) => e.nombre === empleadoSel.nombre)) {
       return;
     }
 
@@ -342,7 +396,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
           finTs: par.fin,
         });
       });
-      lista.sort((a, b) => +toDateSafe(a.inicioTs) - +toDateSafe(b.inicioTs));
+      lista.sort(
+        (a, b) => +toDateSafe(a.inicioTs) - +toDateSafe(b.inicioTs)
+      );
       setTurnos(lista);
     });
 
@@ -354,17 +410,152 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     setDiaSel(null);
   }, [empleadoSel?.nombre, negocio?.id]);
 
-  /* ---------- Slots 30' y ocupación ---------- */
-  const slots = useMemo(() => {
-    if (!diaSel) return [] as { hora: string; ocupado: boolean; turno?: TurnoNegocio }[];
+  // 🧠 Configuración de calendario para este empleado (negocio + empleado)
+  const calendarioEmpleado = useMemo(() => {
+    if (!empleadoSel) return null;
 
-    const cal = empleadoSel?.calendario || {};
-    const [hi, mi] = String(cal.inicio || "08:00").split(":").map(Number);
-    const [hf, mf] = String(cal.fin || "22:00").split(":").map(Number);
-    const inicioJ = (hi || 0) * 60 + (mi || 0);
-    const finJ = (hf || 0) * 60 + (mf || 0);
+    const cal = empleadoSel.calendario || {};
+
+    // Días libres del negocio
+    const diasNegocio =
+      (negocio.configuracionAgenda?.diasLibres || []) as (string | number)[];
+
+    // Días libres del empleado (pueden venir como número o string)
+    const diasEmpleadoRaw = (cal.diasLibres || []) as (string | number)[];
+    const diasEmpleado = diasEmpleadoRaw.map((d) =>
+      typeof d === "number" ? MAP_DIA_NUM_A_STR[d] || "" : String(d)
+    );
+
+    const diasLibres = Array.from(new Set([...diasNegocio, ...diasEmpleado]));
+
+    return {
+      modoTurnos: negocio.configuracionAgenda?.modoTurnos || "jornada",
+      clientesPorDia:
+        negocio.configuracionAgenda?.modoTurnos === "personalizado"
+          ? negocio.configuracionAgenda?.clientesPorDia || undefined
+          : undefined,
+      // En jornada usamos intervalos de 30 minutos en este panel
+      horasSeparacion:
+        negocio.configuracionAgenda?.modoTurnos === "jornada" ? 30 : undefined,
+      diasLibres,
+      inicio:
+        (cal as any).inicio ||
+        negocio.configuracionAgenda?.horaInicio ||
+        "09:00",
+      fin:
+        (cal as any).fin ||
+        negocio.configuracionAgenda?.horaFin ||
+        "18:00",
+
+      // 🆕 medio día (puede venir en calendario o en el empleado)
+      descansoDiaMedio:
+        (cal as any).descansoDiaMedio ??
+        (empleadoSel as any)?.descansoDiaMedio ??
+        null,
+      descansoTurnoMedio:
+        (cal as any).descansoTurnoMedio ??
+        (empleadoSel as any)?.descansoTurnoMedio ??
+        null,
+    };
+  }, [empleadoSel, negocio.configuracionAgenda]);
+
+  /* ---------- Slots 30' y ocupación (respetando medio día REAL) ---------- */
+  const slots = useMemo(() => {
+    if (!diaSel || !empleadoSel) {
+      return [] as { hora: string; ocupado: boolean; turno?: TurnoNegocio }[];
+    }
+
+    const cal: any = empleadoSel.calendario || {};
+
+    // Horario base (empleado o negocio como fallback)
+    const [hi, mi] = String(
+      cal.inicio || negocio.configuracionAgenda?.horaInicio || "09:00"
+    )
+      .split(":")
+      .map(Number);
+
+    const [hf, mf] = String(
+      cal.fin || negocio.configuracionAgenda?.horaFin || "18:00"
+    )
+      .split(":")
+      .map(Number);
+
+    let inicioJ = (hi || 0) * 60 + (mi || 0); // minutos inicio jornada
+    let finJ = (hf || 0) * 60 + (mf || 0); // minutos fin jornada
+    let totalMinutes = finJ - inicioJ;
+
+    if (totalMinutes <= 0) {
+      console.warn("[AgendaNegocio] Rango horario inválido", {
+        inicio: cal.inicio,
+        fin: cal.fin,
+      });
+      return [];
+    }
+
+    // 🧠 Medio día configurado (día concreto + turno mañana/tarde)
+    const descansoDiaMedioRaw: string | null =
+      cal.descansoDiaMedio ?? (empleadoSel as any)?.descansoDiaMedio ?? null;
+
+    const descansoTurnoMedio: "manana" | "tarde" | null =
+      cal.descansoTurnoMedio ??
+      (empleadoSel as any)?.descansoTurnoMedio ??
+      null;
+
+    let esDiaMedio = false;
+
+    if (descansoDiaMedioRaw && descansoTurnoMedio) {
+      const diaMedioNorm = normalize(descansoDiaMedioRaw);
+      const diaSelNorm = normalize(
+        diaSel.toLocaleDateString("es-ES", { weekday: "long" })
+      );
+
+      esDiaMedio = diaSelNorm === diaMedioNorm;
+    }
+
+    // ⏱️ Aplicar recorte de medio día SOLO si el negocio NO tiene ese día
+    // marcado como libre completo. Si el negocio lo tiene libre, ya ni
+    // siquiera deberíamos estar acá porque el día completo está bloqueado.
+    const nombreDiaSelNorm = normalize(
+      diaSel.toLocaleDateString("es-ES", { weekday: "long" })
+    );
+    const negocioTieneLibreEseDia = diasLibresNorm.includes(nombreDiaSelNorm);
+
+    if (esDiaMedio && !negocioTieneLibreEseDia && totalMinutes > 120) {
+      const mitad = Math.floor(totalMinutes / 2); // mitad de la jornada
+
+      if (descansoTurnoMedio === "manana") {
+        // medio día EN LA MAÑANA → trabaja solo la primera mitad
+        // Ej: 08:00–20:00 → 08:00–14:00
+        finJ = inicioJ + mitad;
+      } else if (descansoTurnoMedio === "tarde") {
+        // medio día EN LA TARDE → trabaja solo la segunda mitad
+        // Ej: 08:00–20:00 → 14:00–20:00
+        inicioJ = finJ - mitad;
+      }
+
+      totalMinutes = finJ - inicioJ;
+
+      if (totalMinutes <= 0) {
+        console.warn(
+          "[AgendaNegocio] Medio día dejó un rango vacío, se vuelve a jornada completa"
+        );
+        inicioJ = (hi || 0) * 60 + (mi || 0);
+        finJ = (hf || 0) * 60 + (mf || 0);
+      }
+
+      console.log("[AgendaNegocio] Ventana final aplicada medio día →", {
+        empleado: empleadoSel.nombre,
+        descansoDiaMedioRaw,
+        descansoTurnoMedio,
+        inicioJ,
+        finJ,
+        totalMinutes,
+      });
+    }
+
     const paso = 30;
 
+    // Turnos ya ocupados / bloqueados de ese día
     const turnosDelDia = turnos
       .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
       .map((t) => {
@@ -394,7 +585,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
     }
 
     return out;
-  }, [empleadoSel?.calendario, turnos, diaSel]);
+  }, [empleadoSel, negocio.configuracionAgenda, turnos, diaSel, diasLibresNorm]);
 
   /* ---------- Datos extra del cliente ---------- */
   useEffect(() => {
@@ -447,7 +638,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
   const reservasDelDia = diaSel
     ? turnos
         .filter((t) => esMismoDia(toDateSafe(t.inicioTs as any), diaSel))
-        .sort((a, b) => +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any))
+        .sort(
+          (a, b) =>
+            +toDateSafe(a.inicioTs as any) - +toDateSafe(b.inicioTs as any)
+        )
     : [];
 
   const handleEliminarTurno = async (
@@ -460,7 +654,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
       batch.delete(doc(db, "Negocios", negocio.id, "Turnos", turno.id));
 
       if (turno.clienteUid) {
-        batch.delete(doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id));
+        batch.delete(
+          doc(db, "Usuarios", turno.clienteUid, "Turnos", turno.id)
+        );
       }
 
       await batch.commit();
@@ -487,15 +683,22 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
           console.log("[frontend] notificar-cancelacion payload →", payload);
 
-          const res = await fetch("/.netlify/functions/notificar-cancelacion", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const res = await fetch(
+            "/.netlify/functions/notificar-cancelacion",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          );
 
           const txt = await res.text();
           if (!res.ok) {
-            console.error("❌ No se pudo enviar el mail de cancelación:", res.status, txt);
+            console.error(
+              "❌ No se pudo enviar el mail de cancelación:",
+              res.status,
+              txt
+            );
           } else {
             console.log("✅ Mail de cancelación enviado:", txt);
           }
@@ -538,7 +741,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
           value={empleadoSel?.nombre || ""}
           onChange={(e) => {
             const emp =
-              empleadosParaSelector.find((x) => x.nombre === e.target.value) || null;
+              empleadosParaSelector.find(
+                (x) => x.nombre === e.target.value
+              ) || null;
             setEmpleadoSel(emp);
           }}
         >
@@ -587,7 +792,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
           <div className="grid grid-cols-7 text-xs text-gray-400 mb-1">
             {["L", "M", "X", "J", "V", "S", "D"].map((d, i) => (
-              <div key={i} className="w-10 h-8 flex items-center justify-center">
+              <div
+                key={i}
+                className="w-10 h-8 flex items-center justify-center"
+              >
                 {d}
               </div>
             ))}
@@ -600,7 +808,12 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
               const esHoy = esMismoDia(d, hoy);
               const esPasado =
-                d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+                d <
+                new Date(
+                  hoy.getFullYear(),
+                  hoy.getMonth(),
+                  hoy.getDate()
+                );
               const esLibre = esDiaLibreFecha(d, diasLibresNorm);
               const seleccionado = diaSel && esMismoDia(diaSel, d);
               const disabled = esPasado || esLibre;
@@ -613,7 +826,8 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     esMismoDia(toDateSafe(t.inicioTs as any), d)
                   );
                   const todosBloqueados =
-                    turnosDia.length > 0 && turnosDia.every((t) => t.bloqueado);
+                    turnosDia.length > 0 &&
+                    turnosDia.every((t) => t.bloqueado);
 
                   setModalBloquearDia({
                     visible: true,
@@ -634,7 +848,8 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
               } else if (esHoy) {
                 clases += "bg-white text-black font-bold";
               } else if (esPasado) {
-                clases += "text-gray-500 line-through cursor-not-allowed";
+                clases +=
+                  "text-gray-500 line-through cursor-not-allowed";
               } else if (seleccionado) {
                 clases += "bg-indigo-600 text-white font-bold";
               } else {
@@ -697,14 +912,18 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       className="flex items-center justify-between bg-neutral-900 rounded px-2 py-1"
                     >
                       <span className="font-semibold">
-                        {toDateSafe(t.inicioTs).toLocaleTimeString("es-ES", {
+                        {toDateSafe(
+                          t.inicioTs
+                        ).toLocaleTimeString("es-ES", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
                       </span>
 
                       <span className="truncate">
-                        {t.bloqueado ? "Bloqueado" : t.clienteNombre ?? "Reservado"}
+                        {t.bloqueado
+                          ? "Bloqueado"
+                          : t.clienteNombre ?? "Reservado"}
                         {t.servicioNombre && !t.bloqueado
                           ? ` • ${t.servicioNombre}`
                           : ""}
@@ -720,7 +939,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                   {slots.map((s, i) => {
                     const bloqueado = s.turno?.bloqueado;
                     const ocupado = s.ocupado && !bloqueado;
-                    const vencido = diaSel ? esSlotPasado(diaSel, s.hora) : false;
+                    const vencido = diaSel
+                      ? esSlotPasado(diaSel, s.hora)
+                      : false;
 
                     let claseEstado = "";
                     if (vencido) {
@@ -746,14 +967,23 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                                 )
                               ) {
                                 await deleteDoc(
-                                  doc(db, "Negocios", negocio.id, "Turnos", s.turno!.id)
+                                  doc(
+                                    db,
+                                    "Negocios",
+                                    negocio.id,
+                                    "Turnos",
+                                    s.turno!.id
+                                  )
                                 );
                               }
                             }
                           } else if (ocupado) {
                             setDetalles(s.turno!);
                           } else if (!vencido) {
-                            setModalOpciones({ visible: true, hora: s.hora });
+                            setModalOpciones({
+                              visible: true,
+                              hora: s.hora,
+                            });
                           }
                         }}
                         className={`horario-btn h-14 grid place-items-center text-sm font-semibold transition focus:outline-none ${claseEstado}`}
@@ -797,7 +1027,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
             className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
             style={{ backgroundColor: "var(--color-fondo)" }}
           >
-            <h3 className="text-lg font-semibold mb-4">Detalle del turno</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Detalle del turno
+            </h3>
 
             <div className="space-y-2 text-sm">
               <div>
@@ -816,11 +1048,15 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
               {!detalles.bloqueado ? (
                 <>
                   <div>
-                    <span className="text-gray-400">Servicio:</span>{" "}
+                    <span className="text-gray-400">
+                      Servicio:
+                    </span>{" "}
                     <b>{detalles.servicioNombre || "—"}</b>
                   </div>
                   <div>
-                    <span className="text-gray-400">Cliente:</span>{" "}
+                    <span className="text-gray-400">
+                      Cliente:
+                    </span>{" "}
                     <b>{detalles.clienteNombre || "—"}</b>
                   </div>
                   <div>
@@ -828,7 +1064,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     <b>{detalles.clienteEmail || "—"}</b>
                   </div>
                   <div>
-                    <span className="text-gray-400">Teléfono:</span>{" "}
+                    <span className="text-gray-400">
+                      Teléfono:
+                    </span>{" "}
                     <b>{detalles.clienteTelefono || "—"}</b>
                   </div>
                   {clienteExtra?.nombre && (
@@ -896,12 +1134,16 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
             className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
             style={{ backgroundColor: "var(--color-fondo)" }}
           >
-            <h3 className="text-lg font-semibold mb-4">Eliminar turno</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Eliminar turno
+            </h3>
 
             <p className="text-sm mb-4">
               Estás por eliminar el turno de{" "}
-              <b>{modalEliminar.turno.clienteNombre || "Cliente"}</b> a las{" "}
-              <b>{modalEliminar.turno.hora}</b> el{" "}
+              <b>
+                {modalEliminar.turno.clienteNombre || "Cliente"}
+              </b>{" "}
+              a las <b>{modalEliminar.turno.hora}</b> el{" "}
               <b>{modalEliminar.turno.fecha}</b>.
             </p>
 
@@ -911,14 +1153,18 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {MOTIVOS_PREDETERMINADOS.map((m) => {
-                  const activo = (modalEliminar.motivo || "").trim() === m;
+                  const activo =
+                    (modalEliminar.motivo || "").trim() === m;
                   return (
                     <button
                       key={m}
                       type="button"
                       disabled={modalEliminar.estado === "loading"}
                       onClick={() =>
-                        setModalEliminar((s) => ({ ...s, motivo: m }))
+                        setModalEliminar((s) => ({
+                          ...s,
+                          motivo: m,
+                        }))
                       }
                       className={`px-3 py-1.5 rounded-full text-xs border transition
                   ${
@@ -980,7 +1226,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                 onClick={async () => {
                   if (modalEliminar.estado === "loading") return;
 
-                  setModalEliminar((s) => ({ ...s, estado: "loading" }));
+                  setModalEliminar((s) => ({
+                    ...s,
+                    estado: "loading",
+                  }));
 
                   const motivo = (modalEliminar.motivo || "").trim();
                   const ok = await handleEliminarTurno(
@@ -989,7 +1238,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                   );
 
                   if (ok) {
-                    setModalEliminar((s) => ({ ...s, estado: "success" }));
+                    setModalEliminar((s) => ({
+                      ...s,
+                      estado: "success",
+                    }));
                     setTimeout(() => {
                       setModalEliminar({
                         visible: false,
@@ -999,7 +1251,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       });
                     }, 1200);
                   } else {
-                    setModalEliminar((s) => ({ ...s, estado: "error" }));
+                    setModalEliminar((s) => ({
+                      ...s,
+                      estado: "error",
+                    }));
                   }
                 }}
                 disabled={
@@ -1019,7 +1274,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
             }`}
               >
                 {modalEliminar.estado === "loading" && (
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <svg
+                    className="animate-spin h-4 w-4"
+                    viewBox="0 0 24 24"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -1065,7 +1323,7 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
             }}
           />
           <div
-            className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duración-300"
+            className="rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700 transition-colors duration-300"
             style={{ backgroundColor: "var(--color-fondo)" }}
           >
             <h3 className="text-lg font-semibold mb-4">
@@ -1078,23 +1336,30 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
               {modalBloquearDia.desbloquear ? (
                 <>
                   ¿Seguro que deseas <b>liberar</b> el día{" "}
-                  {modalBloquearDia.fecha.toLocaleDateString("es-ES", {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "long",
-                  })}
+                  {modalBloquearDia.fecha.toLocaleDateString(
+                    "es-ES",
+                    {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "long",
+                    }
+                  )}
                   ?
                   <br />
-                  Todos los turnos bloqueados volverán a estar disponibles.
+                  Todos los turnos bloqueados volverán a estar
+                  disponibles.
                 </>
               ) : (
                 <>
                   ¿Seguro que deseas <b>bloquear</b> el día{" "}
-                  {modalBloquearDia.fecha.toLocaleDateString("es-ES", {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "long",
-                  })}
+                  {modalBloquearDia.fecha.toLocaleDateString(
+                    "es-ES",
+                    {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "long",
+                    }
+                  )}
                   ?
                   <br />
                   Todos los turnos quedarán inhabilitados.
@@ -1122,7 +1387,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                 onClick={async () => {
                   if (modalBloquearDia.estado === "loading") return;
 
-                  setModalBloquearDia((s) => ({ ...s, estado: "loading" }));
+                  setModalBloquearDia((s) => ({
+                    ...s,
+                    estado: "loading",
+                  }));
 
                   try {
                     if (modalBloquearDia.desbloquear) {
@@ -1135,7 +1403,13 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       );
                       for (const t of turnosDia) {
                         await deleteDoc(
-                          doc(db, "Negocios", negocio.id, "Turnos", t.id)
+                          doc(
+                            db,
+                            "Negocios",
+                            negocio.id,
+                            "Turnos",
+                            t.id
+                          )
                         );
                       }
                     } else {
@@ -1151,12 +1425,19 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       const finJ = (hf || 0) * 60 + (mf || 0);
                       const paso = 30;
 
-                      const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+                      const refNeg = collection(
+                        db,
+                        "Negocios",
+                        negocio.id,
+                        "Turnos"
+                      );
 
                       for (let m = inicioJ; m < finJ; m += paso) {
                         const hora = minToHHMM(m);
                         const inicio = combinarFechaHora(fecha, hora);
-                        const fin = new Date(inicio.getTime() + 30 * 60000);
+                        const fin = new Date(
+                          inicio.getTime() + 30 * 60000
+                        );
 
                         await addDoc(refNeg, {
                           negocioId: negocio.id,
@@ -1174,7 +1455,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       }
                     }
 
-                    setModalBloquearDia((s) => ({ ...s, estado: "success" }));
+                    setModalBloquearDia((s) => ({
+                      ...s,
+                      estado: "success",
+                    }));
                     setTimeout(() => {
                       setModalBloquearDia({
                         visible: false,
@@ -1184,8 +1468,14 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                       });
                     }, 1200);
                   } catch (e) {
-                    console.error("❌ Error bloqueando/liberando día:", e);
-                    setModalBloquearDia((s) => ({ ...s, estado: "error" }));
+                    console.error(
+                      "❌ Error bloqueando/liberando día:",
+                      e
+                    );
+                    setModalBloquearDia((s) => ({
+                      ...s,
+                      estado: "error",
+                    }));
                   }
                 }}
                 disabled={modalBloquearDia.estado === "loading"}
@@ -1226,11 +1516,14 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-2 sm:p-6">
           <div
             className="absolute inset-0 bg-black/60"
-            onClick={() => setModalOpciones({ visible: false })}
+            onClick={() =>
+              setModalOpciones({ visible: false })
+            }
           />
           <div className="bg-neutral-900 rounded-2xl p-6 w-full max-w-md relative z-10 shadow-xl border border-neutral-700">
             <h3 className="text-lg font-semibold mb-4">
-              Turno {modalOpciones.hora} • {diaSel.toLocaleDateString("es-ES")}
+              Turno {modalOpciones.hora} •{" "}
+              {diaSel.toLocaleDateString("es-ES")}
             </h3>
 
             <div className="flex flex-col gap-3">
@@ -1254,10 +1547,20 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
                 onClick={async () => {
                   try {
-                    const inicio = combinarFechaHora(diaSel!, modalOpciones.hora!);
-                    const fin = new Date(inicio.getTime() + 30 * 60000);
+                    const inicio = combinarFechaHora(
+                      diaSel!,
+                      modalOpciones.hora!
+                    );
+                    const fin = new Date(
+                      inicio.getTime() + 30 * 60000
+                    );
 
-                    const refNeg = collection(db, "Negocios", negocio.id, "Turnos");
+                    const refNeg = collection(
+                      db,
+                      "Negocios",
+                      negocio.id,
+                      "Turnos"
+                    );
                     await addDoc(refNeg, {
                       negocioId: negocio.id,
                       negocioNombre: negocio.nombre,
@@ -1274,7 +1577,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
                     setModalOpciones({ visible: false });
                   } catch (e) {
-                    console.error("❌ Error bloqueando turno:", e);
+                    console.error(
+                      "❌ Error bloqueando turno:",
+                      e
+                    );
                   }
                 }}
               >
@@ -1291,7 +1597,11 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() =>
-              setManualOpen({ visible: false, hora: null, paso: 1 })
+              setManualOpen({
+                visible: false,
+                hora: null,
+                paso: 1,
+              })
             }
           />
           <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
@@ -1305,7 +1615,11 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                 </h4>
                 <button
                   onClick={() =>
-                    setManualOpen({ visible: false, hora: null, paso: 1 })
+                    setManualOpen({
+                      visible: false,
+                      hora: null,
+                      paso: 1,
+                    })
                   }
                   className="text-gray-300 hover:text-white text-xl"
                 >
@@ -1320,12 +1634,19 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     ¿Desea agendar manualmente un turno a las{" "}
                     <b>{manualOpen.hora}</b> para{" "}
                     <b>{empleadoSel?.nombre}</b> el{" "}
-                    <b>{diaSel.toLocaleDateString("es-ES")}</b>?
+                    <b>
+                      {diaSel.toLocaleDateString("es-ES")}
+                    </b>
+                    ?
                   </p>
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() =>
-                        setManualOpen({ visible: false, hora: null, paso: 1 })
+                        setManualOpen({
+                          visible: false,
+                          hora: null,
+                          paso: 1,
+                        })
                       }
                       className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
                     >
@@ -1333,7 +1654,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     </button>
                     <button
                       onClick={() =>
-                        setManualOpen((s) => ({ ...s, paso: 2 }))
+                        setManualOpen((s) => ({
+                          ...s,
+                          paso: 2,
+                        }))
                       }
                       className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
@@ -1346,7 +1670,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
               {/* Paso 2 */}
               {manualOpen.paso === 2 && (
                 <div className="p-4 sm:p-6 space-y-4 text-sm">
-                  <div className="text-gray-300">Selecciona un servicio:</div>
+                  <div className="text-gray-300">
+                    Selecciona un servicio:
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {servicios.map((s) => (
                       <button
@@ -1365,7 +1691,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                             : "border-neutral-700 hover:bg-neutral-800"
                         }`}
                       >
-                        <div className="font-medium">{s.servicio}</div>
+                        <div className="font-medium">
+                          {s.servicio}
+                        </div>
                         <div className="text-gray-400 text-xs">
                           {s.duracion} min • ${s.precio}
                         </div>
@@ -1376,7 +1704,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                   <div className="flex justify-between">
                     <button
                       onClick={() =>
-                        setManualOpen((s) => ({ ...s, paso: 1 }))
+                        setManualOpen((s) => ({
+                          ...s,
+                          paso: 1,
+                        }))
                       }
                       className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
                     >
@@ -1384,7 +1715,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                     </button>
                     <button
                       onClick={() =>
-                        setManualOpen((s) => ({ ...s, paso: 3 }))
+                        setManualOpen((s) => ({
+                          ...s,
+                          paso: 3,
+                        }))
                       }
                       disabled={!manualOpen.servicio}
                       className={`px-3 py-2 rounded-lg ${
@@ -1462,7 +1796,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                   <div className="flex justify-between">
                     <button
                       onClick={() =>
-                        setManualOpen((s) => ({ ...s, paso: 2 }))
+                        setManualOpen((s) => ({
+                          ...s,
+                          paso: 2,
+                        }))
                       }
                       className="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700"
                     >
@@ -1473,7 +1810,8 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                         if (!manualOpen.nombre?.trim()) {
                           setManualOpen((s) => ({
                             ...s,
-                            error: "El nombre del cliente es obligatorio.",
+                            error:
+                              "El nombre del cliente es obligatorio.",
                           }));
                           return;
                         }
@@ -1487,7 +1825,10 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
 
                         try {
                           const hora = manualOpen.hora!;
-                          const inicio = combinarFechaHora(diaSel!, hora);
+                          const inicio = combinarFechaHora(
+                            diaSel!,
+                            hora
+                          );
                           const dur = parseDuracionMin(
                             manualOpen.servicio.duracion
                           );
@@ -1501,7 +1842,9 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                             return;
                           }
 
-                          const fin = new Date(inicio.getTime() + dur * 60000);
+                          const fin = new Date(
+                            inicio.getTime() + dur * 60000
+                          );
                           const refNeg = collection(
                             db,
                             "Negocios",
@@ -1512,7 +1855,8 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                             negocioId: negocio.id,
                             negocioNombre: negocio.nombre,
                             servicioId: manualOpen.servicio.id,
-                            servicioNombre: manualOpen.servicio.servicio,
+                            servicioNombre:
+                              manualOpen.servicio.servicio,
                             duracion: manualOpen.servicio.duracion,
                             empleadoId: empleadoSel?.id || null,
                             empleadoNombre: empleadoSel?.nombre,
@@ -1522,16 +1866,22 @@ export default function AgendaNegocio({ negocio }: { negocio: Negocio }) {
                             finTs: fin,
                             clienteNombre: manualOpen.nombre.trim(),
                             clienteEmail: manualOpen.email || null,
-                            clienteTelefono: manualOpen.telefono || null,
+                            clienteTelefono:
+                              manualOpen.telefono || null,
                             creadoEn: new Date(),
                             creadoPor: "negocio-manual",
                           });
 
-                          setManualOpen({ visible: false, hora: null, paso: 1 });
+                          setManualOpen({
+                            visible: false,
+                            hora: null,
+                            paso: 1,
+                          });
                         } catch (e) {
                           setManualOpen((s) => ({
                             ...s,
-                            error: "No se pudo guardar el turno.",
+                            error:
+                              "No se pudo guardar el turno.",
                           }));
                         }
                       }}

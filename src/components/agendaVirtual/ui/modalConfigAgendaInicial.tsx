@@ -48,6 +48,7 @@ type Props = {
   onClose: () => void;
   negocioId: string;
   configuracionActual?: ConfigAgenda;
+  onGuardado?: (nuevaConfig: ConfigAgenda) => void; // ⭐ NUEVO
 };
 
 type ServicioLocal = {
@@ -115,6 +116,7 @@ export default function ModalConfigAgendaInicial({
   onClose,
   negocioId,
   configuracionActual,
+  onGuardado, // ⭐ NUEVO: lo recibimos
 }: Props) {
   const [paso, setPaso] = useState(1);
 
@@ -161,7 +163,6 @@ export default function ModalConfigAgendaInicial({
 
   const esNegocio = tipoAgenda === "negocio";
   const totalPasos = esNegocio ? 4 : 3;
-
 
   // --------- Cargar datos desde Firebase al abrir ---------
   useEffect(() => {
@@ -246,30 +247,39 @@ export default function ModalConfigAgendaInicial({
 
         // ---- Empleados iniciales ----
         const empleadosDb = (data.empleadosData as any[]) ?? [];
-
         if (tAgenda === "negocio") {
           if (empleadosDb.length > 0) {
             setEmpleados(
-              empleadosDb.map((e: any) => ({
-                nombre: e.nombre ?? "",
-                email: e.email ?? "",
-                rol: e.rol === "admin" ? "admin" : "empleado",
-                esEmpleado: e.esEmpleado !== false,
-                fotoPerfil: e.fotoPerfil ?? "",
-                subiendoFoto: false,
-                trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
-                horarioModo: "personalizado",
-                horarioInicio: e.calendario?.inicio ?? inicio,
-                horarioFin: e.calendario?.fin ?? fin,
-                diasLibres: Array.isArray(e.calendario?.diasLibres)
-                  ? e.calendario.diasLibres
-                  : dias,
-                descansoModo: "negocio",
-                diasDescansoExtra: [],
-              }))
+              empleadosDb.map((e: any) => {
+                const cal = e.calendario || {};
+                const cfgDescansoModo: DescansoModo =
+                  (e.descansoModo as DescansoModo) ?? "negocio";
+
+                const diasExtraDb: string[] = Array.isArray(e.diasDescansoExtra)
+                  ? e.diasDescansoExtra
+                  : [];
+
+                return {
+                  nombre: e.nombre ?? "",
+                  email: e.email ?? "",
+                  rol: e.rol === "admin" ? "admin" : "empleado",
+                  esEmpleado: e.esEmpleado !== false,
+                  fotoPerfil: e.fotoPerfil ?? "",
+                  subiendoFoto: false,
+                  trabajos: Array.isArray(e.trabajos) ? e.trabajos : [],
+
+                  horarioModo: "personalizado",
+                  horarioInicio: cal.inicio ?? inicio,
+                  horarioFin: cal.fin ?? fin,
+                  diasLibres: Array.isArray(cal.diasLibres) ? cal.diasLibres : dias,
+
+                  // 👇 ahora respeta lo guardado en Firebase
+                  descansoModo: cfgDescansoModo,
+                  diasDescansoExtra: diasExtraDb,
+                } as EmpleadoLocal;
+              })
             );
           } else {
-            // Negocio sin empleados aún: creamos uno base
             setEmpleados([
               {
                 nombre: data.nombre ?? "Empleado 1",
@@ -288,25 +298,6 @@ export default function ModalConfigAgendaInicial({
               },
             ]);
           }
-        } else {
-          // Emprendimiento: 1 empleado interno (vos)
-          setEmpleados([
-            {
-              nombre: data.nombre ?? "Vos",
-              email: data.emailContacto ?? "",
-              rol: "admin",
-              esEmpleado: true,
-              fotoPerfil: data.perfilLogo ?? "",
-              subiendoFoto: false,
-              trabajos: [],
-              horarioModo: "personalizado",
-              horarioInicio: inicio,
-              horarioFin: fin,
-              diasLibres: dias,
-              descansoModo: "negocio",
-              diasDescansoExtra: [],
-            },
-          ]);
         }
 
         // Servicios: empezamos vacío para que el usuario los cargue acá
@@ -630,29 +621,28 @@ export default function ModalConfigAgendaInicial({
 
           const extra = e.diasDescansoExtra ?? [];
 
-// 👉 MODO "1 día libre o más": debe haber AL MENOS 1 día seleccionado
-if (e.descansoModo === "1dia" && extra.length < 1) {
-  alert(
-    `Elegí al menos 1 día extra de descanso para "${
-      e.nombre || "empleado"
-    }".`
-  );
-  return;
-}
+          // 👉 MODO "1 día libre o más": debe haber AL MENOS 1 día seleccionado
+          if (e.descansoModo === "1dia" && extra.length < 1) {
+            alert(
+              `Elegí al menos 1 día extra de descanso para "${
+                e.nombre || "empleado"
+              }".`
+            );
+            return;
+          }
 
-// 👉 MODO "2 días" o "1 día y medio": deben ser EXACTAMENTE 2 días
-if (
-  (e.descansoModo === "2dias" || e.descansoModo === "diaYMedio") &&
-  extra.length !== 2
-) {
-  alert(
-    `Elegí exactamente 2 días extra de descanso para "${
-      e.nombre || "empleado"
-    }".`
-  );
-  return;
-}
-
+          // 👉 MODO "2 días" o "1 día y medio": deben ser EXACTAMENTE 2 días
+          if (
+            (e.descansoModo === "2dias" || e.descansoModo === "diaYMedio") &&
+            extra.length !== 2
+          ) {
+            alert(
+              `Elegí exactamente 2 días extra de descanso para "${
+                e.nombre || "empleado"
+              }".`
+            );
+            return;
+          }
         }
       }
     }
@@ -705,56 +695,55 @@ if (
               new Set([...diasBaseNegocio, ...diasExtraUnique])
             );
           } else if (e.descansoModo === "diaYMedio") {
-  // Día y medio:
-  // - diasExtraUnique[0] => día libre completo
-  // - diasExtraUnique[1] => día de medio turno
-  if (diasExtraUnique.length >= 1) {
-    descansoDiaLibre = diasExtraUnique[0];
-  }
-  if (diasExtraUnique.length >= 2) {
-    descansoDiaMedio = diasExtraUnique[1];
-  }
+            // Día y medio:
+            // - diasExtraUnique[0] => día libre completo
+            // - diasExtraUnique[1] => día de medio turno
+            if (diasExtraUnique.length >= 1) {
+              descansoDiaLibre = diasExtraUnique[0];
+            }
+            if (diasExtraUnique.length >= 2) {
+              descansoDiaMedio = diasExtraUnique[1];
+            }
 
-  // 👇 Partimos de los días que el negocio tiene cerrados
-  let base = [...diasBaseNegocio];
+            // 👇 Partimos de los días que el negocio tiene cerrados
+            let base = [...diasBaseNegocio];
 
-  // 👉 Si el día de medio turno está en los días cerrados del negocio,
-  // lo sacamos para ESTE empleado (porque él sí trabaja 4h ese día)
-  if (descansoDiaMedio) {
-    base = base.filter((d) => d !== descansoDiaMedio);
-  }
+            // 👉 Si el día de medio turno está en los días cerrados del negocio,
+            // lo sacamos para ESTE empleado (porque él sí trabaja 4h ese día)
+            if (descansoDiaMedio) {
+              base = base.filter((d) => d !== descansoDiaMedio);
+            }
 
-  // 👉 Agregamos el día libre completo del empleado
-  if (descansoDiaLibre) {
-    base.push(descansoDiaLibre);
-  }
+            // 👉 Agregamos el día libre completo del empleado
+            if (descansoDiaLibre) {
+              base.push(descansoDiaLibre);
+            }
 
-  diasLibresEmpleado = Array.from(new Set(base));
+            diasLibresEmpleado = Array.from(new Set(base));
 
-  // 🔍 Calculamos si el medio día es mañana o tarde
-  if (descansoDiaLibre && descansoDiaMedio) {
-    const idxLibre = DIAS_LABELS.findIndex(
-      (d) => normalizarDiaKey(d) === descansoDiaLibre
-    );
-    const idxMedio = DIAS_LABELS.findIndex(
-      (d) => normalizarDiaKey(d) === descansoDiaMedio
-    );
+            // 🔍 Calculamos si el medio día es mañana o tarde
+            if (descansoDiaLibre && descansoDiaMedio) {
+              const idxLibre = DIAS_LABELS.findIndex(
+                (d) => normalizarDiaKey(d) === descansoDiaLibre
+              );
+              const idxMedio = DIAS_LABELS.findIndex(
+                (d) => normalizarDiaKey(d) === descansoDiaMedio
+              );
 
-    if (idxLibre !== -1 && idxMedio !== -1) {
-      const prevIndex =
-        (idxLibre - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
-      const nextIndex =
-        (idxLibre + 1) % DIAS_LABELS.length;
+              if (idxLibre !== -1 && idxMedio !== -1) {
+                const prevIndex =
+                  (idxLibre - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+                const nextIndex =
+                  (idxLibre + 1) % DIAS_LABELS.length;
 
-      if (idxMedio === prevIndex) {
-        descansoTurnoMedio = "manana";
-      } else if (idxMedio === nextIndex) {
-        descansoTurnoMedio = "tarde";
-      }
-    }
-  }
-}
-
+                if (idxMedio === prevIndex) {
+                  descansoTurnoMedio = "manana";
+                } else if (idxMedio === nextIndex) {
+                  descansoTurnoMedio = "tarde";
+                }
+              }
+            }
+          }
 
           return {
             nombre: e.nombre.trim(),
@@ -817,7 +806,6 @@ if (
         ];
       }
 
-
       const adminUidsEmails = empleadosNormalizados
         .filter((e) => e.adminEmail)
         .map((e) => e.adminEmail);
@@ -856,20 +844,9 @@ if (
 
       await updateDoc(negocioRef, payload);
 
-      // ---- Guardar servicios en subcolección Precios ----
-      if (serviciosValidos.length > 0) {
-        const preciosRef = collection(negocioRef, "Precios");
-        for (const s of serviciosValidos) {
-          const precioNumber =
-            s.precio.trim() === "" ? 0 : Number(s.precio.trim());
-
-          await addDoc(preciosRef, {
-            servicio: s.nombre.trim(),
-            precio: Number.isNaN(precioNumber) ? 0 : precioNumber,
-            duracion: s.duracion,
-            createdAt: serverTimestamp(),
-          });
-        }
+      // ⭐ Avisamos al padre cuál es la nueva config de agenda
+      if (onGuardado) {
+        onGuardado(nuevaConfig);
       }
 
       // ✅ cerrar modal y refrescar web
@@ -885,252 +862,174 @@ if (
     }
   };
 
-// --------- Render tarjeta empleado (Creador / Empleados) ---------
-const renderEmpleadoCard = (index: number, esCreador: boolean) => {
-  const e = empleados[index];
-  if (!e) return null;
+  // --------- Render tarjeta empleado (Creador / Empleados) ---------
+  const renderEmpleadoCard = (index: number, esCreador: boolean) => {
+    const e = empleados[index];
+    if (!e) return null;
 
-// ------------ UI de descanso (creador y empleados) ------------
-const BloqueDescanso = () => {
-  const esModo1Dia = e.descansoModo === "1dia";
-  const esModoDiaYMedio = e.descansoModo === "diaYMedio";
+    // ------------ UI de descanso (creador y empleados) ------------
+    const BloqueDescanso = () => {
+      const esModo1Dia = e.descansoModo === "1dia";
+      const esModoDiaYMedio = e.descansoModo === "diaYMedio";
 
-  const diasSeleccionados = e.diasDescansoExtra || [];
+      const diasSeleccionados = e.diasDescansoExtra || [];
 
-  // Para "1 día y medio" interpretamos:
-  // - diasSeleccionados[0] => día libre completo
-  // - diasSeleccionados[1] => día de medio turno (4 horas)
-  const diaLibreKey = esModoDiaYMedio ? diasSeleccionados[0] ?? null : null;
-  const diaMedioKey = esModoDiaYMedio ? diasSeleccionados[1] ?? null : null;
+      // Para "1 día y medio" interpretamos:
+      // - diasSeleccionados[0] => día libre completo
+      // - diasSeleccionados[1] => día de medio turno (4 horas)
+      const diaLibreKey = esModoDiaYMedio ? diasSeleccionados[0] ?? null : null;
+      const diaMedioKey = esModoDiaYMedio ? diasSeleccionados[1] ?? null : null;
 
-  const labelDesdeKey = (key: string | null) => {
-    if (!key) return null;
-    return DIAS_LABELS.find((d) => normalizarDiaKey(d) === key) ?? null;
-  };
+      const labelDesdeKey = (key: string | null) => {
+        if (!key) return null;
+        return DIAS_LABELS.find((d) => normalizarDiaKey(d) === key) ?? null;
+      };
 
-  const diaLibreLabel = labelDesdeKey(diaLibreKey);
+      const diaLibreLabel = labelDesdeKey(diaLibreKey);
 
-  // Para el medio día: solo permitimos el día anterior y el siguiente del día libre
-  const getPrevNextOptions = () => {
-    if (!diaLibreLabel) return [];
-    const index = DIAS_LABELS.findIndex((d) => d === diaLibreLabel);
-    if (index === -1) return [];
+      // Para el medio día: solo permitimos el día anterior y el siguiente del día libre
+      const getPrevNextOptions = () => {
+        if (!diaLibreLabel) return [];
+        const index = DIAS_LABELS.findIndex((d) => d === diaLibreLabel);
+        if (index === -1) return [];
 
-    const prevIndex = (index - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
-    const nextIndex = (index + 1) % DIAS_LABELS.length;
+        const prevIndex = (index - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+        const nextIndex = (index + 1) % DIAS_LABELS.length;
 
-    const prevLabel = DIAS_LABELS[prevIndex];
-    const nextLabel = DIAS_LABELS[nextIndex];
+        const prevLabel = DIAS_LABELS[prevIndex];
+        const nextLabel = DIAS_LABELS[nextIndex];
 
-    return [
-      { label: prevLabel, key: normalizarDiaKey(prevLabel), tipo: "antes" as const },
-      { label: nextLabel, key: normalizarDiaKey(nextLabel), tipo: "despues" as const },
-    ];
-  };
+        return [
+          { label: prevLabel, key: normalizarDiaKey(prevLabel), tipo: "antes" as const },
+          { label: nextLabel, key: normalizarDiaKey(nextLabel), tipo: "despues" as const },
+        ];
+      };
 
-  const opcionesMedioDia = getPrevNextOptions();
+      const opcionesMedioDia = getPrevNextOptions();
 
-  // Helper para setear el array de días de descanso (solo diseño)
-  const setDiasDescanso = (dias: string[]) => {
-    handleEmpleadoChange(index, "diasDescansoExtra", dias);
-  };
+      // Helper para setear el array de días de descanso (solo diseño)
+      const setDiasDescanso = (dias: string[]) => {
+        handleEmpleadoChange(index, "diasDescansoExtra", dias);
+      };
 
-  // Paso 1: seleccionar el día libre completo
-  const handleSeleccionDiaLibre = (labelDia: string) => {
-    const key = normalizarDiaKey(labelDia);
+      // Paso 1: seleccionar el día libre completo
+      const handleSeleccionDiaLibre = (labelDia: string) => {
+        const key = normalizarDiaKey(labelDia);
 
-    // Si hace clic de nuevo en el mismo día => lo deseleccionamos
-    if (diaLibreKey === key) {
-      // Mantengo (opcional) el medio día si lo hubiera, pero sin día libre no tiene mucho sentido.
-      // Para diseño podríamos simplemente limpiar todo:
-      setDiasDescanso([]);
-      return;
-    }
+        // Si hace clic de nuevo en el mismo día => lo deseleccionamos
+        if (diaLibreKey === key) {
+          // Mantengo (opcional) el medio día si lo hubiera, pero sin día libre no tiene mucho sentido.
+          // Para diseño podríamos simplemente limpiar todo:
+          setDiasDescanso([]);
+          return;
+        }
 
-    // Si ya había medio día, lo mantenemos solo si sigue siendo adyacente; para diseño, lo reseteamos.
-    setDiasDescanso([key]);
-  };
+        // Si ya había medio día, lo mantenemos solo si sigue siendo adyacente; para diseño, lo reseteamos.
+        setDiasDescanso([key]);
+      };
 
-  // Paso 2: seleccionar el día donde hace solo 4 horas
-  const handleSeleccionDiaMedio = (optKey: string) => {
-    if (!diaLibreKey) return; // aún no eligió el día libre
+      // Paso 2: seleccionar el día donde hace solo 4 horas
+      const handleSeleccionDiaMedio = (optKey: string) => {
+        if (!diaLibreKey) return; // aún no eligió el día libre
 
-    // Si clickea el mismo día medio ya seleccionado => lo quitamos (opcional)
-    if (diaMedioKey === optKey) {
-      setDiasDescanso([diaLibreKey]);
-      return;
-    }
+        // Si clickea el mismo día medio ya seleccionado => lo quitamos (opcional)
+        if (diaMedioKey === optKey) {
+          setDiasDescanso([diaLibreKey]);
+          return;
+        }
 
-    setDiasDescanso([diaLibreKey, optKey]);
-  };
+        setDiasDescanso([diaLibreKey, optKey]);
+      };
 
-  // Para el texto explicativo de mañana / tarde según la posición del medio día
-  const getResumenMedioDia = () => {
-    if (!diaLibreKey || !diaMedioKey) return "";
+      // Para el texto explicativo de mañana / tarde según la posición del medio día
+      const getResumenMedioDia = () => {
+        if (!diaLibreKey || !diaMedioKey) return "";
 
-    const libreIndex = DIAS_LABELS.findIndex(
-      (d) => normalizarDiaKey(d) === diaLibreKey
-    );
-    const medioIndex = DIAS_LABELS.findIndex(
-      (d) => normalizarDiaKey(d) === diaMedioKey
-    );
-    if (libreIndex === -1 || medioIndex === -1) return "";
+        const libreIndex = DIAS_LABELS.findIndex(
+          (d) => normalizarDiaKey(d) === diaLibreKey
+        );
+        const medioIndex = DIAS_LABELS.findIndex(
+          (d) => normalizarDiaKey(d) === diaMedioKey
+        );
+        if (libreIndex === -1 || medioIndex === -1) return "";
 
-    const prevIndex = (libreIndex - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
-    const nextIndex = (libreIndex + 1) % DIAS_LABELS.length;
+        const prevIndex = (libreIndex - 1 + DIAS_LABELS.length) % DIAS_LABELS.length;
+        const nextIndex = (libreIndex + 1) % DIAS_LABELS.length;
 
-    if (medioIndex === prevIndex) {
-      return `Ese día de medio turno será en la mañana.`;
-    }
-    if (medioIndex === nextIndex) {
-      return `Ese día de medio turno será en la tarde.`;
-    }
-    return "";
-  };
+        if (medioIndex === prevIndex) {
+          return `Ese día de medio turno será en la mañana.`;
+        }
+        if (medioIndex === nextIndex) {
+          return `Ese día de medio turno será en la tarde.`;
+        }
+        return "";
+      };
 
-  const resumenMedioDia = getResumenMedioDia();
+      const resumenMedioDia = getResumenMedioDia();
 
-  return (
-    <div className="space-y-3">
-      <label className="block text-xs mb-1 text-gray-300">
-        Descanso semanal del empleado
-      </label>
+      return (
+        <div className="space-y-3">
+          <label className="block text-xs mb-1 text-gray-300">
+            Descanso semanal del empleado
+          </label>
 
-      {/* BOTONES MODO DE DESCANSO */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {[
-          {
-            key: "negocio" as DescansoModo,
-            label: "Mismos días que el negocio",
-          },
-          {
-            key: "1dia" as DescansoModo,
-            label: "1 día libre o más",
-          },
-          {
-            key: "diaYMedio" as DescansoModo,
-            label: "1 día libre y medio",
-          },
-        ].map((b) => (
-          <button
-            key={b.key}
-            type="button"
-            onClick={() => handleEmpleadoChange(index, "descansoModo", b.key)}
-            className={`px-3 py-2 rounded-lg border text-xs transition
+          {/* BOTONES MODO DE DESCANSO */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[
+              {
+                key: "negocio" as DescansoModo,
+                label: "Mismos días que el negocio",
+              },
+              {
+                key: "1dia" as DescansoModo,
+                label: "1 día libre o más",
+              },
+              {
+                key: "diaYMedio" as DescansoModo,
+                label: "1 día libre y medio",
+              },
+            ].map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => handleEmpleadoChange(index, "descansoModo", b.key)}
+                className={`px-3 py-2 rounded-lg border text-xs transition
               ${
                 e.descansoModo === b.key
                   ? "bg-emerald-600 border-emerald-600 text-white"
                   : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
               }`}
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
 
-      {/* MODO: 1 día libre o más (multi selección simple) */}
-      {esModo1Dia && (
-        <div className="space-y-2 pt-1">
-          <p className="text-xs text-gray-400">
-            Elegí 1 o más días que este empleado tendrá libre.
-          </p>
+          {/* MODO: 1 día libre o más (multi selección simple) */}
+          {esModo1Dia && (
+            <div className="space-y-2 pt-1">
+              <p className="text-xs text-gray-400">
+                Elegí 1 o más días que este empleado tendrá libre.
+              </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {DIAS_LABELS.map((dia) => {
-              const key = normalizarDiaKey(dia);
-              const activo = diasSeleccionados.includes(key);
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {DIAS_LABELS.map((dia) => {
+                  const key = normalizarDiaKey(dia);
+                  const activo = diasSeleccionados.includes(key);
 
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleDiaExtraEmpleado(index, dia)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs transition
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleDiaExtraEmpleado(index, dia)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs transition
                     ${
                       activo
                         ? "bg-emerald-600 border-emerald-600 text-white"
                         : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
                     }`}
-                >
-                  {dia}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* MODO: 1 día libre y medio (2 pasos) */}
-      {esModoDiaYMedio && (
-        <div className="space-y-3 pt-1">
-          {/* Paso 1: día libre completo */}
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">
-              <span className="font-semibold text-gray-200">Paso 1:</span>{" "}
-              elegí el día libre completo de este empleado.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {DIAS_LABELS.map((dia) => {
-                const key = normalizarDiaKey(dia);
-                const activo = diaLibreKey === key;
-
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleSeleccionDiaLibre(dia)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs transition
-                      ${
-                        activo
-                          ? "bg-emerald-600 border-emerald-600 text-white"
-                          : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                      }`}
-                  >
-                    {dia}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Paso 2: día donde hace solo 4 horas (pegado al libre) */}
-          {diaLibreKey && opcionesMedioDia.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400">
-                <span className="font-semibold text-gray-200">Paso 2:</span>{" "}
-                ¿qué día hará solo 4 horas?
-                <span className="block text-[11px] text-gray-500">
-                  Debe ser el día anterior o el siguiente al día libre.
-                </span>
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                {opcionesMedioDia.map((opt) => {
-                  const activo = diaMedioKey === opt.key;
-
-                  // Texto pequeño que describe mañana/tarde según sea antes/después
-                  const extraTexto =
-                    opt.tipo === "antes"
-                      ? " (4h en la mañana)"
-                      : " (4h en la tarde)";
-
-                  return (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => handleSeleccionDiaMedio(opt.key)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs transition text-left
-                        ${
-                          activo
-                            ? "bg-emerald-600 border-emerald-600 text-white"
-                            : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                        }`}
                     >
-                      {opt.label}
-                      <span className="block text-[10px] opacity-80">
-                        {extraTexto}
-                      </span>
+                      {dia}
                     </button>
                   );
                 })}
@@ -1138,453 +1037,529 @@ const BloqueDescanso = () => {
             </div>
           )}
 
-          {/* Resumen visual (opcional) */}
-          {diaLibreKey && diaMedioKey && resumenMedioDia && (
-            <div className="text-[11px] text-emerald-300 bg-[#102019] border border-emerald-700/40 rounded-md px-3 py-2">
-              Día libre completo:{" "}
-              <span className="font-semibold">
-                {labelDesdeKey(diaLibreKey)}
-              </span>
-              <br />
-              Día de medio turno:{" "}
-              <span className="font-semibold">
-                {labelDesdeKey(diaMedioKey)}
-              </span>
-              <br />
-              {resumenMedioDia}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+          {/* MODO: 1 día libre y medio (2 pasos) */}
+          {esModoDiaYMedio && (
+            <div className="space-y-3 pt-1">
+              {/* Paso 1: día libre completo */}
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">
+                  <span className="font-semibold text-gray-200">Paso 1:</span>{" "}
+                  elegí el día libre completo de este empleado.
+                </p>
 
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {DIAS_LABELS.map((dia) => {
+                    const key = normalizarDiaKey(dia);
+                    const activo = diaLibreKey === key;
 
-  // =============== CARD DEL CREADOR ===============
-  if (esCreador) {
-    return (
-      <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
-        <p className="font-semibold text-gray-100">Vos (creador de la agenda)</p>
-
-        {/* Pregunta si trabaja */}
-        <div className="space-y-2">
-          <p className="text-xs text-gray-300">¿Usted trabaja aquí?</p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => handleEmpleadoChange(index, "esEmpleado", true)}
-              className={`px-3 py-2 rounded-lg border text-xs transition
-                ${
-                  e.esEmpleado
-                    ? "bg-emerald-600 border-emerald-600 text-white"
-                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                }`}
-            >
-              Sí, trabajo aquí
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleEmpleadoChange(index, "esEmpleado", false)}
-              className={`px-3 py-2 rounded-lg border text-xs transition
-                ${
-                  !e.esEmpleado
-                    ? "bg-emerald-600 border-emerald-600 text-white"
-                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
-                }`}
-            >
-              No, solo administro
-            </button>
-          </div>
-        </div>
-
-        {/* Si NO trabaja → no mostrar más */}
-        {!e.esEmpleado && (
-          <div className="text-xs text-gray-400 bg-[#1c1c1c] border border-[#333] rounded-lg p-3">
-            No configurará turnos porque solo administra la agenda.
-          </div>
-        )}
-
-        {/* Si SÍ trabaja → mostrar todo */}
-        {e.esEmpleado && (
-          <div className="space-y-4">
-            {/* FOTO */}
-            <div>
-              <label className="block text-xs mb-1 text-gray-300">
-                Foto de perfil (opcional)
-              </label>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
-                  {e.fotoPerfil ? (
-                    <img src={e.fotoPerfil} className="w-full h-full object-cover" />
-                  ) : (
-                    <span>
-                      {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
-                    </span>
-                  )}
-                </div>
-
-                <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
-                  {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(ev) => {
-                      const file = ev.target.files?.[0];
-                      if (file) handleSubirFotoEmpleado(index, file);
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
-
-            {/* NOMBRE */}
-            <div>
-              <label className="block text-xs mb-1 text-gray-300">
-                Nombre completo
-              </label>
-              <input
-                type="text"
-                value={e.nombre}
-                onChange={(ev) =>
-                  handleEmpleadoChange(index, "nombre", ev.target.value)
-                }
-                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-                placeholder="Ej: Juan Pérez"
-              />
-            </div>
-
-            {/* SERVICIOS */}
-            {serviciosValidos.length > 0 && (
-              <div>
-                <label className="block text-xs mb-1 text-gray-300">
-                  Servicios que realiza
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {serviciosValidos.map((s, idx) => {
-                    const seleccionado = e.trabajos.includes(s.nombre);
                     return (
                       <button
-                        key={idx}
+                        key={key}
                         type="button"
-                        onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
-                        className={`px-3 py-1.5 rounded-full border text-xs transition
-                          ${
-                            seleccionado
-                              ? "bg-emerald-600 border-emerald-600 text-white"
-                              : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
-                          }`}
+                        onClick={() => handleSeleccionDiaLibre(dia)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs transition
+                      ${
+                        activo
+                          ? "bg-emerald-600 border-emerald-600 text-white"
+                          : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                      }`}
                       >
-                        {s.nombre}
+                        {dia}
                       </button>
                     );
                   })}
                 </div>
               </div>
-            )}
 
-            {/* HORARIO */}
-            <div className="space-y-2">
-              <label className="block text-xs mb-1 text-gray-300">
-                Horario de este empleado
-              </label>
+              {/* Paso 2: día donde hace solo 4 horas (pegado al libre) */}
+              {diaLibreKey && opcionesMedioDia.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400">
+                    <span className="font-semibold text-gray-200">Paso 2:</span>{" "}
+                    ¿qué día hará solo 4 horas?
+                    <span className="block text-[11px] text-gray-500">
+                      Debe ser el día anterior o el siguiente al día libre.
+                    </span>
+                  </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
-                <div>
-                  <label className="block text-xs mb-1 text-gray-300">
-                    Hora de entrada
-                  </label>
-                  <input
-                    type="time"
-                    value={e.horarioInicio}
-                    onChange={(ev) =>
-                      handleEmpleadoChange(index, "horarioInicio", ev.target.value)
-                    }
-                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    {opcionesMedioDia.map((opt) => {
+                      const activo = diaMedioKey === opt.key;
+
+                      // Texto pequeño que describe mañana/tarde según sea antes/después
+                      const extraTexto =
+                        opt.tipo === "antes"
+                          ? " (4h en la mañana)"
+                          : " (4h en la tarde)";
+
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => handleSeleccionDiaMedio(opt.key)}
+                          className={`px-3 py-1.5 rounded-lg border text-xs transition text-left
+                        ${
+                          activo
+                            ? "bg-emerald-600 border-emerald-600 text-white"
+                            : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                        }`}
+                        >
+                          {opt.label}
+                          <span className="block text-[10px] opacity-80">
+                            {extraTexto}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-xs mb-1 text-gray-300">
-                    Hora de salida
+              {/* Resumen visual (opcional) */}
+              {diaLibreKey && diaMedioKey && resumenMedioDia && (
+                <div className="text-[11px] text-emerald-300 bg-[#102019] border border-emerald-700/40 rounded-md px-3 py-2">
+                  Día libre completo:{" "}
+                  <span className="font-semibold">
+                    {labelDesdeKey(diaLibreKey)}
+                  </span>
+                  <br />
+                  Día de medio turno:{" "}
+                  <span className="font-semibold">
+                    {labelDesdeKey(diaMedioKey)}
+                  </span>
+                  <br />
+                  {resumenMedioDia}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // =============== CARD DEL CREADOR ===============
+    if (esCreador) {
+      return (
+        <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
+          <p className="font-semibold text-gray-100">Vos (creador de la agenda)</p>
+
+          {/* Pregunta si trabaja */}
+          <div className="space-y-2">
+            <p className="text-xs text-gray-300">¿Usted trabaja aquí?</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleEmpleadoChange(index, "esEmpleado", true)}
+                className={`px-3 py-2 rounded-lg border text-xs transition
+                ${
+                  e.esEmpleado
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                }`}
+              >
+                Sí, trabajo aquí
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleEmpleadoChange(index, "esEmpleado", false)}
+                className={`px-3 py-2 rounded-lg border text-xs transition
+                ${
+                  !e.esEmpleado
+                    ? "bg-emerald-600 border-emerald-600 text-white"
+                    : "bg-[#181818] border-[#3a3a3a] text-gray-300 hover:bg-[#222]"
+                }`}
+              >
+                No, solo administro
+              </button>
+            </div>
+          </div>
+
+          {/* Si NO trabaja → no mostrar más */}
+          {!e.esEmpleado && (
+            <div className="text-xs text-gray-400 bg-[#1c1c1c] border border-[#333] rounded-lg p-3">
+              No configurará turnos porque solo administra la agenda.
+            </div>
+          )}
+
+          {/* Si SÍ trabaja → mostrar todo */}
+          {e.esEmpleado && (
+            <div className="space-y-4">
+              {/* FOTO */}
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">
+                  Foto de perfil (opcional)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
+                    {e.fotoPerfil ? (
+                      <img src={e.fotoPerfil} className="w-full h-full object-cover" />
+                    ) : (
+                      <span>
+                        {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
+                      </span>
+                    )}
+                  </div>
+
+                  <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
+                    {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(ev) => {
+                        const file = ev.target.files?.[0];
+                        if (file) handleSubirFotoEmpleado(index, file);
+                      }}
+                    />
                   </label>
-                  <input
-                    type="time"
-                    value={e.horarioFin}
-                    onChange={(ev) =>
-                      handleEmpleadoChange(index, "horarioFin", ev.target.value)
-                    }
-                    className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-                  />
                 </div>
               </div>
+
+              {/* NOMBRE */}
+              <div>
+                <label className="block text-xs mb-1 text-gray-300">
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  value={e.nombre}
+                  onChange={(ev) =>
+                    handleEmpleadoChange(index, "nombre", ev.target.value)
+                  }
+                  className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+                  placeholder="Ej: Juan Pérez"
+                />
+              </div>
+
+              {/* SERVICIOS */}
+              {serviciosValidos.length > 0 && (
+                <div>
+                  <label className="block text-xs mb-1 text-gray-300">
+                    Servicios que realiza
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {serviciosValidos.map((s, idx) => {
+                      const seleccionado = e.trabajos.includes(s.nombre);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
+                          className={`px-3 py-1.5 rounded-full border text-xs transition
+                          ${
+                            seleccionado
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
+                          }`}
+                        >
+                          {s.nombre}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* HORARIO */}
+              <div className="space-y-2">
+                <label className="block text-xs mb-1 text-gray-300">
+                  Horario de este empleado
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+                  <div>
+                    <label className="block text-xs mb-1 text-gray-300">
+                      Hora de entrada
+                    </label>
+                    <input
+                      type="time"
+                      value={e.horarioInicio}
+                      onChange={(ev) =>
+                        handleEmpleadoChange(index, "horarioInicio", ev.target.value)
+                      }
+                      className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs mb-1 text-gray-300">
+                      Hora de salida
+                    </label>
+                    <input
+                      type="time"
+                      value={e.horarioFin}
+                      onChange={(ev) =>
+                        handleEmpleadoChange(index, "horarioFin", ev.target.value)
+                      }
+                      className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* DESCANSO */}
+              <BloqueDescanso />
             </div>
-
-            {/* DESCANSO */}
-            <BloqueDescanso />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // =============== CARD EMPLEADO NORMAL ===============
-  return (
-    <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <p className="font-semibold text-gray-100">Empleado {index}</p>
-
-        <button
-          type="button"
-          onClick={() => handleEliminarEmpleado(index)}
-          className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
-        >
-          Eliminar
-        </button>
-      </div>
-
-      {/* FOTO */}
-      <div>
-        <label className="block text-xs mb-1 text-gray-300">
-          Foto de perfil (opcional)
-        </label>
-
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
-            {e.fotoPerfil ? (
-              <img src={e.fotoPerfil} className="w-full h-full object-cover" />
-            ) : (
-              <span>
-                {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
-              </span>
-            )}
-          </div>
-
-          <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
-            {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(ev) => {
-                const file = ev.target.files?.[0];
-                if (file) handleSubirFotoEmpleado(index, file);
-              }}
-            />
-          </label>
+          )}
         </div>
-      </div>
+      );
+    }
 
-      {/* NOMBRE */}
-      <div>
-        <label className="block text-xs mb-1 text-gray-300">
-          Nombre completo
-        </label>
-        <input
-          type="text"
-          value={e.nombre}
-          onChange={(ev) =>
-            handleEmpleadoChange(index, "nombre", ev.target.value)
-          }
-          className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-          placeholder="Ej: Juan Pérez"
-        />
-      </div>
+    // =============== CARD EMPLEADO NORMAL ===============
+    return (
+      <div className="rounded-xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-4">
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <p className="font-semibold text-gray-100">Empleado {index}</p>
 
-      {/* SERVICIOS */}
-      {serviciosValidos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => handleEliminarEmpleado(index)}
+            className="text-xs px-2 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+          >
+            Eliminar
+          </button>
+        </div>
+
+        {/* FOTO */}
         <div>
           <label className="block text-xs mb-1 text-gray-300">
-            Servicios que realiza
+            Foto de perfil (opcional)
           </label>
-          <div className="flex flex-wrap gap-2">
-            {serviciosValidos.map((s, idx) => {
-              const seleccionado = e.trabajos.includes(s.nombre);
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
-                  className={`px-3 py-1.5 rounded-full border text-xs transition
+
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#222] flex items-center justify-center text-xs text-gray-300 overflow-hidden">
+              {e.fotoPerfil ? (
+                <img src={e.fotoPerfil} className="w-full h-full object-cover" />
+              ) : (
+                <span>
+                  {e.nombre ? e.nombre.charAt(0).toUpperCase() : "?"}
+                </span>
+              )}
+            </div>
+
+            <label className="px-3 py-1.5 text-xs rounded-md bg-[#222] hover:bg-[#2d2d2d] cursor-pointer text-gray-100">
+              {e.subiendoFoto ? "Subiendo..." : "Subir foto"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(ev) => {
+                  const file = ev.target.files?.[0];
+                  if (file) handleSubirFotoEmpleado(index, file);
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* NOMBRE */}
+        <div>
+          <label className="block text-xs mb-1 text-gray-300">
+            Nombre completo
+          </label>
+          <input
+            type="text"
+            value={e.nombre}
+            onChange={(ev) =>
+              handleEmpleadoChange(index, "nombre", ev.target.value)
+            }
+            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+            placeholder="Ej: Juan Pérez"
+          />
+        </div>
+
+        {/* SERVICIOS */}
+        {serviciosValidos.length > 0 && (
+          <div>
+            <label className="block text-xs mb-1 text-gray-300">
+              Servicios que realiza
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {serviciosValidos.map((s, idx) => {
+                const seleccionado = e.trabajos.includes(s.nombre);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => toggleTrabajoEmpleado(index, s.nombre)}
+                    className={`px-3 py-1.5 rounded-full border text-xs transition
                     ${
                       seleccionado
                         ? "bg-emerald-600 border-emerald-600 text-white"
                         : "bg-[#181818] border-[#3a3a3a] text-gray-200 hover:bg-[#222]"
                     }`}
-                >
-                  {s.nombre}
-                </button>
-              );
-            })}
+                  >
+                    {s.nombre}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* HORARIO */}
-      <div className="space-y-2">
-        <label className="block text-xs mb-1 text-gray-300">
-          Horario de este empleado
-        </label>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
-          <div>
-            <label className="block text-xs mb-1 text-gray-300">
-              Hora de entrada
-            </label>
-            <input
-              type="time"
-              value={e.horarioInicio}
-              onChange={(ev) =>
-                handleEmpleadoChange(index, "horarioInicio", ev.target.value)
-              }
-              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs mb-1 text-gray-300">
-              Hora de salida
-            </label>
-            <input
-              type="time"
-              value={e.horarioFin}
-              onChange={(ev) =>
-                handleEmpleadoChange(index, "horarioFin", ev.target.value)
-              }
-              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* DESCANSO */}
-      <BloqueDescanso />
-    </div>
-  );
-};
-
-// 🔥 PASO 3 SOLO PARA NEGOCIO: Ubicación sin branding
-const renderPasoUbicacionNegocioSolo = () => {
-  return (
-    <div className="space-y-6 text-sm text-gray-100">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-gray-100">
-          Ubicación de tu negocio
-        </h2>
-        <p className="text-xs text-gray-400">
-          Esta dirección se mostrará a tus clientes. Podés ajustar el pin en el mapa.
-        </p>
-      </div>
-
-      {/* Contenedor */}
-      <div className="rounded-2xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-3">
-        {/* Estado actual */}
-        {ubicacion ? (
-          <div className="text-xs text-gray-300">
-            <p className="font-semibold mb-1">Ubicación guardada</p>
-            <p className="text-gray-200">
-              {direccion || ubicacion.direccion}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1">
-              Podés mover el pin en el mapa si querés ajustarla.
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400">
-            Todavía no guardaste una ubicación.
-          </p>
         )}
 
-        {/* 🔍 Botón geolocalizar */}
-        <button
-          type="button"
-          onClick={handleGeolocalizar}
-          disabled={estadoUbicacion === "cargando"}
-          className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
+        {/* HORARIO */}
+        <div className="space-y-2">
+          <label className="block text-xs mb-1 text-gray-300">
+            Horario de este empleado
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+            <div>
+              <label className="block text-xs mb-1 text-gray-300">
+                Hora de entrada
+              </label>
+              <input
+                type="time"
+                value={e.horarioInicio}
+                onChange={(ev) =>
+                  handleEmpleadoChange(index, "horarioInicio", ev.target.value)
+                }
+                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs mb-1 text-gray-300">
+                Hora de salida
+              </label>
+              <input
+                type="time"
+                value={e.horarioFin}
+                onChange={(ev) =>
+                  handleEmpleadoChange(index, "horarioFin", ev.target.value)
+                }
+                className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* DESCANSO */}
+        <BloqueDescanso />
+      </div>
+    );
+  };
+
+  // 🔥 PASO 3 SOLO PARA NEGOCIO: Ubicación sin branding
+  const renderPasoUbicacionNegocioSolo = () => {
+    return (
+      <div className="space-y-6 text-sm text-gray-100">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-gray-100">
+            Ubicación de tu negocio
+          </h2>
+          <p className="text-xs text-gray-400">
+            Esta dirección se mostrará a tus clientes. Podés ajustar el pin en el mapa.
+          </p>
+        </div>
+
+        {/* Contenedor */}
+        <div className="rounded-2xl border border-[#3a3a3a] bg-[#151515] p-4 space-y-3">
+          {/* Estado actual */}
+          {ubicacion ? (
+            <div className="text-xs text-gray-300">
+              <p className="font-semibold mb-1">Ubicación guardada</p>
+              <p className="text-gray-200">
+                {direccion || ubicacion.direccion}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                Podés mover el pin en el mapa si querés ajustarla.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">
+              Todavía no guardaste una ubicación.
+            </p>
+          )}
+
+          {/* 🔍 Botón geolocalizar */}
+          <button
+            type="button"
+            onClick={handleGeolocalizar}
+            disabled={estadoUbicacion === "cargando"}
+            className={`mt-2 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2
             ${
               estadoUbicacion === "cargando"
                 ? "bg-[#181818] border border-[#3a3a3a] text-gray-300 cursor-not-allowed"
                 : "bg-emerald-600 hover:bg-emerald-700 text-white"
             }`}
-        >
-          {estadoUbicacion === "cargando" && "Buscando ubicación..."}
-          {estadoUbicacion === "exito" && "✅ Ubicación guardada"}
-          {estadoUbicacion === "idle" && "📍 Usar mi ubicación actual"}
-        </button>
+          >
+            {estadoUbicacion === "cargando" && "Buscando ubicación..."}
+            {estadoUbicacion === "exito" && "✅ Ubicación guardada"}
+            {estadoUbicacion === "idle" && "📍 Usar mi ubicación actual"}
+          </button>
 
-        {/* 🗺️ Mapa */}
-        {ubicacion && (
-          <div className="mt-3 h-52 rounded-md overflow-hidden border border-[#333]">
-            <MapContainer
-              key={`${ubicacion.lat}-${ubicacion.lng}`}
-              center={[ubicacion.lat, ubicacion.lng]}
-              zoom={16}
-              style={{ width: "100%", height: "100%" }}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; OpenStreetMap contributors'
-              />
-              <Marker
-                position={[ubicacion.lat, ubicacion.lng]}
-                icon={customIcon}
-                draggable={true}
-                eventHandlers={{
-                  dragend: handleMarkerDragEnd,
-                }}
+          {/* 🗺️ Mapa */}
+          {ubicacion && (
+            <div className="mt-3 h-52 rounded-md overflow-hidden border border-[#333]">
+              <MapContainer
+                key={`${ubicacion.lat}-${ubicacion.lng}`}
+                center={[ubicacion.lat, ubicacion.lng]}
+                zoom={16}
+                style={{ width: "100%", height: "100%" }}
               >
-                <Popup>
-                  Mueve el pin si la ubicación no es correcta
-                </Popup>
-              </Marker>
-            </MapContainer>
-          </div>
-        )}
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OpenStreetMap contributors'
+                />
+                <Marker
+                  position={[ubicacion.lat, ubicacion.lng]}
+                  icon={customIcon}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend: handleMarkerDragEnd,
+                  }}
+                >
+                  <Popup>
+                    Mueve el pin si la ubicación no es correcta
+                  </Popup>
+                </Marker>
+              </MapContainer>
+            </div>
+          )}
 
-        {/* Dirección manual */}
-        <div className="space-y-2 pt-2">
-          <label className="block text-xs mb-1 text-gray-300">
-            Dirección o referencia
-          </label>
-          <input
-            type="text"
-            value={direccion}
-            onChange={(e) => setDireccion(e.target.value)}
-            className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Ej: Av. 18 de Julio 1234, Centro"
-          />
+          {/* Dirección manual */}
+          <div className="space-y-2 pt-2">
+            <label className="block text-xs mb-1 text-gray-300">
+              Dirección o referencia
+            </label>
+            <input
+              type="text"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              className="w-full px-3 py-2 bg-[#181818] border border-[#3a3a3a] rounded-md text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="Ej: Av. 18 de Julio 1234, Centro"
+            />
+          </div>
+        </div>
+
+        <hr className="border-[#333]" />
+
+        <div className="flex justify-between items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPaso(2)}
+            className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
+          >
+            Volver
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPaso(4)}
+            className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
-
-      <hr className="border-[#333]" />
-
-      <div className="flex justify-between items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setPaso(2)}
-          className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
-        >
-          Volver
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPaso(4)}
-          className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
-        >
-          Siguiente
-        </button>
-      </div>
-    </div>
-  );
-};
+    );
+  };
 
   // ==================== CONTENIDOS POR PASO ====================
-
   const renderPasoServicios = () => {
     const titulo = esNegocio
       ? "Servicios de tu negocio"
@@ -1719,119 +1694,118 @@ const renderPasoUbicacionNegocioSolo = () => {
   };
 
   const renderPasoEmpleados = () => {
-  const creador = empleados[0];
-  const creadorNoTrabaja = creador && creador.esEmpleado === false;
+    const creador = empleados[0];
+    const creadorNoTrabaja = creador && creador.esEmpleado === false;
 
-  const empleadosReales = empleados.filter((e, idx) => idx !== 0 && e.esEmpleado);
+    const empleadosReales = empleados.filter((e, idx) => idx !== 0 && e.esEmpleado);
 
-  return (
-    <div className="space-y-6 text-sm text-gray-100">
-      {/* TÍTULO */}
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-gray-100">
-          ¿Quiénes van a atender en este negocio?
-        </h2>
+    return (
+      <div className="space-y-6 text-sm text-gray-100">
+        {/* TÍTULO */}
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-gray-100">
+            ¿Quiénes van a atender en este negocio?
+          </h2>
 
-        {!creadorNoTrabaja ? (
-          <p className="text-xs text-gray-400">
-            Configurá tus empleados, sus horarios y sus días libres. Después
-            podés cambiar todo desde el panel.
-          </p>
-        ) : (
-          <p className="text-xs text-gray-400">
-            Usted indicó que solo administra la agenda. Agregue al menos un
-            empleado que atienda clientes.
-          </p>
+          {!creadorNoTrabaja ? (
+            <p className="text-xs text-gray-400">
+              Configurá tus empleados, sus horarios y sus días libres. Después
+              podés cambiar todo desde el panel.
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400">
+              Usted indicó que solo administra la agenda. Agregue al menos un
+              empleado que atienda clientes.
+            </p>
+          )}
+        </div>
+
+        {/* ADVERTENCIA SI NO HAY SERVICIOS */}
+        {serviciosValidos.length === 0 && (
+          <div className="rounded-lg border border-yellow-600/70 bg-yellow-900/30 px-4 py-3 text-xs text-yellow-100">
+            Primero agregá al menos un servicio en el paso anterior para poder
+            asignarlo a tus empleados.
+          </div>
         )}
-      </div>
 
-      {/* ADVERTENCIA SI NO HAY SERVICIOS */}
-      {serviciosValidos.length === 0 && (
-        <div className="rounded-lg border border-yellow-600/70 bg-yellow-900/30 px-4 py-3 text-xs text-yellow-100">
-          Primero agregá al menos un servicio en el paso anterior para poder
-          asignarlo a tus empleados.
+        {/* CARDS DE EMPLEADOS */}
+        <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-1">
+
+          {/* CREATOR ALWAYS FIRST */}
+          {renderEmpleadoCard(0, true)}
+
+          {/* EMPLEADOS NORMALES */}
+          {empleados.map((emp, idx) => {
+            if (idx === 0) return null;              // skip creator
+            return renderEmpleadoCard(idx, false);
+          })}
         </div>
-      )}
 
-      {/* CARDS DE EMPLEADOS */}
-      <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-1">
-
-        {/* CREATOR ALWAYS FIRST */}
-        {renderEmpleadoCard(0, true)}
-
-        {/* EMPLEADOS NORMALES */}
-        {empleados.map((emp, idx) => {
-          if (idx === 0) return null;              // skip creator
-          return renderEmpleadoCard(idx, false);
-        })}
-      </div>
-
-      {/* BOTÓN AÑADIR EMPLEADO */}
-      <div>
-        <button
-          type="button"
-          onClick={handleAgregarEmpleado}
-          className="px-4 py-2 rounded-lg bg-[#222] text-white hover:bg-[#2d2d2d] font-medium"
-        >
-          + Añadir empleado
-        </button>
-      </div>
-
-      {/* VALIDACIÓN SI EL CREADOR NO TRABAJA */}
-      {creadorNoTrabaja && empleadosReales.length === 0 && (
-        <div className="rounded-lg border border-red-700 bg-red-900/30 px-4 py-3 text-xs text-red-200">
-          Debe agregar al menos un empleado que atienda clientes para continuar.
+        {/* BOTÓN AÑADIR EMPLEADO */}
+        <div>
+          <button
+            type="button"
+            onClick={handleAgregarEmpleado}
+            className="px-4 py-2 rounded-lg bg-[#222] text-white hover:bg-[#2d2d2d] font-medium"
+          >
+            + Añadir empleado
+          </button>
         </div>
-      )}
 
-      <hr className="border-[#333]" />
+        {/* VALIDACIÓN SI EL CREADOR NO TRABAJA */}
+        {creadorNoTrabaja && empleadosReales.length === 0 && (
+          <div className="rounded-lg border border-red-700 bg-red-900/30 px-4 py-3 text-xs text-red-200">
+            Debe agregar al menos un empleado que atienda clientes para continuar.
+          </div>
+        )}
 
-      {/* BOTONES SIGUIENTE / VOLVER */}
-      <div className="flex justify-between items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setPaso(1)}
-          className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
-        >
-          Volver
-        </button>
+        <hr className="border-[#333]" />
 
-        <button
-          type="button"
-          onClick={() => {
+        {/* BOTONES SIGUIENTE / VOLVER */}
+        <div className="flex justify-between items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPaso(1)}
+            className="px-4 py-2 rounded-lg bg-[#222] text-gray-200 hover:bg-[#2d2d2d]"
+          >
+            Volver
+          </button>
 
-            // VALIDACIONES
-            if (serviciosValidos.length === 0) {
-              alert("Agregá al menos un servicio para continuar.");
-              return;
-            }
+          <button
+            type="button"
+            onClick={() => {
 
-            // ❗ Si el creador NO trabaja → debe haber al menos UN empleado real
-            if (creadorNoTrabaja && empleadosReales.length === 0) {
-              alert("Debe agregar al menos un empleado que atienda clientes.");
-              return;
-            }
-
-            // ❗ Si el creador trabaja → debe tener servicios asignados
-            if (!creadorNoTrabaja) {
-              const c = empleados[0];
-              if (!c.trabajos || c.trabajos.length === 0) {
-                alert("Debe seleccionar al menos un servicio que usted realiza.");
+              // VALIDACIONES
+              if (serviciosValidos.length === 0) {
+                alert("Agregá al menos un servicio para continuar.");
                 return;
               }
-            }
 
-            setPaso(3);
-          }}
-          className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
-        >
-          Siguiente
-        </button>
+              // ❗ Si el creador NO trabaja → debe haber al menos UN empleado real
+              if (creadorNoTrabaja && empleadosReales.length === 0) {
+                alert("Debe agregar al menos un empleado que atienda clientes.");
+                return;
+              }
+
+              // ❗ Si el creador trabaja → debe tener servicios asignados
+              if (!creadorNoTrabaja) {
+                const c = empleados[0];
+                if (!c.trabajos || c.trabajos.length === 0) {
+                  alert("Debe seleccionar al menos un servicio que usted realiza.");
+                  return;
+                }
+              }
+
+              setPaso(3);
+            }}
+            className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
-    </div>
-  );
-};
-
+    );
+  };
 
   const renderPasoUbicacionEmprendimiento = () => {
     return (
@@ -2144,17 +2118,15 @@ const renderPasoUbicacionNegocioSolo = () => {
 
           {!esNegocio && paso === 2 && renderPasoUbicacionEmprendimiento()}
 
-{/* PASO 3 */}
-{paso === 3 && (
-  esNegocio
-    ? renderPasoUbicacionNegocioSolo()   // negocio → paso 3 es ubicación
-    : renderPasoUbicacionYBranding()     // emprendimiento → paso 3 es branding
-)}
+          {/* PASO 3 */}
+          {paso === 3 && (
+            esNegocio
+              ? renderPasoUbicacionNegocioSolo()   // negocio → paso 3 es ubicación
+              : renderPasoUbicacionYBranding()     // emprendimiento → paso 3 es branding
+          )}
 
-{/* PASO 4 SOLO PARA NEGOCIO */}
-{paso === 4 && esNegocio && renderPasoUbicacionYBranding()}
-
-
+          {/* PASO 4 SOLO PARA NEGOCIO */}
+          {paso === 4 && esNegocio && renderPasoUbicacionYBranding()}
         </div>
       )}
     </ModalBase>

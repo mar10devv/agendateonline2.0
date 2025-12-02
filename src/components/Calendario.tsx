@@ -7,12 +7,16 @@ import { useCalendario } from "../lib/useCalendario";
 // Debe llegar desde AgendaVirtual / ModalAgendarse ya combinado.
 //
 export type CalendarioEmpleado = {
-  inicio: string;                      // "10:00"
-  fin: string;                         // "20:00"
+  inicio: string; // "10:00"
+  fin: string; // "20:00"
   modoTurnos: "personalizado" | "jornada";
-  clientesPorDia?: number;             // usado en modo personalizado
-  horasSeparacion?: number;            // usado en modo jornada
-  diasLibres?: string[];               // negocio + empleado (ej: ["domingo"])
+  clientesPorDia?: number; // usado en modo personalizado
+  horasSeparacion?: number; // usado en modo jornada
+  diasLibres?: string[]; // negocio + empleado (ej: ["domingo"])
+
+  // 🆕 opcionales para medio día
+  descansoDiaMedio?: string | null; // ej: "viernes"
+  descansoTurnoMedio?: "manana" | "tarde" | null;
 };
 
 type Props = {
@@ -39,44 +43,38 @@ export default function Calendario({
   // 🔍 DEBUG: ver qué calendario está llegando
   console.log("[Calendario] props.calendario:", calendario);
 
-  //
-  // 🔴 Si no hay datos mínimos, mostramos aviso
-  //
-  if (
-    !calendario ||
-    !calendario.inicio ||
-    !calendario.fin ||
-    !calendario.modoTurnos
-  ) {
-    return (
-      <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
-        <p className="text-yellow-700 font-medium mb-3">
-          ⚠️ Este profesional no tiene su calendario configurado.
-        </p>
-        <button
-          type="button"
-          className="px-5 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg shadow hover:opacity-90 transition"
-        >
-          Configurar horarios
-        </button>
-      </div>
-    );
-  }
+  // Estado local de selección
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+  const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
+
+  // ✅ Consideramos "válido" solo si tiene datos mínimos
+  const calendarioValido: CalendarioEmpleado | null =
+    calendario &&
+    calendario.inicio &&
+    calendario.fin &&
+    calendario.modoTurnos
+      ? calendario
+      : null;
 
   //
   // 🟢 useCalendario genera base de días + horarios
+  //    AHORA le pasamos también la fechaSeleccionada para que aplique medio día.
   //
-  const {
-    diasDisponibles: diasBase,
-    horariosDisponibles,
-  } = useCalendario(calendario, 15);
+  const { diasDisponibles: diasBase, horariosDisponibles } = useCalendario(
+    calendarioValido as any, // puede ser null, el hook ya lo maneja
+    15,
+    fechaSeleccionada
+  );
 
   // Normalizamos los días libres que vienen del negocio/empleado
   const diasLibresNormalizados =
-    calendario.diasLibres?.map(normalizeDia) ?? [];
+    calendarioValido?.diasLibres?.map(normalizeDia) ?? [];
 
-  console.log("[Calendario] diasLibres (crudo):", calendario.diasLibres);
-  console.log("[Calendario] diasLibres normalizados:", diasLibresNormalizados);
+  console.log("[Calendario] diasLibres (crudo):", calendarioValido?.diasLibres);
+  console.log(
+    "[Calendario] diasLibres normalizados:",
+    diasLibresNormalizados
+  );
 
   // Refuerzo: vuelvo a marcar como disabled los días libres aquí
   const diasDisponibles = diasBase.map((d) => {
@@ -96,12 +94,10 @@ export default function Calendario({
   });
 
   console.log("[Calendario] diasDisponibles finales:", diasDisponibles);
-
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(
-    null
-  );
-  const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(
-    null
+  console.log(
+    "[Calendario] horariosDisponibles para fecha:",
+    fechaSeleccionada,
+    horariosDisponibles
   );
 
   //
@@ -113,8 +109,28 @@ export default function Calendario({
       setFechaSeleccionada(primerDia.date);
       setHoraSeleccionada(null);
       onSeleccionarTurno?.(primerDia.date, null);
+    } else {
+      setFechaSeleccionada(null);
+      setHoraSeleccionada(null);
     }
   }, [diasDisponibles, onSeleccionarTurno]);
+
+  // 🔴 Si NO hay calendario válido, mostramos aviso (después de hooks)
+  if (!calendarioValido) {
+    return (
+      <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-xl text-center shadow">
+        <p className="text-yellow-700 font-medium mb-3">
+          ⚠️ Este profesional no tiene su calendario configurado.
+        </p>
+        <button
+          type="button"
+          className="px-5 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg shadow hover:opacity-90 transition"
+        >
+          Configurar horarios
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 border rounded-xl shadow bg-white w-full max-w-lg mx-auto">
