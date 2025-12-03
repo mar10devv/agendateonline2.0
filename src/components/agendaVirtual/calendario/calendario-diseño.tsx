@@ -581,32 +581,36 @@ export default function CalendarioBase({
     }
   };
 
-  // handler para cancelar turno y liberar slots
-  const handleCancelarTurno = async (turno: TurnoExistente) => {
-    if (!negocio?.id || !turno?.id) return;
+  // handler para cancelar turno y liberar slots + enviar mail
+const handleCancelarTurno = async (turno: TurnoExistente) => {
+  if (!negocio?.id || !turno?.id) return;
 
-    const confirmar = window.confirm(
-      "¿Seguro que querés cancelar este turno y liberar el horario?\n\nEl cliente recibirá el horario nuevamente disponible para reservar."
+  const confirmar = window.confirm(
+    "¿Seguro que querés cancelar este turno y liberar el horario?\n\nEl cliente recibirá el horario nuevamente disponible para reservar."
+  );
+  if (!confirmar) return;
+
+  try {
+    setCancelandoTurno(true);
+    await cancelarTurnoBackend({
+      negocioId: negocio.id,
+      turnoId: turno.id,
+      clienteUid: turno.clienteUid ?? null,
+      inicio: turno.inicio,
+    });
+
+    // cerramos modal luego de cancelar
+    setModalTurno({ visible: false, turno: null });
+  } catch (err: any) {
+    console.error("Error al cancelar el turno:", err);
+    alert(
+      "Ocurrió un error al cancelar el turno. Intentá de nuevo en unos segundos."
     );
-    if (!confirmar) return;
+  } finally {
+    setCancelandoTurno(false);
+  }
+};
 
-    try {
-      setCancelandoTurno(true);
-      await cancelarTurnoBackend({
-        negocioId: negocio.id,
-        turnoId: turno.id,
-      });
-
-      // cerramos modal luego de cancelar
-      setModalTurno({ visible: false, turno: null });
-    } catch (err: any) {
-      alert(
-        "Ocurrió un error al cancelar el turno. Intentá de nuevo en unos segundos."
-      );
-    } finally {
-      setCancelandoTurno(false);
-    }
-  };
 
   // ======================= RENDER =======================
 

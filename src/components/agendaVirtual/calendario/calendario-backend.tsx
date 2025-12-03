@@ -1532,16 +1532,92 @@ export async function marcarTurnoAsistenciaBackend(opts: {
 export async function cancelarTurnoBackend(opts: {
   negocioId: string;
   turnoId: string;
+  clienteUid?: string | null;
+  inicio?: Date; // usamos el inicio para intentar matchear el turno del usuario
 }) {
-  const { negocioId, turnoId } = opts;
+  const { negocioId, turnoId, clienteUid, inicio } = opts;
 
-  // Si en el futuro queremos guardar historial, acá podríamos:
-  // - copiar los datos a otra colección
-  // - marcar estado "cancelado-negocio"
-  // Por ahora, solo lo borramos para liberar slots.
-  const refTurno = doc(db, "Negocios", negocioId, "Turnos", turnoId);
+  // 1) ✅ Borrar turno en la agenda del NEGOCIO (esto libera el slot sí o sí)
+  const refTurnoNegocio = doc(db, "Negocios", negocioId, "Turnos", turnoId);
+  await deleteDoc(refTurnoNegocio);
 
-  await deleteDoc(refTurno);
+  // 2) ✅ Intentar borrar turno en la agenda del USUARIO (si tenemos uid)
+  if (!clienteUid) return;
+
+  // 2.a) PRIMERO intentamos borrar por ID directo (misma lógica que AgendaNegocio vieja)
+  try {
+    const refTurnoUsuarioDirecto = doc(
+      db,
+      "Usuarios",
+      clienteUid,
+      "Turnos",
+      turnoId
+    );
+
+    await deleteDoc(refTurnoUsuarioDirecto);
+
+    console.log(
+      "[cancelarTurnoBackend] Turno borrado en Usuarios por id directo",
+      { clienteUid, turnoId }
+    );
+  } catch (err) {
+    console.warn(
+      "[cancelarTurnoBackend] No se pudo borrar por id directo en Usuarios/",
+      clienteUid,
+      err
+    );
+  }
+
+  // 2.b) FALLBACK: misma idea que teníamos antes -> buscar por negocioId (+ inicio aprox)
+  try {
+    const refTurnosUsuario = collection(db, "Usuarios", clienteUid, "Turnos");
+
+    // buscamos SOLO los turnos de ese negocio
+    const qUser = query(refTurnosUsuario, where("negocioId", "==", negocioId));
+    const snapUser = await getDocs(qUser);
+
+    if (snapUser.empty) {
+      return;
+    }
+
+    const batch = writeBatch(db);
+
+    snapUser.forEach((docSnap) => {
+      const data: any = docSnap.data();
+
+      // tratamos de reconstruir la fecha/hora de inicio
+      const iniDoc = toDateSafe(
+        data.inicioTs ?? data.inicio ?? data.fecha ?? null
+      );
+
+      if (inicio && !isNaN(+iniDoc)) {
+        const diffMs = Math.abs(+iniDoc - +inicio);
+        // si la diferencia es <= 5 minutos, asumimos que es el mismo turno
+        if (diffMs <= 5 * 60 * 1000) {
+          batch.delete(docSnap.ref);
+        }
+      } else {
+        // ⚠️ fallback MUY amplio (igual que antes):
+        // si no tenemos inicio o iniDoc, borramos todos los turnos
+        // de ese negocio en el usuario
+        batch.delete(docSnap.ref);
+      }
+    });
+
+    await batch.commit();
+    console.log(
+      "[cancelarTurnoBackend] Cleanup extra en Usuarios/ hecho por negocioId/inicio",
+      { clienteUid, negocioId }
+    );
+  } catch (err) {
+    // Si las reglas de Firestore no permiten tocar Usuarios/{cliente},
+    // lo logeamos pero NO rompemos el flujo.
+    console.warn(
+      "[cancelarTurnoBackend] No se pudo borrar el turno en Usuarios/ (fallback)",
+      clienteUid,
+      err
+    );
+  }
 }
 
 /* =====================================================
