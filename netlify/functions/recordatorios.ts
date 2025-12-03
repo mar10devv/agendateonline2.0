@@ -22,7 +22,6 @@ const transporter = nodemailer.createTransport({
 const MS_HORA = 60 * 60 * 1000;
 
 // 🌍 Zona horaria y locale por defecto
-// (Si no hay nada en el turno, usamos esto: Uruguay)
 const DEFAULT_TZ = "America/Montevideo";
 const DEFAULT_LOCALE = "es-ES";
 
@@ -106,6 +105,10 @@ exports.handler = async function () {
       win1hEnd.toISOString()
     );
 
+    // 🛡 Sets para evitar duplicados en esta ejecución
+    const procesados24 = new Set<string>();
+    const procesados1h = new Set<string>();
+
     /* -------- Recordatorio 24h -------- */
     const snap24 = await db
       .collectionGroup("Turnos")
@@ -122,6 +125,17 @@ exports.handler = async function () {
         console.log("⏭️ Ya se envió recordatorio 24h a:", t.clienteEmail);
         continue;
       }
+
+      const fechaTurno = t.inicioTs.toDate();
+      const minutoTurno = Math.round(fechaTurno.getTime() / 60000);
+      const dedupeKey =
+        `24|${t.clienteEmail}|${t.negocioNombre || ""}|${minutoTurno}`;
+
+      if (procesados24.has(dedupeKey)) {
+        console.log("⏭️ Duplicado 24h en esta corrida, se omite:", dedupeKey);
+        continue;
+      }
+      procesados24.add(dedupeKey);
 
       const horaLocal = obtenerHoraLocalDesdeTurno(t);
 
@@ -161,6 +175,17 @@ exports.handler = async function () {
         console.log("⏭️ Ya se envió recordatorio 1h a:", t.clienteEmail);
         continue;
       }
+
+      const fechaTurno = t.inicioTs.toDate();
+      const minutoTurno = Math.round(fechaTurno.getTime() / 60000);
+      const dedupeKey =
+        `1h|${t.clienteEmail}|${t.negocioNombre || ""}|${minutoTurno}`;
+
+      if (procesados1h.has(dedupeKey)) {
+        console.log("⏭️ Duplicado 1h en esta corrida, se omite:", dedupeKey);
+        continue;
+      }
+      procesados1h.add(dedupeKey);
 
       const horaLocal = obtenerHoraLocalDesdeTurno(t);
 
