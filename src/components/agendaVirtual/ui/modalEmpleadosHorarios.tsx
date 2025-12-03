@@ -3,22 +3,95 @@
 import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
 
+type DiaYMedio = {
+  diaCompleto: string;
+  tipo: "antes" | "despues";
+  medioDia: string;
+  inicioMedio: string;
+  finMedio: string;
+};
+
+type HorarioEmpleado = {
+  inicio: string;
+  fin: string;
+  diasLibres: string[];
+  diaYMedio?: DiaYMedio | null;
+};
+
 type Props = {
   abierto: boolean;
   onClose: () => void;
-  horario: {
-    inicio: string;
-    fin: string;
-    diasLibres: string[];
-    diaYMedio?: {
-      diaCompleto: string;
-      tipo: "antes" | "despues";
-      medioDia: string;
-      inicioMedio: string;
-      finMedio: string;
-    } | null;
-  };
-  onGuardar: (nuevoHorario: any) => void;
+  horario: HorarioEmpleado;
+  onGuardar: (nuevoHorario: HorarioEmpleado) => void;
+};
+
+const diasSemana = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+  "Domingo",
+];
+
+const capitalizarDia = (d: string) =>
+  d ? d.charAt(0).toUpperCase() + d.slice(1).toLowerCase() : d;
+
+// 🛡️ Normalizar hora y evitar undefined / valores raros
+function normalizarHora(
+  hora: string | null | undefined,
+  fallback: string
+): string {
+  if (!hora || typeof hora !== "string") return fallback;
+
+  const match = hora.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!match) return fallback;
+
+  let h = Number(match[1]) || 0;
+  let m = Number(match[2]) || 0;
+
+  if (h < 0) h = 0;
+  if (h > 23) h = 23;
+  if (m < 0) m = 0;
+  if (m > 59) m = 59;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// 💡 Calcula la mitad de una jornada, tolerando undefined
+function calcularMitad(
+  inicio?: string | null,
+  fin?: string | null
+): string {
+  const ini = normalizarHora(inicio, "09:00");
+  const finReal = normalizarHora(fin, "17:00");
+
+  const [hi, mi] = ini.split(":").map(Number);
+  const [hf, mf] = finReal.split(":").map(Number);
+
+  const inicioMin = hi * 60 + mi;
+  const finMin = hf * 60 + mf;
+
+  if (Number.isNaN(inicioMin) || Number.isNaN(finMin) || finMin <= inicioMin) {
+    return ini; // fallback razonable
+  }
+
+  const mitad = Math.floor((inicioMin + finMin) / 2);
+  const hh = String(Math.floor(mitad / 60)).padStart(2, "0");
+  const mm = String(mitad % 60).padStart(2, "0");
+
+  return `${hh}:${mm}`;
+}
+
+const getDiaAnterior = (dia: string) => {
+  const idx = diasSemana.indexOf(dia);
+  return diasSemana[(idx - 1 + 7) % 7];
+};
+
+const getDiaSiguiente = (dia: string) => {
+  const idx = diasSemana.indexOf(dia);
+  return diasSemana[(idx + 1) % 7];
 };
 
 export default function ModalHorariosEmpleados({
@@ -27,64 +100,41 @@ export default function ModalHorariosEmpleados({
   horario,
   onGuardar,
 }: Props) {
-  
-  const diasSemana = [
-    "Lunes",
-    "Martes",
-    "Miércoles",
-    "Jueves",
-    "Viernes",
-    "Sábado",
-    "Domingo",
-  ];
+  // Estado interno del horario (copiamos el prop pero saneado)
+  const [tempHorario, setTempHorario] = useState<HorarioEmpleado>(() => {
+    const diasNormalizados = Array.isArray(horario?.diasLibres)
+      ? horario.diasLibres.map(capitalizarDia)
+      : [];
 
-  // función para obtener dia anterior/siguiente
-  const getDiaAnterior = (dia: string) => {
-    const idx = diasSemana.indexOf(dia);
-    return diasSemana[(idx - 1 + 7) % 7];
-  };
+    return {
+      inicio: horario?.inicio || "09:00",
+      fin: horario?.fin || "17:00",
+      diasLibres: diasNormalizados,
+      diaYMedio: horario?.diaYMedio ?? null,
+    };
+  });
 
-  const getDiaSiguiente = (dia: string) => {
-    const idx = diasSemana.indexOf(dia);
-    return diasSemana[(idx + 1) % 7];
-  };
-
-  // mitad de la jornada
-  const calcularMitad = (inicio: string, fin: string) => {
-    const [hi, mi] = inicio.split(":").map(Number);
-    const [hf, mf] = fin.split(":").map(Number);
-
-    const inicioMin = hi * 60 + mi;
-    const finMin = hf * 60 + mf;
-    const mitad = Math.floor((inicioMin + finMin) / 2);
-
-    const hh = String(Math.floor(mitad / 60)).padStart(2, "0");
-    const mm = String(mitad % 60).padStart(2, "0");
-
-    return `${hh}:${mm}`;
-  };
-
-  const [tempHorario, setTempHorario] = useState(horario);
   const [diasOriginales, setDiasOriginales] = useState<string[]>([]);
 
+  // Cuando cambia el horario que viene de arriba (o se abre el modal), sincronizamos
   useEffect(() => {
-    const diasNormalizados = Array.isArray(horario.diasLibres)
-      ? horario.diasLibres.map(
-          (d) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()
-        )
+    const diasNormalizados = Array.isArray(horario?.diasLibres)
+      ? horario.diasLibres.map(capitalizarDia)
       : [];
 
     setDiasOriginales(diasNormalizados);
 
-    setTempHorario({
-      ...horario,
+    setTempHorario((prev) => ({
+      inicio: horario?.inicio || prev.inicio || "09:00",
+      fin: horario?.fin || prev.fin || "17:00",
       diasLibres: diasNormalizados,
-    });
+      diaYMedio: horario?.diaYMedio ?? null,
+    }));
   }, [horario, abierto]);
 
   if (!abierto) return null;
 
-  // mitad jornada calculada
+  // mitad jornada calculada SIEMPRE con valores saneados
   const mitadJornada = calcularMitad(tempHorario.inicio, tempHorario.fin);
 
   return (
@@ -209,7 +259,6 @@ export default function ModalHorariosEmpleados({
         {/* MODO 2: UN DÍA Y MEDIO */}
         {tempHorario.diaYMedio && (
           <div className="flex flex-col gap-5">
-
             {/* DÍA COMPLETO */}
             <div>
               <label className="block text-sm mb-1">Día libre completo</label>
@@ -218,7 +267,6 @@ export default function ModalHorariosEmpleados({
                 onChange={(e) => {
                   const dia = e.target.value;
                   const anterior = getDiaAnterior(dia);
-                  const siguiente = getDiaSiguiente(dia);
 
                   setTempHorario({
                     ...tempHorario,
@@ -243,7 +291,6 @@ export default function ModalHorariosEmpleados({
 
             {/* OPCIONES VALIDAS */}
             <div className="flex flex-col gap-3 p-3 bg-neutral-900 rounded-lg">
-
               <label className="text-sm opacity-80 mb-2">
                 Medio día libre
               </label>
@@ -275,7 +322,8 @@ export default function ModalHorariosEmpleados({
                   }
                 `}
               >
-                {getDiaAnterior(tempHorario.diaYMedio.diaCompleto)} por la mañana
+                {getDiaAnterior(tempHorario.diaYMedio.diaCompleto)} por la
+                mañana
               </button>
 
               {/* Medio día DESPUES */}
@@ -305,11 +353,10 @@ export default function ModalHorariosEmpleados({
                   }
                 `}
               >
-                {getDiaSiguiente(tempHorario.diaYMedio.diaCompleto)} por la tarde
+                {getDiaSiguiente(tempHorario.diaYMedio.diaCompleto)} por la
+                tarde
               </button>
-
             </div>
-
           </div>
         )}
       </div>

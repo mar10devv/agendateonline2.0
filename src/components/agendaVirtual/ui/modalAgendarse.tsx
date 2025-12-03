@@ -19,47 +19,8 @@ import type { DocumentReference, DocumentData } from "firebase/firestore";
 import Loader from "../../ui/loaderSpinner";
 
 import { db } from "../../../lib/firebase";
-import CalendarioUI from "../ui/calendarioUI";
+import CalendarioBase from "../calendario/calendario-diseño"; // ✅ usamos el calendario nuevo
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-
-/* -----------------------------------------------------
-   🔥 FUNCIÓN: combinar negocio + empleado
-   (días libres negocio + días libres empleado + horario)
------------------------------------------------------ */
-function obtenerCalendarioFinal(negocio: any, empleado: any) {
-  const conf = negocio.configuracionAgenda || {};
-
-  const diasNegocio: string[] = conf.diasLibres || [];
-  const diasEmpleado: string[] = empleado?.calendario?.diasLibres || [];
-
-  const calendarioFinal = {
-    // Si el empleado tiene horario propio, se respeta; si no, horario genérico
-    inicio: empleado?.calendario?.inicio || conf.horaInicio || "09:00",
-    fin: empleado?.calendario?.fin || conf.horaFin || "18:00",
-
-    // Config global de la agenda
-    modoTurnos: conf.modoTurnos || "jornada",
-    clientesPorDia:
-      typeof conf.clientesPorDia === "number" ? conf.clientesPorDia : null,
-    horasSeparacion: 30, // minutos por turno, si lo usás en useCalendario
-
-    // 👇 mezcla días libres del negocio + del empleado (sin duplicados)
-    diasLibres: [...new Set([...diasNegocio, ...diasEmpleado])],
-  };
-
-  console.log("[ModalAgendarse] obtenerCalendarioFinal →", {
-    negocioId: negocio?.id,
-    empleadoNombre: empleado?.nombre,
-    diasNegocio,
-    diasEmpleado,
-    calendarioFinal,
-  });
-
-  return calendarioFinal;
-}
-/* ----------------------------------------------------
-   FIN FUNCIÓN NUEVA
----------------------------------------------------- */
 
 type Empleado = {
   nombre: string;
@@ -96,6 +57,7 @@ type Props = {
       clientesPorDia?: number | null;
       horaInicio?: string;
       horaFin?: string;
+      horasSeparacion?: number | null;
     };
     ubicacion?: {
       lat: number;
@@ -268,6 +230,27 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
 
   return { activo: false, inicio: null, fin: null, docPath: null };
 }
+
+/* 🔹 helper: ¿el empleado tiene descanso configurado? (días libres o día y medio) */
+const empleadoTieneDescansoConfigurado = (e: Empleado): boolean => {
+  if (!e || !e.calendario) return false;
+
+  const cal: any = e.calendario || {};
+  const diasLibres = cal.diasLibres;
+  const diaYMedio = cal.diaYMedio;
+
+  const tieneListaDias =
+    Array.isArray(diasLibres) && diasLibres.length > 0;
+
+  const tieneDiaYMedio =
+    !!diaYMedio &&
+    typeof diaYMedio.diaCompleto === "string" &&
+    diaYMedio.diaCompleto.trim() !== "" &&
+    typeof diaYMedio.medioDia === "string" &&
+    diaYMedio.medioDia.trim() !== "";
+
+  return tieneListaDias || tieneDiaYMedio;
+};
 
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [paso, setPaso] = useState(1);
@@ -538,7 +521,7 @@ function PasoEmpleados({
   }, [servicio, negocio]);
 
   const validarEmpleado = (e: Empleado) => {
-    if (!e.calendario?.diasLibres || e.calendario.diasLibres.length === 0) {
+    if (!empleadoTieneDescansoConfigurado(e)) {
       setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
       return;
     }
@@ -597,7 +580,7 @@ function PasoEmpleados({
   );
 }
 
-/* ---------- PasoTurnos (AQUÍ USAMOS calendarioFinal) ---------- */
+/* ---------- PasoTurnos: usa CalendarioBase (calendario-backend) ---------- */
 function PasoTurnos({
   negocio,
   empleado,
@@ -605,22 +588,14 @@ function PasoTurnos({
   onSelect,
   onBack,
 }: {
-  negocio: { id: string; configuracionAgenda?: any };
+  negocio: { id: string; configuracionAgenda?: any; empleadosData?: Empleado[] };
   empleado: any;
   servicio: any;
   onSelect: (t: { hora: string; fecha: Date }) => void;
   onBack: () => void;
 }) {
-  // 🔥 Crear calendario final negocio + empleado
-  const calendarioFinal = obtenerCalendarioFinal(negocio, empleado);
-
-  // Enviamos al calendario un empleado con su calendario ya mezclado
-  const empleadoConCalendarioFinal = {
-    ...empleado,
-    calendario: calendarioFinal,
-  };
-
-  console.log("[ModalAgendarse] PasoTurnos → empleadoConCalendarioFinal:", empleadoConCalendarioFinal);
+  const minutosPorSlot =
+    negocio.configuracionAgenda?.horasSeparacion ?? 30;
 
   return (
     <div>
@@ -629,12 +604,18 @@ function PasoTurnos({
       </p>
 
       <div className="flex justify-center mb-6">
-        <CalendarioUI
-          empleado={empleadoConCalendarioFinal}
-          servicio={servicio}
-          negocioId={negocio.id}
-          onSelectTurno={(t) => {
-            onSelect(t);
+        <CalendarioBase
+          modo="cliente"
+          usuarioActual={{} as any}        // en modo cliente no usamos permisos
+          negocio={negocio as any}
+          empleado={empleado as any}
+          empleados={(negocio.empleadosData || []) as any}
+          minutosPorSlot={minutosPorSlot}
+          onSlotLibreClick={(slot: any) => {
+            onSelect({
+              fecha: slot.fecha,
+              hora: slot.hora,
+            });
           }}
         />
       </div>
@@ -716,14 +697,12 @@ function PasoConfirmacion({
 
     setGuardandoTurno(true);
     try {
-      // FECHAS CORRECTAS
       const inicioDate = combinarFechaHora(turno.fecha, turno.hora);
       const dur = parseDuracionMin(servicio.duracion);
       const finDate = new Date(inicioDate.getTime() + dur * 60000);
       const inicioTs = Timestamp.fromDate(inicioDate);
       const finTs = Timestamp.fromDate(finDate);
 
-      // TEXTO PARA EMAILS
       const fechaTexto = inicioDate.toLocaleDateString("es-ES", {
         weekday: "long",
         day: "numeric",
@@ -771,12 +750,10 @@ function PasoConfirmacion({
         emailConfirmacionError: null,
       };
 
-      // Crear en Negocios/{id}/Turnos
       const turnosRef = collection(db, "Negocios", negocio.id, "Turnos");
       const created = await addDoc(turnosRef, docNegocioData);
       const nuevoId = created.id;
 
-      // Copiar a Usuarios/{uid}/Turnos/{id}
       await setDoc(
         doc(db, "Usuarios", usuario.uid, "Turnos", nuevoId),
         {
@@ -786,7 +763,6 @@ function PasoConfirmacion({
         { merge: true }
       );
 
-      // Disparar función de email
       await fetch("/.netlify/functions/confirmar-turno", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
