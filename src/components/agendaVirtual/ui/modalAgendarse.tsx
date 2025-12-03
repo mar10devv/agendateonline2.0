@@ -64,6 +64,8 @@ type Props = {
       lng: number;
       direccion: string;
     };
+    // 🔹 NUEVO: saber si esta agenda es un emprendimiento
+    esEmprendimiento?: boolean;
   };
 };
 
@@ -100,7 +102,7 @@ function parseDuracionMin(d: any): number {
   if (typeof d === "string") {
     if (d.includes(":")) {
       const [h, m] = d.split(":").map(Number);
-      return (h || 0) * 60 + (m || 0);
+      return (h || 0) * 60 + (m || 0) * 1;
     }
     const n = Number(d);
     if (!Number.isNaN(n)) return n;
@@ -252,6 +254,34 @@ const empleadoTieneDescansoConfigurado = (e: Empleado): boolean => {
   return tieneListaDias || tieneDiaYMedio;
 };
 
+// 🔹 Normaliza la URL de la foto del empleado para negocio / emprendimiento
+function getAvatarUrl(e: Empleado): string | null {
+  // Emprendimiento suele guardar directamente fotoPerfil como string
+  if (typeof e.fotoPerfil === "string" && e.fotoPerfil.trim() !== "") {
+    return e.fotoPerfil.trim();
+  }
+
+  // En algunos negocios usamos "foto" y puede ser string u objeto
+  const f: any = (e as any).foto;
+  if (!f) return null;
+
+  if (typeof f === "string" && f.trim() !== "") {
+    return f.trim();
+  }
+
+  if (typeof f === "object") {
+    if (typeof f.url === "string" && f.url.trim() !== "") {
+      return f.url.trim();
+    }
+    if (typeof f.secure_url === "string" && f.secure_url.trim() !== "") {
+      return f.secure_url.trim();
+    }
+  }
+
+  return null;
+}
+
+
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [paso, setPaso] = useState(1);
   const [servicio, setServicio] = useState<Servicio | null>(null);
@@ -393,6 +423,7 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
               <PasoEmpleados
                 servicio={servicio}
                 negocio={negocio}
+                esEmprendimiento={negocio.esEmprendimiento === true}
                 onSelect={(e) => {
                   setEmpleado(e);
                   setPaso(3);
@@ -495,11 +526,13 @@ function PasoServicios({
 function PasoEmpleados({
   servicio,
   negocio,
+  esEmprendimiento = false,
   onSelect,
   onBack,
 }: {
   servicio: Servicio;
   negocio: { empleadosData?: Empleado[] };
+  esEmprendimiento?: boolean;
   onSelect: (e: Empleado) => void;
   onBack: () => void;
 }) {
@@ -521,15 +554,19 @@ function PasoEmpleados({
   }, [servicio, negocio]);
 
   const validarEmpleado = (e: Empleado) => {
-    if (!empleadoTieneDescansoConfigurado(e)) {
-      setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
-      return;
-    }
+    // 🟣 Emprendimiento: NO bloqueamos por días libres ni horarios
+    if (!esEmprendimiento) {
+      // 🟠 Negocio: sí exigimos config por empleado
+      if (!empleadoTieneDescansoConfigurado(e)) {
+        setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
+        return;
+      }
 
-    const tieneHorario = e.calendario?.inicio && e.calendario?.fin;
-    if (!tieneHorario) {
-      setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
-      return;
+      const tieneHorario = e.calendario?.inicio && e.calendario?.fin;
+      if (!tieneHorario) {
+        setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
+        return;
+      }
     }
 
     setError(null);
@@ -544,33 +581,44 @@ function PasoEmpleados({
         Selecciona un empleado
       </p>
 
-      {error && <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">{error}</p>}
+      {error && (
+        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">
+          {error}
+        </p>
+      )}
 
       {filtrados.length > 0 ? (
-        filtrados.map((e, idx) => (
-          <button
-            key={idx}
-            onClick={() => validarEmpleado(e)}
-            className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
-          >
-            {e.fotoPerfil || (e as any).foto ? (
-              <img
-                src={e.fotoPerfil || (e as any).foto}
-                alt={e.nombre}
-                className="w-12 h-12 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
-                {e.nombre?.charAt(0) || "?"}
+        filtrados.map((e, idx) => {
+          const avatarUrl = getAvatarUrl(e);
+
+          return (
+            <button
+              key={idx}
+              onClick={() => validarEmpleado(e)}
+              className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={e.nombre}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
+                  {e.nombre?.charAt(0) || "?"}
+                </div>
+              )}
+
+              <div className="text-left">
+                <p className="font-medium">{e.nombre}</p>
               </div>
-            )}
-            <div className="text-left">
-              <p className="font-medium">{e.nombre}</p>
-            </div>
-          </button>
-        ))
+            </button>
+          );
+        })
       ) : (
-        <p className="text-gray-400 text-sm">No hay empleados disponibles para este servicio.</p>
+        <p className="text-gray-400 text-sm">
+          No hay empleados disponibles para este servicio.
+        </p>
       )}
 
       <button onClick={onBack} className="text-sm text-gray-400">
@@ -579,6 +627,7 @@ function PasoEmpleados({
     </div>
   );
 }
+
 
 /* ---------- PasoTurnos: usa CalendarioBase (calendario-backend) ---------- */
 function PasoTurnos({

@@ -786,8 +786,8 @@ export default function AgendaVirtualUIv3({
                 // 👉 Punto solo si todavía NO hay ubicación guardada
                 mostrarAlerta = !ubicacion;
               } else if (item.id === "empleados") {
-                // 👉 Punto si HAY al menos un empleado incompleto
-                mostrarAlerta = hayEmpleadosIncompletos;
+                // 👉 SOLO negocios normales, no emprendimientos
+                mostrarAlerta = !esEmprendimiento && hayEmpleadosIncompletos;
               }
               // En "agenda" nunca mostramos punto
             }
@@ -828,6 +828,7 @@ export default function AgendaVirtualUIv3({
             );
           })}
         </div>
+
 
         {/* CONTENIDO */}
         <div
@@ -921,14 +922,17 @@ export default function AgendaVirtualUIv3({
             slug={negocio.slug}
           />
         )}
+{modalAgendarse && (
+  <ModalAgendarse
+    abierto={modalAgendarse}
+    onClose={() => setModalAgendarse(false)}
+    negocio={{ 
+      ...negocio,
+      esEmprendimiento, // 👈 le pasamos el flag que ya tenés en AgendaVirtualUIv3
+    }}
+  />
+)}
 
-        {modalAgendarse && (
-          <ModalAgendarse
-            abierto={modalAgendarse}
-            onClose={() => setModalAgendarse(false)}
-            negocio={negocio}
-          />
-        )}
 
         {modalPerfil && (
           <ModalPerfil
@@ -958,12 +962,14 @@ export default function AgendaVirtualUIv3({
         )}
 
         {modalServicios && (
-          <ModalAgregarServicios
-            abierto={modalServicios}
-            onCerrar={() => setModalServicios(false)}
-            negocioId={negocio.id}
-          />
-        )}
+  <ModalAgregarServicios
+    abierto={modalServicios}
+    onCerrar={() => setModalServicios(false)}
+    negocioId={negocio.id}
+    esEmprendimiento={esEmprendimiento} // 👈 pasar el flag
+  />
+)}
+
 
       </div>
     </>

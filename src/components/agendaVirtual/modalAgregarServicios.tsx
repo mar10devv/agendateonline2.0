@@ -9,6 +9,8 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  getDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import ModalBase from "../ui/modalGenerico";
@@ -28,12 +30,14 @@ type Props = {
   abierto: boolean;
   onCerrar: () => void;
   negocioId: string;
+  esEmprendimiento: boolean; // 👈 importante
 };
 
 export default function ModalAgregarServicios({
   abierto,
   onCerrar,
   negocioId,
+  esEmprendimiento,
 }: Props) {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -49,7 +53,7 @@ export default function ModalAgregarServicios({
   const duraciones = [
     10, 20, 30, 40, 50,
     60, 70, 80, 90,
-    120, 150, 180, 210, 240
+    120, 150, 180, 210, 240,
   ];
 
   const formatearDuracion = (min: number) => {
@@ -65,7 +69,7 @@ export default function ModalAgregarServicios({
   // ============================================
   const esServicioVacio = (s: Servicio) => {
     return (
-      (s.servicio.trim() === "") &&
+      s.servicio.trim() === "" &&
       (s.precio === "" || s.precio === 0) &&
       s.duracion === 30
     );
@@ -75,9 +79,7 @@ export default function ModalAgregarServicios({
   // Eliminar TODOS los servicios nuevos vacíos
   // ============================================
   const limpiarServiciosVacios = () => {
-    setServicios((prev) =>
-      prev.filter((s) => s.id || !esServicioVacio(s))
-    );
+    setServicios((prev) => prev.filter((s) => s.id || !esServicioVacio(s)));
   };
 
   // ============================================
@@ -109,9 +111,9 @@ export default function ModalAgregarServicios({
 
     const negocioRef = doc(db, "Negocios", negocioId);
     const preciosRef = collection(negocioRef, "Precios");
-    const q = query(preciosRef, orderBy("createdAt", "desc"));
+    const qPrecios = query(preciosRef, orderBy("createdAt", "desc"));
 
-    const unsubscribe = onSnapshot(q, (snap) => {
+    const unsubscribe = onSnapshot(qPrecios, (snap) => {
       const data = snap.docs.map(
         (d) =>
           ({
@@ -142,7 +144,10 @@ export default function ModalAgregarServicios({
   // ============================================
   const handleAgregar = () => {
     limpiarServiciosVacios();
-    setServicios((prev) => [{ servicio: "", precio: "", duracion: 30 }, ...prev]);
+    setServicios((prev) => [
+      { servicio: "", precio: "", duracion: 30 },
+      ...prev,
+    ]);
     setAbiertoIndex(0);
   };
 
@@ -178,11 +183,14 @@ export default function ModalAgregarServicios({
       const negocioRef = doc(db, "Negocios", negocioId);
       const preciosRef = collection(negocioRef, "Precios");
 
+      const nuevosServiciosIds: string[] = [];
+
       for (const s of servicios) {
         if (s.servicio.trim() !== "") {
           const precioFinal = s.precio === "" ? 0 : Number(s.precio);
 
           if (s.id) {
+            // Actualizar servicio existente
             await setDoc(
               doc(preciosRef, s.id),
               {
@@ -193,11 +201,62 @@ export default function ModalAgregarServicios({
               { merge: true }
             );
           } else {
-            await addDoc(preciosRef, {
+            // Crear servicio nuevo
+            const nuevoDoc = await addDoc(preciosRef, {
               servicio: s.servicio,
               precio: precioFinal,
               duracion: s.duracion,
               createdAt: serverTimestamp(),
+            });
+
+            nuevosServiciosIds.push(nuevoDoc.id);
+          }
+        }
+      }
+
+      // ============================================
+      // Vincular servicios nuevos al único empleado
+      // usando empleadosData dentro del negocio
+      // ============================================
+      if (esEmprendimiento && nuevosServiciosIds.length > 0) {
+        const snapNegocio = await getDoc(negocioRef);
+
+        if (snapNegocio.exists()) {
+          const data: any = snapNegocio.data();
+          const empleadosData: any[] = Array.isArray(data.empleadosData)
+            ? data.empleadosData
+            : [];
+
+          if (empleadosData.length > 0) {
+            // buscamos empleado principal (esEmpleado === true) o el primero
+            let idxPrincipal = empleadosData.findIndex(
+              (e) => e && e.esEmpleado === true
+            );
+            if (idxPrincipal === -1) idxPrincipal = 0;
+
+            const empleadoPrincipal = empleadosData[idxPrincipal] || {};
+            const trabajosActuales: string[] = Array.isArray(
+              empleadoPrincipal.trabajos
+            )
+              ? empleadoPrincipal.trabajos
+              : [];
+
+            const setTrabajos = new Set<string>(trabajosActuales);
+            for (const idServ of nuevosServiciosIds) {
+              setTrabajos.add(idServ);
+            }
+
+            const empleadoActualizado = {
+              ...empleadoPrincipal,
+              trabajos: Array.from(setTrabajos),
+            };
+
+            const nuevosEmpleadosData = empleadosData.map((e, idx) =>
+              idx === idxPrincipal ? empleadoActualizado : e
+            );
+
+            await updateDoc(negocioRef, {
+              empleadosData: nuevosEmpleadosData,
             });
           }
         }
@@ -234,7 +293,9 @@ export default function ModalAgregarServicios({
           {cargando ? (
             <p className="text-gray-300">Cargando servicios...</p>
           ) : servicios.length === 0 ? (
-            <p className="text-gray-400 text-sm">No hay servicios cargados aún.</p>
+            <p className="text-gray-400 text-sm">
+              No hay servicios cargados aún.
+            </p>
           ) : (
             servicios.map((serv, i) => (
               <div
@@ -252,62 +313,69 @@ export default function ModalAgregarServicios({
                 </button>
 
                 {abiertoIndex === i && (
-  <div className="p-4 flex flex-col gap-4 bg-black/30 rounded-b-xl">
+                  <div className="p-4 flex flex-col gap-4 bg-black/30 rounded-b-xl">
+                    <InputAnimado
+                      label="Nombre del servicio"
+                      id={`nombre-${i}`}
+                      value={serv.servicio}
+                      onChange={(e) =>
+                        handleChange(i, "servicio", e.target.value)
+                      }
+                    />
 
-    <InputAnimado
-      label="Nombre del servicio"
-      id={`nombre-${i}`}
-      value={serv.servicio}
-      onChange={(e) => handleChange(i, "servicio", e.target.value)}
-    />
+                    <InputAnimado
+                      label="Precio"
+                      id={`precio-${i}`}
+                      value={serv.precio === 0 ? "" : String(serv.precio)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleChange(
+                          i,
+                          "precio",
+                          val === "" ? "" : Number(val)
+                        );
+                      }}
+                    />
 
-    <InputAnimado
-      label="Precio"
-      id={`precio-${i}`}
-      value={serv.precio === 0 ? "" : String(serv.precio)}
-      onChange={(e) => {
-        const val = e.target.value;
-        handleChange(i, "precio", val === "" ? "" : Number(val));
-      }}
-    />
+                    {/* SLIDER DURACIÓN */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm text-gray-300">
+                        Duración
+                      </label>
 
-    {/* SLIDER DURACIÓN */}
-    <div className="flex flex-col gap-1">
-      <label className="text-sm text-gray-300">Duración</label>
+                      <input
+                        type="range"
+                        min={0}
+                        max={duraciones.length - 1}
+                        step={1}
+                        value={Math.max(
+                          0,
+                          duraciones.indexOf(serv.duracion)
+                        )}
+                        onChange={(e) => {
+                          const index = Number(e.target.value);
+                          const nuevaDuracion = duraciones[index];
+                          handleChange(i, "duracion", nuevaDuracion);
+                        }}
+                        className="w-full accent-green-500"
+                      />
 
-      <input
-        type="range"
-        min={0}
-        max={duraciones.length - 1}
-        step={1}
-        value={duraciones.indexOf(serv.duracion)}
-        onChange={(e) => {
-          const index = Number(e.target.value);
-          const nuevaDuracion = duraciones[index];
-          handleChange(i, "duracion", nuevaDuracion);
-        }}
-        className="w-full accent-green-500"
-      />
+                      <p className="text-gray-200 text-sm font-medium mt-1">
+                        {formatearDuracion(serv.duracion)}
+                      </p>
+                    </div>
 
-      <p className="text-gray-200 text-sm font-medium mt-1">
-        {formatearDuracion(serv.duracion)}
-      </p>
-    </div>
-
-    {/* BOTÓN ELIMINAR */}
-<div className="w-[calc(100%+2rem)] -ml-4 mt-3 pt-3 border-t border-white/10">
-  <button
-    onClick={() => handleEliminar(i)}
-    className="w-full py-2 rounded-b-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md transition text-center"
-  >
-    ✕
-  </button>
-</div>
-
-
-  </div>
-)}
-
+                    {/* BOTÓN ELIMINAR */}
+                    <div className="w-[calc(100%+2rem)] -ml-4 mt-3 pt-3 border-t border-white/10">
+                      <button
+                        onClick={() => handleEliminar(i)}
+                        className="w-full py-2 rounded-b-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md transition text-center"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
