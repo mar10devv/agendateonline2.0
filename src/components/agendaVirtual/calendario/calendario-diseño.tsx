@@ -12,6 +12,7 @@ import {
   liberarDiaCompletoBackend,
   esDuenoOAdmin,
   escucharTurnosEmpleadoTiempoReal,
+  marcarTurnoAsistenciaBackend, // 👈 NUEVO
   type NegocioAgendaSource,
   type EmpleadoAgendaSource,
   type TurnoFuente,
@@ -109,6 +110,9 @@ export default function CalendarioBase({
     visible: false,
     turno: null,
   });
+
+  // loading para marcar asistencia
+  const [marcandoAsistencia, setMarcandoAsistencia] = useState(false);
 
   // ======================= EMPLEADO ACTUAL =======================
 
@@ -523,6 +527,42 @@ export default function CalendarioBase({
     return "";
   };
 
+  // handler para marcar asistencia desde el modal
+  const handleMarcarAsistencia = async (
+    turno: TurnoExistente,
+    nuevoEstado: "asistio" | "no-asistio"
+  ) => {
+    if (!negocio?.id || !turno?.id) return;
+    try {
+      setMarcandoAsistencia(true);
+      await marcarTurnoAsistenciaBackend({
+        negocioId: negocio.id,
+        turnoId: turno.id,
+        asistencia: nuevoEstado,
+      });
+
+      // actualizar estado local del modal para que se vea al instante
+      setModalTurno((prev) =>
+        prev.turno
+          ? {
+              visible: true,
+              turno: {
+                ...prev.turno,
+                asistencia: nuevoEstado,
+                estado: "completado",
+              },
+            }
+          : prev
+      );
+    } catch (err: any) {
+      alert(
+        "Ocurrió un error al marcar la asistencia. Intentá de nuevo en unos segundos."
+      );
+    } finally {
+      setMarcandoAsistencia(false);
+    }
+  };
+
   // ======================= RENDER =======================
 
   return (
@@ -884,6 +924,20 @@ export default function CalendarioBase({
                   .join("")
                   .slice(0, 2) || "?";
 
+              const asistenciaLabel =
+                t.asistencia === "asistio"
+                  ? "Cliente asistió"
+                  : t.asistencia === "no-asistio"
+                  ? "Cliente no asistió"
+                  : "Pendiente de marcar";
+
+              const asistenciaColor =
+                t.asistencia === "asistio"
+                  ? "bg-emerald-600/20 text-emerald-300 border-emerald-600/50"
+                  : t.asistencia === "no-asistio"
+                  ? "bg-red-600/20 text-red-300 border-red-600/50"
+                  : "bg-yellow-500/10 text-yellow-200 border-yellow-500/50";
+
               return (
                 <div className="space-y-4 text-sm text-gray-100">
                   {/* Cliente */}
@@ -946,6 +1000,54 @@ export default function CalendarioBase({
                         {t.clienteTelefono || "No registrado"}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Estado / asistencia */}
+                  <div className="bg-white/5 rounded-lg p-3 space-y-2">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                      Asistencia
+                    </p>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[11px] font-medium ${asistenciaColor}`}
+                    >
+                      {asistenciaLabel}
+                    </span>
+
+                    <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                      <button
+                        disabled={marcandoAsistencia}
+                        onClick={() =>
+                          handleMarcarAsistencia(t, "asistio")
+                        }
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 ${
+                          marcandoAsistencia
+                            ? "bg-emerald-700/60 text-emerald-100 cursor-wait"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        }`}
+                      >
+                        ✅ Marcó asistencia
+                      </button>
+
+                      <button
+                        disabled={marcandoAsistencia}
+                        onClick={() =>
+                          handleMarcarAsistencia(t, "no-asistio")
+                        }
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 ${
+                          marcandoAsistencia
+                            ? "bg-red-700/60 text-red-100 cursor-wait"
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
+                      >
+                        ❌ No asistió
+                      </button>
+                    </div>
+
+                    {marcandoAsistencia && (
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Guardando asistencia...
+                      </p>
+                    )}
                   </div>
 
                   {/* Botón cerrar */}

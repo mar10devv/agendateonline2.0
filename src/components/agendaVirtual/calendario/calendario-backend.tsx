@@ -9,6 +9,7 @@ import {
   where,
   writeBatch,
   onSnapshot,
+  updateDoc, // 👈 NUEVO
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
@@ -117,6 +118,8 @@ export type ConfigCalendarioUnificado = {
 
 /* -------- Turnos ya guardados en Firestore (normalizados) -------- */
 
+export type EstadoAsistencia = "pendiente" | "asistio" | "no-asistio";
+
 /**
  * Turno normalizado y listo para usar en el calendario (Date reales).
  */
@@ -128,12 +131,16 @@ export type TurnoExistente = {
 
   servicioId?: string;
   servicioNombre?: string;
+  precio?: number; // 💰 para estadísticas
 
   clienteUid?: string | null;
   clienteNombre?: string | null;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
-  clienteFotoUrl?: string | null; // ✅ NUEVO
+  clienteFotoUrl?: string | null;
+
+  estado?: string; // ej: "reservado" | "completado" | etc
+  asistencia?: EstadoAsistencia; // 👈 NUEVO
 
   raw?: any; // documento original (para debug o uso avanzado)
 };
@@ -785,12 +792,16 @@ export type TurnoFuente = {
 
   servicioId?: string;
   servicioNombre?: string;
+  precio?: number;
 
   clienteUid?: string | null;
   clienteNombre?: string | null;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
-  clienteFotoUrl?: string | null; // ✅ NUEVO
+  clienteFotoUrl?: string | null;
+
+  estado?: string;
+  asistencia?: EstadoAsistencia;
 
   [key: string]: any;
 };
@@ -868,6 +879,9 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
       continue;
     }
 
+    const asistencia: EstadoAsistencia =
+      (t.asistencia as EstadoAsistencia) ?? "pendiente";
+
     out.push({
       id: t.id,
       inicio: par.inicio,
@@ -875,11 +889,14 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
       bloqueado: t.bloqueado ?? false,
       servicioId: t.servicioId,
       servicioNombre: t.servicioNombre,
+      precio: t.precio,
       clienteUid: t.clienteUid ?? null,
       clienteNombre: t.clienteNombre ?? null,
       clienteEmail: t.clienteEmail ?? null,
       clienteTelefono: t.clienteTelefono ?? null,
-      clienteFotoUrl: t.clienteFotoUrl ?? null, // ✅ NUEVO
+      clienteFotoUrl: t.clienteFotoUrl ?? null,
+      estado: t.estado,
+      asistencia, // 👈 NUEVO
       raw: t,
     });
   }
@@ -1332,7 +1349,8 @@ export async function crearTurnoManualBackend(opts: {
   clienteNombre: string;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
-  clienteFotoUrl?: string | null; // ✅ NUEVO
+  clienteFotoUrl?: string | null;
+  precio?: number | null;
 }) {
   const {
     usuario,
@@ -1347,7 +1365,8 @@ export async function crearTurnoManualBackend(opts: {
     clienteNombre,
     clienteEmail,
     clienteTelefono,
-    clienteFotoUrl, // ✅ NUEVO
+    clienteFotoUrl,
+    precio,
   } = opts;
 
   // Validamos permisos (dueño/admin)
@@ -1365,6 +1384,7 @@ export async function crearTurnoManualBackend(opts: {
     servicioId,
     servicioNombre,
     duracion,
+    precio: precio ?? null,
     empleadoId: empleadoId || null,
     empleadoNombre,
     fecha: inicio.toISOString().split("T")[0],
@@ -1374,7 +1394,9 @@ export async function crearTurnoManualBackend(opts: {
     clienteNombre: clienteNombre.trim(),
     clienteEmail: clienteEmail || null,
     clienteTelefono: clienteTelefono || null,
-    clienteFotoUrl: clienteFotoUrl || null, // ✅ NUEVO
+    clienteFotoUrl: clienteFotoUrl || null,
+    estado: "reservado",
+    asistencia: "pendiente", // 👈 todos los turnos nuevos arrancan pendientes
     creadoEn: new Date(),
     creadoPor: "negocio-manual",
   });
@@ -1480,6 +1502,29 @@ export async function liberarDiaCompletoBackend(opts: {
   const batch = writeBatch(db);
   snap.forEach((d) => batch.delete(d.ref));
   await batch.commit();
+}
+
+/**
+ * 7.5 Marcar asistencia de un turno
+ *
+ * La va a usar el empleado desde el modal "Detalle del turno".
+ * - asistencia = "asistio"  -> cliente atendido, cuenta como ingreso real.
+ * - asistencia = "no-asistio" -> no vino, sirve para estadísticas de ausencias.
+ */
+export async function marcarTurnoAsistenciaBackend(opts: {
+  negocioId: string;
+  turnoId: string;
+  asistencia: EstadoAsistencia;
+}) {
+  const { negocioId, turnoId, asistencia } = opts;
+
+  const refTurno = doc(db, "Negocios", negocioId, "Turnos", turnoId);
+
+  await updateDoc(refTurno, {
+    asistencia,
+    estado: "completado", // el turno ya terminó (vino o no vino)
+    actualizadoEn: new Date(),
+  });
 }
 
 /* =====================================================

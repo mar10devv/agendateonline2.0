@@ -22,8 +22,9 @@ import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 import CardServicio from "../../ui/cardServicio";
 import ModalEmprendimiento from "./modalEmprendimiento";
+import IconEstadisticas from "../../../assets/estadisticas-svg.svg?url";
 
-
+import ModalEstadisticas from "../ui/modalEstadisticas"
 import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
 import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
@@ -153,6 +154,7 @@ export default function AgendaVirtualUIv3({
   const [modalShare, setModalShare] = useState(false);
   const [modalAgendarse, setModalAgendarse] = useState(false);
   const [modalPerfil, setModalPerfil] = useState(false);
+    const [modalEstadisticas, setModalEstadisticas] = useState(false);
   const [modalEmpleados, setModalEmpleados] = useState(false);
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] =
@@ -678,14 +680,33 @@ const hayEmpleadosIncompletos = useMemo(() => {
             text-[var(--color-texto)]
           "
         >
-          {(modo === "dueño" || modo === "admin") && (
-            <button
-              onClick={() => setModalPerfil(true)}
-              className="absolute top-4 right-4"
-            >
-              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-            </button>
+          {/* Configuración + Estadísticas (solo DUEÑO) */}
+          {modo === "dueño" && (
+            <div className="absolute top-4 right-4 flex items-center gap-3">
+              {/* Icono estadísticas */}
+              <button
+  onClick={() => setModalEstadisticas(true)}
+  className="p-1 rounded-full hover:bg-black/10 transition"
+  title="Ver estadísticas"
+>
+  <img
+    src={IconEstadisticas}
+    alt="Estadísticas"
+    className="w-7 h-7 icono-blanco opacity-80 hover:opacity-100 transition"
+  />
+</button>
+
+              {/* Icono configuración */}
+              <button
+                onClick={() => setModalPerfil(true)}
+                className="p-1 rounded-full hover:bg-black/10 transition"
+                title="Configurar perfil"
+              >
+                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+              </button>
+            </div>
           )}
+
 
           {/* Foto */}
           <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
@@ -979,6 +1000,16 @@ const hayEmpleadosIncompletos = useMemo(() => {
     esEmprendimiento={esEmprendimiento} // 👈 pasar el flag
   />
 )}
+
+{modalEstadisticas && (
+          <ModalEstadisticas
+            abierto={modalEstadisticas}
+            onCerrar={() => setModalEstadisticas(false)}
+            negocio={negocio}
+            empleados={empleadosParaAgenda}
+            turnos={turnos}
+          />
+        )}
 
 
       </div>
