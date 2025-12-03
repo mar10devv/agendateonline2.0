@@ -10,7 +10,9 @@ import {
   writeBatch,
   onSnapshot,
   updateDoc, // 👈 NUEVO
+  deleteDoc, // 👈 PARA cancelarTurnoBackend
 } from "firebase/firestore";
+
 import { db } from "../../../lib/firebase";
 
 /* =====================================================
@@ -1525,6 +1527,21 @@ export async function marcarTurnoAsistenciaBackend(opts: {
     estado: "completado", // el turno ya terminó (vino o no vino)
     actualizadoEn: new Date(),
   });
+}
+
+export async function cancelarTurnoBackend(opts: {
+  negocioId: string;
+  turnoId: string;
+}) {
+  const { negocioId, turnoId } = opts;
+
+  // Si en el futuro queremos guardar historial, acá podríamos:
+  // - copiar los datos a otra colección
+  // - marcar estado "cancelado-negocio"
+  // Por ahora, solo lo borramos para liberar slots.
+  const refTurno = doc(db, "Negocios", negocioId, "Turnos", turnoId);
+
+  await deleteDoc(refTurno);
 }
 
 /* =====================================================

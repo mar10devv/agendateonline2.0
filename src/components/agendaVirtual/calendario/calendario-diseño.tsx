@@ -12,7 +12,8 @@ import {
   liberarDiaCompletoBackend,
   esDuenoOAdmin,
   escucharTurnosEmpleadoTiempoReal,
-  marcarTurnoAsistenciaBackend, // 👈 NUEVO
+  marcarTurnoAsistenciaBackend, // ✅ ya estaba
+  cancelarTurnoBackend, // ✅ NUEVO
   type NegocioAgendaSource,
   type EmpleadoAgendaSource,
   type TurnoFuente,
@@ -113,6 +114,8 @@ export default function CalendarioBase({
 
   // loading para marcar asistencia
   const [marcandoAsistencia, setMarcandoAsistencia] = useState(false);
+  // loading para cancelar turno
+  const [cancelandoTurno, setCancelandoTurno] = useState(false);
 
   // ======================= EMPLEADO ACTUAL =======================
 
@@ -483,23 +486,38 @@ export default function CalendarioBase({
 
     switch (slot.estado) {
       case "libre":
-        return `${base} bg-white text-black hover:bg-gray-200`;
+        // ✅ disponibles en VERDE
+        return `${base} bg-emerald-600 text-white hover:bg-emerald-700`;
+
       case "ocupado":
+        // ✅ turnos ocupados en ROJO
         if (modo === "cliente") {
-          return `${base} bg-indigo-900 text-gray-300 cursor-not-allowed opacity-60`;
-        }
-        return `${base} bg-indigo-600 text-white hover:bg-indigo-700`;
-      case "bloqueado":
-        if (modo === "cliente") {
-          return `${base} bg-red-900 text-gray-300 cursor-not-allowed opacity-60`;
+          return `${base} bg-red-700 text-white cursor-not-allowed opacity-70`;
         }
         return `${base} bg-red-600 text-white hover:bg-red-700`;
+
+      case "bloqueado":
+        // 🚫 bloqueado: rojo más oscuro / apagado
+        if (modo === "cliente") {
+          return `${base} bg-red-900 text-red-200 cursor-not-allowed opacity-60`;
+        }
+        return `${base} bg-red-900 text-red-100 hover:bg-red-800`;
+
       case "pasado":
-        return `${base} bg-neutral-800 text-gray-500 cursor-not-allowed`;
+        // 🔹 PASADO SIN reserva → gris apagado (igual que antes)
+        if (!slot.turnoOcupado) {
+          return `${base} bg-neutral-900 text-gray-500 cursor-not-allowed`;
+        }
+
+        // 🔸 PASADO CON reserva → gris PERO marcado con borde y mejor contraste
+        return `${base} bg-neutral-800 text-gray-100 border border-gray-400/80 hover:bg-neutral-700`;
+
       default:
         return `${base} bg-neutral-700 text-gray-300`;
     }
   };
+
+
 
   const getSlotTitle = (slot: SlotCalendario) => {
     if (modo === "cliente") {
@@ -560,6 +578,33 @@ export default function CalendarioBase({
       );
     } finally {
       setMarcandoAsistencia(false);
+    }
+  };
+
+  // handler para cancelar turno y liberar slots
+  const handleCancelarTurno = async (turno: TurnoExistente) => {
+    if (!negocio?.id || !turno?.id) return;
+
+    const confirmar = window.confirm(
+      "¿Seguro que querés cancelar este turno y liberar el horario?\n\nEl cliente recibirá el horario nuevamente disponible para reservar."
+    );
+    if (!confirmar) return;
+
+    try {
+      setCancelandoTurno(true);
+      await cancelarTurnoBackend({
+        negocioId: negocio.id,
+        turnoId: turno.id,
+      });
+
+      // cerramos modal luego de cancelar
+      setModalTurno({ visible: false, turno: null });
+    } catch (err: any) {
+      alert(
+        "Ocurrió un error al cancelar el turno. Intentá de nuevo en unos segundos."
+      );
+    } finally {
+      setCancelandoTurno(false);
     }
   };
 
@@ -901,10 +946,6 @@ export default function CalendarioBase({
 
           {/* Contenido */}
           <div className="w-full max-w-md relative z-10 rounded-2xl bg-neutral-900 border border-neutral-700 shadow-xl p-6">
-            <h3 className="text-lg font-semibold mb-3">
-              Detalle del turno
-            </h3>
-
             {(() => {
               const t = modalTurno.turno!;
               const fechaStr = t.inicio.toLocaleDateString("es-UY", {
@@ -938,8 +979,34 @@ export default function CalendarioBase({
                   ? "bg-red-600/20 text-red-300 border-red-600/50"
                   : "bg-yellow-500/10 text-yellow-200 border-yellow-500/50";
 
+              const puedeCancelar =
+                t.estado !== "cancelado" && t.estado !== "cancelado-negocio";
+
               return (
                 <div className="space-y-4 text-sm text-gray-100">
+                  {/* Header + botón cancelar */}
+                  <div className="flex items-center justify-between mb-2 gap-3">
+                    <h3 className="text-lg font-semibold">
+                      Detalle del turno
+                    </h3>
+
+                    {puedeCancelar && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancelarTurno(t)}
+                        disabled={cancelandoTurno}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-500 ${
+                          cancelandoTurno
+                            ? "bg-red-800/70 text-red-100 cursor-wait"
+                            : "bg-red-700 hover:bg-red-800 text-white"
+                        }`}
+                        title="Cancelar este turno y liberar el horario"
+                      >
+                        {cancelandoTurno ? "Cancelando..." : "Cancelar turno"}
+                      </button>
+                    )}
+                  </div>
+
                   {/* Cliente */}
                   <div className="flex items-center gap-3">
                     {t.clienteFotoUrl ? (
@@ -1015,12 +1082,12 @@ export default function CalendarioBase({
 
                     <div className="flex flex-col sm:flex-row gap-2 mt-3">
                       <button
-                        disabled={marcandoAsistencia}
+                        disabled={marcandoAsistencia || cancelandoTurno}
                         onClick={() =>
                           handleMarcarAsistencia(t, "asistio")
                         }
                         className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 ${
-                          marcandoAsistencia
+                          marcandoAsistencia || cancelandoTurno
                             ? "bg-emerald-700/60 text-emerald-100 cursor-wait"
                             : "bg-emerald-600 hover:bg-emerald-700 text-white"
                         }`}
@@ -1029,12 +1096,12 @@ export default function CalendarioBase({
                       </button>
 
                       <button
-                        disabled={marcandoAsistencia}
+                        disabled={marcandoAsistencia || cancelandoTurno}
                         onClick={() =>
                           handleMarcarAsistencia(t, "no-asistio")
                         }
                         className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 ${
-                          marcandoAsistencia
+                          marcandoAsistencia || cancelandoTurno
                             ? "bg-red-700/60 text-red-100 cursor-wait"
                             : "bg-red-600 hover:bg-red-700 text-white"
                         }`}
@@ -1043,9 +1110,11 @@ export default function CalendarioBase({
                       </button>
                     </div>
 
-                    {marcandoAsistencia && (
+                    {(marcandoAsistencia || cancelandoTurno) && (
                       <p className="text-[11px] text-gray-400 mt-1">
-                        Guardando asistencia...
+                        {cancelandoTurno
+                          ? "Cancelando turno..."
+                          : "Guardando asistencia..."}
                       </p>
                     )}
                   </div>
