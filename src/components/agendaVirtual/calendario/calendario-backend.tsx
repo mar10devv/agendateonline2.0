@@ -127,9 +127,11 @@ export type TurnoExistente = {
   clienteNombre?: string | null;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
+  clienteFotoUrl?: string | null; // ✅ NUEVO
 
   raw?: any; // documento original (para debug o uso avanzado)
 };
+
 
 /**
  * Estados posibles de un slot de agenda.
@@ -770,13 +772,16 @@ export type TurnoFuente = {
 
   servicioId?: string;
   servicioNombre?: string;
+
   clienteUid?: string | null;
   clienteNombre?: string | null;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
+  clienteFotoUrl?: string | null; // ✅ NUEVO
 
   [key: string]: any;
 };
+
 
 /**
  * Intenta deducir inicio y fin de un turno dado (TurnoFuente),
@@ -851,19 +856,21 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
       continue;
     }
 
-    out.push({
-      id: t.id,
-      inicio: par.inicio,
-      fin: par.fin,
-      bloqueado: t.bloqueado ?? false,
-      servicioId: t.servicioId,
-      servicioNombre: t.servicioNombre,
-      clienteUid: t.clienteUid ?? null,
-      clienteNombre: t.clienteNombre ?? null,
-      clienteEmail: t.clienteEmail ?? null,
-      clienteTelefono: t.clienteTelefono ?? null,
-      raw: t,
-    });
+out.push({
+  id: t.id,
+  inicio: par.inicio,
+  fin: par.fin,
+  bloqueado: t.bloqueado ?? false,
+  servicioId: t.servicioId,
+  servicioNombre: t.servicioNombre,
+  clienteUid: t.clienteUid ?? null,
+  clienteNombre: t.clienteNombre ?? null,
+  clienteEmail: t.clienteEmail ?? null,
+  clienteTelefono: t.clienteTelefono ?? null,
+  clienteFotoUrl: t.clienteFotoUrl ?? null, // ✅ NUEVO
+  raw: t,
+});
+
   }
 
   // Ordenamos por fecha/hora de inicio (menor a mayor)
@@ -1235,7 +1242,9 @@ export async function crearTurnoManualBackend(opts: {
   clienteNombre: string;
   clienteEmail?: string | null;
   clienteTelefono?: string | null;
+  clienteFotoUrl?: string | null; // ✅ NUEVO
 }) {
+
   const {
     usuario,
     negocio,
@@ -1249,7 +1258,9 @@ export async function crearTurnoManualBackend(opts: {
     clienteNombre,
     clienteEmail,
     clienteTelefono,
+    clienteFotoUrl, // ✅ NUEVO
   } = opts;
+
 
   // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
@@ -1275,9 +1286,11 @@ export async function crearTurnoManualBackend(opts: {
     clienteNombre: clienteNombre.trim(),
     clienteEmail: clienteEmail || null,
     clienteTelefono: clienteTelefono || null,
+    clienteFotoUrl: clienteFotoUrl || null, // ✅ NUEVO
     creadoEn: new Date(),
     creadoPor: "negocio-manual",
   });
+
 }
 
 /**

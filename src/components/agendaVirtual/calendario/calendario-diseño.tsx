@@ -17,6 +17,7 @@ import {
   type TurnoFuente,
   type SlotCalendario,
   type UsuarioActual,
+  type TurnoExistente,
 } from "./calendario-backend";
 
 export type ModoCalendario = "cliente" | "negocio";
@@ -43,6 +44,11 @@ type ModalDiaState = {
 type ModalSlotState = {
   visible: boolean;
   slot: SlotCalendario | null;
+};
+
+type ModalTurnoState = {
+  visible: boolean;
+  turno: TurnoExistente | null;
 };
 
 // ======================= HELPERS EMPLEADOS =======================
@@ -94,6 +100,11 @@ export default function CalendarioBase({
   const [modalSlot, setModalSlot] = useState<ModalSlotState>({
     visible: false,
     slot: null,
+  });
+
+  const [modalTurno, setModalTurno] = useState<ModalTurnoState>({
+    visible: false,
+    turno: null,
   });
 
   // ======================= EMPLEADO ACTUAL =======================
@@ -338,37 +349,34 @@ export default function CalendarioBase({
     year: "numeric",
   });
 
-  
-
   // -------- Slots del día seleccionado --------
-const slotsDelDia: SlotCalendario[] = useMemo(() => {
-  if (!diaSeleccionado) return [];
+  const slotsDelDia: SlotCalendario[] = useMemo(() => {
+    if (!diaSeleccionado) return [];
 
-  const nombreDiaLong = diaSeleccionado.toLocaleDateString("es-ES", {
-    weekday: "long",
-  });
-  const diaNorm = normalizarDia(nombreDiaLong);
+    const nombreDiaLong = diaSeleccionado.toLocaleDateString("es-ES", {
+      weekday: "long",
+    });
+    const diaNorm = normalizarDia(nombreDiaLong);
 
-  // Validación del día medio (lógica backend reflejada en el front)
-  const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
-  const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
+    // Validación del día medio (lógica backend reflejada en el front)
+    const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+    const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
 
-  // Día libre completo (negocio o empleado)
-  const esDiaLibre =
-    config.diasLibresNegocioNorm.includes(diaNorm) ||
-    config.diasLibresEmpleadoNorm.includes(diaNorm);
+    // Día libre completo (negocio o empleado)
+    const esDiaLibre =
+      config.diasLibresNegocioNorm.includes(diaNorm) ||
+      config.diasLibresEmpleadoNorm.includes(diaNorm);
 
-  // 👉 Si es día libre TOTAL → ningún slot
-  if (!esDiaMedio && esDiaLibre) {
-    return [];
-  }
+    // 👉 Si es día libre TOTAL → ningún slot
+    if (!esDiaMedio && esDiaLibre) {
+      return [];
+    }
 
-  // 👉 Si es medio turno o día laboral normal → backend se encarga de la ventana
-  return generarSlotsDelDia(config, diaSeleccionado, turnosNormalizados, {
-    minutosPorSlot,
-  });
-}, [config, diaSeleccionado, turnosNormalizados, minutosPorSlot]);
-
+    // 👉 Si es medio turno o día laboral normal → backend se encarga de la ventana
+    return generarSlotsDelDia(config, diaSeleccionado, turnosNormalizados, {
+      minutosPorSlot,
+    });
+  }, [config, diaSeleccionado, turnosNormalizados, minutosPorSlot]);
 
   // ======================= HANDLERS =======================
 
@@ -402,29 +410,36 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
   };
 
   const manejarClickSlot = (slot: SlotCalendario) => {
+    // 🧍 MODO CLIENTE
     if (modo === "cliente") {
       if (slot.estado !== "libre") return;
       onSlotLibreClick?.(slot);
       return;
     }
 
-    if (slot.estado === "pasado") {
-      if (slot.turnoOcupado && onSlotOcupadoClick) {
-        onSlotOcupadoClick(slot);
-      }
+    // 👑 MODO NEGOCIO
+
+    // 1) Si es un turno pasado pero con reserva → ver detalle
+    if (slot.estado === "pasado" && slot.turnoOcupado) {
+      setModalTurno({ visible: true, turno: slot.turnoOcupado });
+      onSlotOcupadoClick?.(slot);
       return;
     }
 
+    // 2) Si está ocupado → ver detalle del cliente
+    if (slot.estado === "ocupado" && slot.turnoOcupado) {
+      setModalTurno({ visible: true, turno: slot.turnoOcupado });
+      onSlotOcupadoClick?.(slot);
+      return;
+    }
+
+    // 3) Slot libre → opciones (agregar manual / bloquear)
     if (slot.estado === "libre") {
       setModalSlot({ visible: true, slot });
       return;
     }
 
-    if (slot.estado === "ocupado") {
-      onSlotOcupadoClick?.(slot);
-      return;
-    }
-
+    // 4) Slot bloqueado → callback opcional
     if (slot.estado === "bloqueado") {
       onSlotBloqueadoClick?.(slot);
       return;
@@ -556,96 +571,95 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
             </div>
           ))}
         </div>
-{/* Días del mes */}
-<div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
-  {dias.map((d, idx) => {
-    if (!d) return <div key={idx} className="w-10 h-8" />;
 
-    const esHoy =
-      d.toDateString() === hoy.toDateString();
-    const esPasado =
-      d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        {/* Días del mes */}
+        <div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
+          {dias.map((d, idx) => {
+            if (!d) return <div key={idx} className="w-10 h-8" />;
 
-    const nombreDiaLong = d.toLocaleDateString("es-ES", {
-      weekday: "long",
-    });
-    const diaNorm = normalizarDia(nombreDiaLong);
+            const esHoy =
+              d.toDateString() === hoy.toDateString();
+            const esPasado =
+              d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
-    // ======================
-    // 🔥 Jerarquía de días libres
-    // ======================
-    const diasNegocio = (config as any).diasLibresNegocioNorm || [];
-    const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
+            const nombreDiaLong = d.toLocaleDateString("es-ES", {
+              weekday: "long",
+            });
+            const diaNorm = normalizarDia(nombreDiaLong);
 
-    // RAW (tal cual vienen)
-    const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
-    const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
+            // ======================
+            // 🔥 Jerarquía de días libres
+            // ======================
+            const diasNegocio = (config as any).diasLibresNegocioNorm || [];
+            const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
 
-    // Detectar si ES el día medio del empleado
-    const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
-    const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
+            // RAW (tal cual vienen)
+            const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
+            const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
 
-    // 👉 El negocio manda SIEMPRE:
-    //    si el negocio lo marca libre, el día se bloquea aunque sea medio día
-    const esLibreNegocio = esLibreNegocioRaw;
+            // Detectar si ES el día medio del empleado
+            const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+            const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
 
-    // 👉 El empleado solo aporta día libre completo si NO es su medio día
-    const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
+            // 👉 El negocio manda SIEMPRE:
+            //    si el negocio lo marca libre, el día se bloquea aunque sea medio día
+            const esLibreNegocio = esLibreNegocioRaw;
 
-    // Día libre total si:
-    //  - negocio lo marca libre, o
-    //  - empleado lo marca libre y NO es medio día
-    const esDiaLibre = esLibreNegocio || esLibreEmpleado;
+            // 👉 El empleado solo aporta día libre completo si NO es su medio día
+            const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
 
-    const seleccionado =
-      diaSeleccionado && esMismoDia(d, diaSeleccionado);
-    const disabled = esPasado || esDiaLibre;
+            // Día libre total si:
+            //  - negocio lo marca libre, o
+            //  - empleado lo marca libre y NO es medio día
+            const esDiaLibre = esLibreNegocio || esLibreEmpleado;
 
-    // ======================
-    // 🎨 ESTILOS DEL DÍA
-    // ======================
-    let clases =
-      "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+            const seleccionado =
+              diaSeleccionado && esMismoDia(d, diaSeleccionado);
+            const disabled = esPasado || esDiaLibre;
 
-    if (esDiaLibre) {
-      clases +=
-        "text-red-400 line-through cursor-not-allowed opacity-70";
-    } else if (esHoy) {
-      clases += "bg-white text-black font-bold";
-    } else if (esPasado) {
-      clases += "text-gray-500 line-through cursor-not-allowed";
-    } else if (seleccionado) {
-      clases += "bg-indigo-600 text-white font-bold";
-    } else {
-      clases += "hover:bg-neutral-700";
-    }
+            // ======================
+            // 🎨 ESTILOS DEL DÍA
+            // ======================
+            let clases =
+              "w-10 h-8 flex items-center justify-center rounded-lg transition ";
 
-    return (
-      <button
-        key={idx}
-        disabled={disabled}
-        onClick={() =>
-          manejarClickDia(d, {
-            esPasado,
-            esDiaLibre,
-          })
-        }
-        className={clases}
-        title={
-          esDiaLibre
-            ? esLibreNegocio
-              ? "Día cerrado por el negocio"
-              : "Día libre del empleado"
-            : ""
-        }
-      >
-        {d.getDate()}
-      </button>
-    );
-  })}
-</div>
+            if (esDiaLibre) {
+              clases +=
+                "text-red-400 line-through cursor-not-allowed opacity-70";
+            } else if (esHoy) {
+              clases += "bg-white text-black font-bold";
+            } else if (esPasado) {
+              clases += "text-gray-500 line-through cursor-not-allowed";
+            } else if (seleccionado) {
+              clases += "bg-indigo-600 text-white font-bold";
+            } else {
+              clases += "hover:bg-neutral-700";
+            }
 
-
+            return (
+              <button
+                key={idx}
+                disabled={disabled}
+                onClick={() =>
+                  manejarClickDia(d, {
+                    esPasado,
+                    esDiaLibre,
+                  })
+                }
+                className={clases}
+                title={
+                  esDiaLibre
+                    ? esLibreNegocio
+                      ? "Día cerrado por el negocio"
+                      : "Día libre del empleado"
+                    : ""
+                }
+              >
+                {d.getDate()}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Slots del día */}
         {diaSeleccionado ? (
@@ -803,6 +817,122 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
                 {modalDia.desbloquear ? "Liberar día" : "Bloquear día"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DETALLE TURNO OCUPADO (NEGOCIO) */}
+      {modo === "negocio" && modalTurno.visible && modalTurno.turno && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center p-2 sm:p-6">
+          {/* Fondo */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setModalTurno({ visible: false, turno: null })}
+          />
+
+          {/* Contenido */}
+          <div className="w-full max-w-md relative z-10 rounded-2xl bg-neutral-900 border border-neutral-700 shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-3">
+              Detalle del turno
+            </h3>
+
+            {(() => {
+              const t = modalTurno.turno!;
+              const fechaStr = t.inicio.toLocaleDateString("es-UY", {
+                weekday: "long",
+                day: "2-digit",
+                month: "2-digit",
+              });
+              const horaStr = t.inicio.toLocaleTimeString("es-UY", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+
+              const iniciales =
+                (t.clienteNombre || "?")
+                  .split(" ")
+                  .map((p) => p[0]?.toUpperCase())
+                  .join("")
+                  .slice(0, 2) || "?";
+
+              return (
+                <div className="space-y-4 text-sm text-gray-100">
+                  {/* Cliente */}
+                  <div className="flex items-center gap-3">
+                    {t.clienteFotoUrl ? (
+                      <img
+                        src={t.clienteFotoUrl}
+                        alt={t.clienteNombre || "Cliente"}
+                        className="w-12 h-12 rounded-full object-cover border border-white/10"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+                        {iniciales}
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="font-semibold text-base">
+                        {t.clienteNombre || "Cliente sin nombre"}
+                      </p>
+                      <p className="text-xs text-gray-300">
+                        {t.clienteEmail || "Sin email registrado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Servicio y horario */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                        Servicio
+                      </p>
+                      <p className="text-sm font-medium mt-1">
+                        {t.servicioNombre || "Sin servicio asignado"}
+                      </p>
+                    </div>
+
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                        Día y hora
+                      </p>
+                      <p className="text-sm font-medium mt-1">
+                        {fechaStr} · {horaStr} hs
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Contacto */}
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                      Contacto
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs break-all">
+                        <span className="font-semibold">Email: </span>
+                        {t.clienteEmail || "No registrado"}
+                      </p>
+                      <p className="text-xs">
+                        <span className="font-semibold">Teléfono: </span>
+                        {t.clienteTelefono || "No registrado"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Botón cerrar */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={() =>
+                        setModalTurno({ visible: false, turno: null })
+                      }
+                      className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
