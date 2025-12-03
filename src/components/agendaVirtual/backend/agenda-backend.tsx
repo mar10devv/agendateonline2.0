@@ -57,7 +57,14 @@ export type Negocio = {
     lng: number;
     direccion: string;
   };
+
+  // 👇 NUEVOS CAMPOS OPCIONALES (coinciden con Firestore)
+  tipoAgenda?: "emprendimiento" | "negocio";
+  tipoNegocio?: string;
+  plan?: string;
+  premium?: boolean;
 };
+
 
 // ✅ Importamos el tipo Empleado unificado
 import type { Empleado } from "./modalEmpleadosBackend";
@@ -158,7 +165,14 @@ const empleadosData = (negocioData.empleadosData || []).map((e: any, idx: number
         configuracionAgenda: negocioData.configuracionAgenda || {},
         descripcion: negocioData.descripcion || "",
         ubicacion: negocioData.ubicacion || null,
+
+        // 🔥 NUEVO: estos vienen directo del doc de Firestore
+        tipoAgenda: negocioData.tipoAgenda || "negocio",
+        tipoNegocio: negocioData.tipoNegocio || "",
+        plan: negocioData.plan || "agenda",
+        premium: negocioData.premium ?? false,
       };
+
 
       if (!user) {
         callback("no-sesion", "cliente", null, negocio);

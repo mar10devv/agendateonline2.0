@@ -21,6 +21,8 @@ import { guardarUbicacionNegocio, escucharServicios } from "../backend/agenda-ba
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 import CardServicio from "../../ui/cardServicio";
+import ModalEmprendimiento from "./modalEmprendimiento";
+
 
 import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
 import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
@@ -33,8 +35,6 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { useMap } from "react-leaflet";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
-
-
 
 const customIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
@@ -132,6 +132,9 @@ type Props = {
   turnos: Turno[];
   modo: "dueño" | "cliente" | "admin";
   usuario?: Usuario;
+
+  // 👇 NUEVO: viene del padre (agendaVirtual.tsx)
+  esEmprendimiento: boolean;
 };
 
 /* ------------------------------ COMPONENTE ------------------------------ */
@@ -143,6 +146,7 @@ export default function AgendaVirtualUIv3({
   turnos,
   modo,
   usuario,
+  esEmprendimiento, // 👈 ahora lo recibimos
 }: Props) {
   /* --------  ESTADOS  -------- */
   const [vista, setVista] = useState<string>("agenda");
@@ -153,6 +157,8 @@ export default function AgendaVirtualUIv3({
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] =
     useState<"idle" | "cargando" | "exito">("idle");
+    const [modalEmprendimiento, setModalEmprendimiento] = useState(false);
+
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
@@ -214,7 +220,6 @@ export default function AgendaVirtualUIv3({
   }, [empleadosFuente]);
 
   // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
-  // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
@@ -245,7 +250,6 @@ export default function AgendaVirtualUIv3({
       return !(horarioOk && diasOk && trabajosOk);
     });
   }, [empleadosParaAgenda]);
-
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -405,29 +409,35 @@ export default function AgendaVirtualUIv3({
 
   const renderVista = () => {
     switch (vista) {
-case "servicios":
-  return (
-<div className="flex flex-wrap gap-6 justify-start">
-  {serviciosState.length > 0 ? (
-    serviciosState.map((s) => (
-      <CardServicio
-        key={s.id || s.servicio}
-        nombre={s.servicio}
-        precio={s.precio}
-        duracion={s.duracion}
-      />
-    ))
-  ) : (
-    <p className="opacity-80">No hay servicios cargados.</p>
-  )}
-</div>
-
-  );
-
+      case "servicios":
+        return (
+          <div className="flex flex-wrap gap-6 justify-start">
+            {serviciosState.length > 0 ? (
+              serviciosState.map((s) => (
+                <CardServicio
+                  key={s.id || s.servicio}
+                  nombre={s.servicio}
+                  precio={s.precio}
+                  duracion={s.duracion}
+                />
+              ))
+            ) : (
+              <p className="opacity-80">No hay servicios cargados.</p>
+            )}
+          </div>
+        );
 
       case "empleados": {
-        const listaEmpleados =
+        // Fuente base
+        let listaEmpleados =
           empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
+
+        // 🟢 Si es EMPRENDIMIENTO, mostramos solo al dueño (o el primero)
+        if (esEmprendimiento) {
+          const dueno =
+            listaEmpleados.find((e) => e.rol === "dueño") || listaEmpleados[0];
+          listaEmpleados = dueno ? [dueno] : [];
+        }
 
         return (
           <div className="relative w-full">
@@ -462,6 +472,7 @@ case "servicios":
           </div>
         );
       }
+
 
       case "agenda": {
         const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
@@ -635,8 +646,6 @@ case "servicios":
 
   return (
     <>
-
-
       <div
         className="
           min-h-screen w-full flex flex-col items-center
@@ -751,9 +760,9 @@ case "servicios":
           </div>
         </div>
 
-{/* NAV */}
-<div
-  className="
+        {/* NAV */}
+        <div
+          className="
     w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
     bg-[var(--color-primario-oscuro)]
     text-[var(--color-texto)]
@@ -761,65 +770,64 @@ case "servicios":
     hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
     transition-all duration-300
   "
->
-  {navItems.map((item) => {
-    const onboardingIncompleto =
-      (modo === "dueño" || modo === "admin") &&
-      negocio.configuracionAgenda?.onboardingCompletado !== true;
+        >
+          {navItems.map((item) => {
+            const onboardingIncompleto =
+              (modo === "dueño" || modo === "admin") &&
+              negocio.configuracionAgenda?.onboardingCompletado !== true;
 
-    let mostrarAlerta = false;
+            let mostrarAlerta = false;
 
-    if (onboardingIncompleto) {
-      if (item.id === "servicios") {
-        // 👉 Punto solo si NO hay servicios cargados
-        mostrarAlerta = serviciosState.length === 0;
-      } else if (item.id === "ubicacion") {
-        // 👉 Punto solo si todavía NO hay ubicación guardada
-        mostrarAlerta = !ubicacion;
-      } else if (item.id === "empleados") {
-        // 👉 Punto si HAY al menos un empleado incompleto
-        mostrarAlerta = hayEmpleadosIncompletos;
-      }
-      // En "agenda" nunca mostramos punto
-    }
+            if (onboardingIncompleto) {
+              if (item.id === "servicios") {
+                // 👉 Punto solo si NO hay servicios cargados
+                mostrarAlerta = serviciosState.length === 0;
+              } else if (item.id === "ubicacion") {
+                // 👉 Punto solo si todavía NO hay ubicación guardada
+                mostrarAlerta = !ubicacion;
+              } else if (item.id === "empleados") {
+                // 👉 Punto si HAY al menos un empleado incompleto
+                mostrarAlerta = hayEmpleadosIncompletos;
+              }
+              // En "agenda" nunca mostramos punto
+            }
 
-    return (
-      <button
-        key={item.id}
-        onClick={() => setVista(item.id)}
-        className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
+            return (
+              <button
+                key={item.id}
+                onClick={() => setVista(item.id)}
+                className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
           ${
             vista === item.id
               ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
               : "bg-transparent"
           }`}
-      >
-        {/* PUNTO AMARILLO PARPADEANDO */}
-        {mostrarAlerta && (
-          <span
-            className="
+              >
+                {/* PUNTO AMARILLO PARPADEANDO */}
+                {mostrarAlerta && (
+                  <span
+                    className="
               absolute -top-1 right-4
               h-2.5 w-2.5 rounded-full
               bg-yellow-400
               shadow-[0_0_10px_rgba(250,204,21,0.9)]
               animate-pulse
             "
-          />
-        )}
+                  />
+                )}
 
-        <div className="w-8 h-8 flex items-center justify-center">
-          <img
-            src={item.icon}
-            alt={item.label}
-            className="w-8 h-8 icono-blanco"
-          />
+                <div className="w-8 h-8 flex items-center justify-center">
+                  <img
+                    src={item.icon}
+                    alt={item.label}
+                    className="w-8 h-8 icono-blanco"
+                  />
+                </div>
+                <span className="text-xs mt-1 text-center">{item.label}</span>
+              </button>
+            );
+          })}
         </div>
-        <span className="text-xs mt-1 text-center">{item.label}</span>
-      </button>
-    );
-  })}
-</div>
-
 
         {/* CONTENIDO */}
         <div
@@ -842,16 +850,25 @@ case "servicios":
             }
           `}
         >
-          {/* CONFIG PARA EMPLEADOS */}
-          {vista === "empleados" && (modo === "dueño" || modo === "admin") && (
-            <button
-              onClick={() => setModalEmpleados(true)}
-              className="absolute top-4 right-4 z-20"
-              title="Administrar empleados"
-            >
-              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-            </button>
-          )}
+{/* CONFIG PARA EMPLEADOS */}
+{vista === "empleados" && (modo === "dueño" || modo === "admin") && (
+  <button
+    onClick={() => {
+      if (esEmprendimiento) {
+        // 👉 Emprendimiento: abrimos modal especial
+        setModalEmprendimiento(true);
+      } else {
+        // 👉 Negocio normal: abrimos modal de empleados
+        setModalEmpleados(true);
+      }
+    }}
+    className="absolute top-4 right-4 z-20"
+    title={esEmprendimiento ? "Configurar emprendimiento" : "Administrar empleados"}
+  >
+    <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+  </button>
+)}
+
 
           {/* CONFIG PARA SERVICIOS */}
           {vista === "servicios" && (modo === "dueño" || modo === "admin") && (
@@ -928,6 +945,15 @@ case "servicios":
             onCerrar={() => setModalEmpleados(false)}
             negocioId={negocio.id}
             modo={modo === "cliente" ? "dueño" : modo}
+            esEmprendimiento={esEmprendimiento} // 👈 este sí lo mantiene ModalEmpleadosUI
+          />
+        )}
+
+        {modalEmprendimiento && (
+          <ModalEmprendimiento
+            abierto={modalEmprendimiento}
+            onCerrar={() => setModalEmprendimiento(false)}
+            negocio={negocio}
           />
         )}
 
@@ -938,6 +964,7 @@ case "servicios":
             negocioId={negocio.id}
           />
         )}
+
       </div>
     </>
   );

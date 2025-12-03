@@ -940,7 +940,7 @@ export function generarSlotsDelDia(
   let inicioJ = jornadaInicioMin;
   let finJ = jornadaFinMin;
 
-  // Usamos SIEMPRE la misma lógica que generarHorariosBase
+  // Usamos la misma lógica de medio día que en generarHorariosBase
   const ventanaMedio = calcularVentanaMedioDia(
     config,
     diaNorm,
@@ -948,8 +948,7 @@ export function generarSlotsDelDia(
     jornadaFinMin
   );
 
-  // Si calcularVentanaMedioDia devuelve algo y el día es el medio,
-  // recortamos la jornada a esa ventana (mañana o tarde)
+  // Si es el día de medio turno y tenemos ventana válida, recortamos jornada
   if (esDiaMedio && ventanaMedio) {
     inicioJ = ventanaMedio.inicioMin;
     finJ = ventanaMedio.finMin;
@@ -975,7 +974,55 @@ export function generarSlotsDelDia(
   const slots: SlotCalendario[] = [];
 
   // ==========================
-  //   GENERAR SLOT POR SLOT
+  //   MODO PERSONALIZADO
+  //   -> X clientesPorDia distribuidos en la jornada
+  // ==========================
+  if (config.modoTurnos === "personalizado" && config.clientesPorDia && config.clientesPorDia > 0) {
+    const totalJornada = finJ - inicioJ;
+    const step = Math.floor(totalJornada / config.clientesPorDia);
+
+    if (step <= 0) {
+      return [];
+    }
+
+    for (let i = 0; i < config.clientesPorDia; i++) {
+      const slotInicioMin = inicioJ + step * i;
+      const slotFinMin = i === config.clientesPorDia - 1 ? finJ : slotInicioMin + step;
+
+      const hora = minToHHMM(slotInicioMin);
+      const inicio = combinarFechaHora(fecha, hora);
+      const fin = new Date(inicio.getTime() + (slotFinMin - slotInicioMin) * 60000);
+
+      // ¿Algún turno cubre este rango?
+      const covering = reservasDia.find((t) => solapan(+inicio, +fin, t.i, t.f));
+      const esPasado = inicio < ahora;
+
+      let estado: SlotEstado = "libre";
+
+      if (covering?.bloqueado) {
+        estado = esPasado ? "pasado" : "bloqueado";
+      } else if (covering) {
+        estado = esPasado ? "pasado" : "ocupado";
+      } else if (esPasado) {
+        estado = "pasado";
+      }
+
+      slots.push({
+        fecha,
+        hora,
+        inicio,
+        fin,
+        estado,
+        turnoOcupado: covering,
+      });
+    }
+
+    return slots;
+  }
+
+  // ==========================
+  //   MODO JORNADA (normal)
+  //   -> slots cada minutosPorSlot
   // ==========================
   for (let m = inicioJ; m < finJ; m += minutosPorSlot) {
     const hora = minToHHMM(m);

@@ -47,8 +47,7 @@ export default function AgendaVirtual({ slug }: Props) {
         if (estadoDetectado === "listo" && negocioDetectado) {
           setNegocio(negocioDetectado);
 
-          const emps = (negocioDetectado.empleadosData ??
-            []) as Empleado[];
+          const emps = (negocioDetectado.empleadosData ?? []) as Empleado[];
           setEmpleados(emps);
 
           const tns = await getTurnos(slug, fechaSeleccionada);
@@ -133,15 +132,18 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }
 
+  // 👇 Flag para saber si esta agenda es un EMPRENDIMIENTO
+  const esEmprendimiento = negocio.tipoAgenda === "emprendimiento";
+
   return (
     <>
-
       <AgendaVirtualUI
         empleados={empleados}
         turnos={turnos}
         negocio={negocio}
         servicios={negocio.servicios ?? []}
         modo={modo}
+        esEmprendimiento={esEmprendimiento} // 👈 se lo pasamos al UI
       />
     </>
   );
