@@ -629,6 +629,7 @@ function PasoEmpleados({
 }
 
 
+
 /* ---------- PasoTurnos: usa CalendarioBase (calendario-backend) ---------- */
 function PasoTurnos({
   negocio,
@@ -660,6 +661,8 @@ function PasoTurnos({
           empleado={empleado as any}
           empleados={(negocio.empleadosData || []) as any}
           minutosPorSlot={minutosPorSlot}
+          // 🔥 duración REAL del servicio en minutos (para que no ofrezca 16:30 si dura 120')
+          duracionServicioMin={servicio.duracion}
           onSlotLibreClick={(slot: any) => {
             onSelect({
               fecha: slot.fecha,
@@ -680,6 +683,7 @@ function PasoTurnos({
     </div>
   );
 }
+
 
 /* ---------- PasoConfirmacion con seña + guardado ---------- */
 function PasoConfirmacion({

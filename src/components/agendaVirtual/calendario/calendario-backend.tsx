@@ -132,7 +132,6 @@ export type TurnoExistente = {
   raw?: any; // documento original (para debug o uso avanzado)
 };
 
-
 /**
  * Estados posibles de un slot de agenda.
  */
@@ -426,7 +425,7 @@ export function combinarConfigCalendario(
   let calEmp: EmpleadoAgendaConfig = empleado?.calendario || {};
 
   // 2) si viene SIN horarios, usamos el del empFull
-  if ((!calEmp.inicio && !calEmp.fin) && empFull) {
+  if (!calEmp.inicio && !calEmp.fin && empFull) {
     if (empFull.calendario) {
       calEmp = {
         ...(empFull.calendario as EmpleadoAgendaConfig),
@@ -497,9 +496,7 @@ export function combinarConfigCalendario(
       : undefined;
 
   const horasSeparacion =
-    modoTurnos === "jornada"
-      ? confNeg.horasSeparacion || 30
-      : undefined;
+    modoTurnos === "jornada" ? confNeg.horasSeparacion || 30 : undefined;
 
   // prioridad: horario del empleado
   const inicio = calEmp.inicio || horaInicioNeg;
@@ -556,10 +553,7 @@ export function combinarConfigCalendario(
     descansoDiaLibreNorm &&
     !diasLibresEmpleadoNorm.includes(descansoDiaLibreNorm)
   ) {
-    diasLibresEmpleadoNorm = [
-      ...diasLibresEmpleadoNorm,
-      descansoDiaLibreNorm,
-    ];
+    diasLibresEmpleadoNorm = [...diasLibresEmpleadoNorm, descansoDiaLibreNorm];
   }
 
   const diasLibresCombinadosNorm = Array.from(
@@ -580,8 +574,6 @@ export function combinarConfigCalendario(
     descansoTurnoMedio,
   };
 }
-
-
 
 /* =====================================================
    2) Generar días del rango
@@ -782,7 +774,6 @@ export type TurnoFuente = {
   [key: string]: any;
 };
 
-
 /**
  * Intenta deducir inicio y fin de un turno dado (TurnoFuente),
  * soportando múltiples nombres de campos usados en el historial del sistema.
@@ -856,21 +847,20 @@ export function normalizarTurnos(lista: TurnoFuente[]): TurnoExistente[] {
       continue;
     }
 
-out.push({
-  id: t.id,
-  inicio: par.inicio,
-  fin: par.fin,
-  bloqueado: t.bloqueado ?? false,
-  servicioId: t.servicioId,
-  servicioNombre: t.servicioNombre,
-  clienteUid: t.clienteUid ?? null,
-  clienteNombre: t.clienteNombre ?? null,
-  clienteEmail: t.clienteEmail ?? null,
-  clienteTelefono: t.clienteTelefono ?? null,
-  clienteFotoUrl: t.clienteFotoUrl ?? null, // ✅ NUEVO
-  raw: t,
-});
-
+    out.push({
+      id: t.id,
+      inicio: par.inicio,
+      fin: par.fin,
+      bloqueado: t.bloqueado ?? false,
+      servicioId: t.servicioId,
+      servicioNombre: t.servicioNombre,
+      clienteUid: t.clienteUid ?? null,
+      clienteNombre: t.clienteNombre ?? null,
+      clienteEmail: t.clienteEmail ?? null,
+      clienteTelefono: t.clienteTelefono ?? null,
+      clienteFotoUrl: t.clienteFotoUrl ?? null, // ✅ NUEVO
+      raw: t,
+    });
   }
 
   // Ordenamos por fecha/hora de inicio (menor a mayor)
@@ -889,17 +879,19 @@ out.push({
 export type GenerarSlotsOpciones = {
   ahora?: Date; // para testear o simular "hoy"
   minutosPorSlot?: number; // tamaño de cada slot (default 30)
+  duracionServicioMin?: number; // duración real del servicio en minutos
 };
 
 /**
  * Genera la grilla de slots de un día específico para un empleado:
  * - Respeta días libres, medio día, horarios, etc.
  * - Marca slots como libre / ocupado / bloqueado / pasado.
+ * - Tiene en cuenta la duración real del servicio para saber qué inicios son válidos.
  *
  * @param config Configuración unificada (negocio+empleado).
  * @param fecha Día a generar.
  * @param turnosDelEmpleado Turnos ya cargados de ese empleado.
- * @param opciones Tamaño de slot y referencia de "ahora".
+ * @param opciones Tamaño de slot, duración de servicio y referencia de "ahora".
  */
 export function generarSlotsDelDia(
   config: ConfigCalendarioUnificado,
@@ -909,6 +901,12 @@ export function generarSlotsDelDia(
 ): SlotCalendario[] {
   const ahora = opciones.ahora ? new Date(opciones.ahora) : new Date();
   const minutosPorSlot = opciones.minutosPorSlot || 30;
+
+  // 👉 si no pasan duracionServicioMin, por defecto usamos el tamaño del slot
+  const duracionServicioMin =
+    typeof opciones.duracionServicioMin === "number"
+      ? opciones.duracionServicioMin
+      : minutosPorSlot;
 
   // Nombre de día normalizado del día a generar (lunes, martes, etc.)
   const diaNombreLong = fecha.toLocaleDateString("es-ES", {
@@ -984,7 +982,11 @@ export function generarSlotsDelDia(
   //   MODO PERSONALIZADO
   //   -> X clientesPorDia distribuidos en la jornada
   // ==========================
-  if (config.modoTurnos === "personalizado" && config.clientesPorDia && config.clientesPorDia > 0) {
+  if (
+    config.modoTurnos === "personalizado" &&
+    config.clientesPorDia &&
+    config.clientesPorDia > 0
+  ) {
     const totalJornada = finJ - inicioJ;
     const step = Math.floor(totalJornada / config.clientesPorDia);
 
@@ -994,15 +996,32 @@ export function generarSlotsDelDia(
 
     for (let i = 0; i < config.clientesPorDia; i++) {
       const slotInicioMin = inicioJ + step * i;
-      const slotFinMin = i === config.clientesPorDia - 1 ? finJ : slotInicioMin + step;
-
       const hora = minToHHMM(slotInicioMin);
       const inicio = combinarFechaHora(fecha, hora);
-      const fin = new Date(inicio.getTime() + (slotFinMin - slotInicioMin) * 60000);
 
-      // ¿Algún turno cubre este rango?
-      const covering = reservasDia.find((t) => solapan(+inicio, +fin, t.i, t.f));
+      // ventana que ocuparía el servicio si empieza en este slot
+      const finServicioMin = slotInicioMin + duracionServicioMin;
+
+      const fin = new Date(inicio.getTime() + duracionServicioMin * 60000);
       const esPasado = inicio < ahora;
+
+      // si el servicio no entra dentro de la jornada real, lo marcamos como cerrado
+      if (finServicioMin > finJ) {
+        slots.push({
+          fecha,
+          hora,
+          inicio,
+          fin,
+          estado: esPasado ? "pasado" : "cerradoNegocio",
+          turnoOcupado: undefined,
+        });
+        continue;
+      }
+
+      // ¿Algún turno cubre este rango completo del servicio?
+      const covering = reservasDia.find((t) =>
+        solapan(+inicio, +fin, t.i, t.f)
+      );
 
       let estado: SlotEstado = "libre";
 
@@ -1034,11 +1053,29 @@ export function generarSlotsDelDia(
   for (let m = inicioJ; m < finJ; m += minutosPorSlot) {
     const hora = minToHHMM(m);
     const inicio = combinarFechaHora(fecha, hora);
-    const fin = new Date(inicio.getTime() + minutosPorSlot * 60000);
 
-    // ¿Algún turno cubre este rango?
-    const covering = reservasDia.find((t) => solapan(+inicio, +fin, t.i, t.f));
+    // ventana completa que ocuparía el servicio
+    const finServicioMin = m + duracionServicioMin;
+    const fin = new Date(inicio.getTime() + duracionServicioMin * 60000);
     const esPasado = inicio < ahora;
+
+    // si el servicio no entra en la jornada (ej: cierre 20:00 y servicio 1h30 → 19:00 OK, 19:30 no)
+    if (finServicioMin > finJ) {
+      slots.push({
+        fecha,
+        hora,
+        inicio,
+        fin,
+        estado: esPasado ? "pasado" : "cerradoNegocio",
+        turnoOcupado: undefined,
+      });
+      continue;
+    }
+
+    // ¿Algún turno cubre este rango completo del servicio?
+    const covering = reservasDia.find((t) =>
+      solapan(+inicio, +fin, t.i, t.f)
+    );
 
     let estado: SlotEstado = "libre";
 
@@ -1062,7 +1099,6 @@ export function generarSlotsDelDia(
 
   return slots;
 }
-
 
 /* =====================================================
    6) Calendario de rango completo
@@ -1090,11 +1126,13 @@ export function generarCalendarioEmpleadoRango(
     diasAdelante?: number;
     desde?: Date;
     minutosPorSlot?: number;
+    duracionServicioMin?: number;
   }
 ): CalendarioEmpleadoRango {
   const diasAdelante = opciones?.diasAdelante ?? 14;
   const desde = opciones?.desde;
   const minutosPorSlot = opciones?.minutosPorSlot ?? 30;
+  const duracionServicioMin = opciones?.duracionServicioMin;
 
   const config = combinarConfigCalendario(negocio, empleado);
   const dias = generarDiasRango(config, diasAdelante, desde);
@@ -1113,6 +1151,7 @@ export function generarCalendarioEmpleadoRango(
 
     const slots = generarSlotsDelDia(config, fecha, turnos, {
       minutosPorSlot,
+      duracionServicioMin,
     });
     slotsPorDia[key] = slots;
   }
@@ -1244,7 +1283,6 @@ export async function crearTurnoManualBackend(opts: {
   clienteTelefono?: string | null;
   clienteFotoUrl?: string | null; // ✅ NUEVO
 }) {
-
   const {
     usuario,
     negocio,
@@ -1260,7 +1298,6 @@ export async function crearTurnoManualBackend(opts: {
     clienteTelefono,
     clienteFotoUrl, // ✅ NUEVO
   } = opts;
-
 
   // Validamos permisos (dueño/admin)
   assertDuenoOAdmin(usuario, negocio);
@@ -1290,7 +1327,6 @@ export async function crearTurnoManualBackend(opts: {
     creadoEn: new Date(),
     creadoPor: "negocio-manual",
   });
-
 }
 
 /**

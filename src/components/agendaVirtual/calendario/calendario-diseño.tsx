@@ -30,6 +30,8 @@ type Props = {
   empleados?: EmpleadoAgendaSource[];
   turnos?: TurnoFuente[];
   minutosPorSlot?: number;
+  /** ⏱ duración real del servicio en minutos (ej: 60, 90, 120) */
+  duracionServicioMin?: number;
   onSlotLibreClick?: (slot: SlotCalendario) => void;
   onSlotOcupadoClick?: (slot: SlotCalendario) => void;
   onSlotBloqueadoClick?: (slot: SlotCalendario) => void;
@@ -81,6 +83,7 @@ export default function CalendarioBase({
   empleados,
   turnos = [],
   minutosPorSlot = 30,
+  duracionServicioMin,
   onSlotLibreClick,
   onSlotOcupadoClick,
   onSlotBloqueadoClick,
@@ -311,9 +314,16 @@ export default function CalendarioBase({
   const diasEnMes = ultimoDia.getDate();
   const inicioSemana = (primerDia.getDay() + 6) % 7; // lunes=0
 
+  // 🔥 Cambios acá:
+  // - En modo "cliente" los días vencidos NO se muestran (fechaMinima = hoy)
+  // - En modo "negocio" seguimos viendo hasta 10 días hacia atrás
   const fechaMinima = new Date(hoy);
-  fechaMinima.setDate(hoy.getDate() - 10);
-  fechaMinima.setHours(0, 0, 0, 0);
+  if (modo === "cliente") {
+    fechaMinima.setHours(0, 0, 0, 0);
+  } else {
+    fechaMinima.setDate(hoy.getDate() - 10);
+    fechaMinima.setHours(0, 0, 0, 0);
+  }
 
   const fechaMaxima = new Date(hoy);
   fechaMaxima.setDate(hoy.getDate() + 30);
@@ -326,6 +336,7 @@ export default function CalendarioBase({
     if (fecha >= fechaMinima && fecha <= fechaMaxima) {
       dias.push(fecha);
     } else {
+      // fuera de rango (pasado para cliente o >30 días) → celda vacía
       dias.push(null);
     }
   }
@@ -350,7 +361,7 @@ export default function CalendarioBase({
   });
 
   // -------- Slots del día seleccionado --------
-  const slotsDelDia: SlotCalendario[] = useMemo(() => {
+  const slotsDelDiaRaw: SlotCalendario[] = useMemo(() => {
     if (!diaSeleccionado) return [];
 
     const nombreDiaLong = diaSeleccionado.toLocaleDateString("es-ES", {
@@ -375,8 +386,24 @@ export default function CalendarioBase({
     // 👉 Si es medio turno o día laboral normal → backend se encarga de la ventana
     return generarSlotsDelDia(config, diaSeleccionado, turnosNormalizados, {
       minutosPorSlot,
+      // 🔥 acá va la magia: le pasamos la duración real del servicio
+      duracionServicioMin: duracionServicioMin ?? minutosPorSlot,
     });
-  }, [config, diaSeleccionado, turnosNormalizados, minutosPorSlot]);
+  }, [
+    config,
+    diaSeleccionado,
+    turnosNormalizados,
+    minutosPorSlot,
+    duracionServicioMin,
+  ]);
+
+  // 🔥 NUEVO: para el cliente solo mostramos slots LIBRES
+  const slotsDelDia: SlotCalendario[] = useMemo(() => {
+    if (modo === "cliente") {
+      return slotsDelDiaRaw.filter((s) => s.estado === "libre");
+    }
+    return slotsDelDiaRaw;
+  }, [slotsDelDiaRaw, modo]);
 
   // ======================= HANDLERS =======================
 
@@ -580,7 +607,8 @@ export default function CalendarioBase({
             const esHoy =
               d.toDateString() === hoy.toDateString();
             const esPasado =
-              d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+              d <
+              new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
             const nombreDiaLong = d.toLocaleDateString("es-ES", {
               weekday: "long",
@@ -602,7 +630,6 @@ export default function CalendarioBase({
             const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
 
             // 👉 El negocio manda SIEMPRE:
-            //    si el negocio lo marca libre, el día se bloquea aunque sea medio día
             const esLibreNegocio = esLibreNegocioRaw;
 
             // 👉 El empleado solo aporta día libre completo si NO es su medio día
@@ -681,7 +708,9 @@ export default function CalendarioBase({
             <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {slotsDelDia.length === 0 && (
                 <p className="col-span-full text-xs text-gray-400">
-                  No hay horarios para este día.
+                  {modo === "cliente"
+                    ? "No hay horarios disponibles para este día."
+                    : "No hay horarios para este día."}
                 </p>
               )}
 
