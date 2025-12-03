@@ -14,16 +14,28 @@ function normalizePrivateKey(src?: string | null): string | undefined {
   if (!src) return undefined;
   let key = src.trim();
 
-  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+  // Quitar comillas exteriores si las hay
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
     key = key.slice(1, -1);
   }
 
+  // Reemplazar \n por saltos reales
   if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
 
-  if (!key.includes("BEGIN PRIVATE KEY") && !key.includes("BEGIN RSA PRIVATE KEY")) {
+  // Intentar decodificar base64 si no parece una key normal
+  if (
+    !key.includes("BEGIN PRIVATE KEY") &&
+    !key.includes("BEGIN RSA PRIVATE KEY")
+  ) {
     try {
       const decoded = Buffer.from(key, "base64").toString("utf8");
-      if (decoded.includes("BEGIN PRIVATE KEY") || decoded.includes("BEGIN RSA PRIVATE KEY")) {
+      if (
+        decoded.includes("BEGIN PRIVATE KEY") ||
+        decoded.includes("BEGIN RSA PRIVATE KEY")
+      ) {
         key = decoded;
       }
     } catch {}
@@ -57,6 +69,10 @@ function loadServiceAccount(): SA {
 /* --------------------------- Firebase Admin ---------------------------- */
 if (!admin.apps.length) {
   const sa = loadServiceAccount();
+  console.log("🔥 Inicializando Firebase Admin para confirmar-turno", {
+    projectId: sa.project_id,
+  });
+
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: sa.project_id,
@@ -65,6 +81,7 @@ if (!admin.apps.length) {
     }),
   });
 }
+
 const db = admin.firestore();
 
 /* ------------------------------- Mailer -------------------------------- */
@@ -77,55 +94,126 @@ const transporter = nodemailer.createTransport({
 });
 
 export const handler: Handler = async (event) => {
+  console.log("➡️ [confirmar-turno] INICIO", {
+    method: event.httpMethod,
+    path: event.path,
+  });
+
   try {
+    // Soportar GET ?docPath=... para pruebas manuales
     if (event.httpMethod === "GET") {
       const url = new URL(event.rawUrl);
       const docPath = url.searchParams.get("docPath");
-      if (!docPath) return { statusCode: 400, body: "Falta docPath" };
+      console.log("🔎 [confirmar-turno] GET con docPath:", docPath);
+
+      if (!docPath) {
+        console.warn("⚠️ [confirmar-turno] Falta docPath en GET");
+        return { statusCode: 400, body: "Falta docPath" };
+      }
+
+      // Simulamos un POST interno
       event.httpMethod = "POST";
       event.body = JSON.stringify({ docPath });
     }
+
     if (event.httpMethod !== "POST") {
+      console.warn(
+        "⚠️ [confirmar-turno] Método no permitido:",
+        event.httpMethod
+      );
       return { statusCode: 405, body: "Use POST" };
     }
 
-    const { docPath } = JSON.parse(event.body || "{}");
-    if (!docPath) return { statusCode: 400, body: "Falta docPath" };
+    let body: any = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch (e) {
+      console.error("❌ [confirmar-turno] Error parseando body:", e);
+      return { statusCode: 400, body: "Body JSON inválido" };
+    }
 
+    const { docPath } = body;
+    console.log("📄 [confirmar-turno] docPath recibido:", docPath);
+
+    if (!docPath) {
+      console.warn("⚠️ [confirmar-turno] Falta docPath en body");
+      return { statusCode: 400, body: "Falta docPath" };
+    }
+
+    // 🔥 Forzar una llamada a Firestore para confirmar que funciona
     await db.listCollections();
+    console.log("✅ [confirmar-turno] Firestore Admin OK");
 
     const ref = db.doc(docPath);
     const snap = await ref.get();
-    if (!snap.exists) return { statusCode: 404, body: "Turno no encontrado" };
+
+    if (!snap.exists) {
+      console.warn("⚠️ [confirmar-turno] Turno no encontrado en:", docPath);
+      return { statusCode: 404, body: "Turno no encontrado" };
+    }
+
     const t: any = snap.data() || {};
+    console.log("🧾 [confirmar-turno] Datos del turno:", {
+      negocioNombre: t.negocioNombre,
+      servicioNombre: t.servicioNombre,
+      empleadoNombre: t.empleadoNombre,
+      clienteEmail: t.clienteEmail,
+      clienteUid: t.clienteUid,
+    });
 
     let clienteEmail: string | undefined = t.clienteEmail;
     const clienteUid: string | undefined = t.clienteUid;
 
+    // Si no tenemos email directo en el turno, buscamos en Usuarios/{uid}
     if (!clienteEmail && clienteUid) {
       try {
+        console.log(
+          "🔎 [confirmar-turno] Buscando email en Usuarios/",
+          clienteUid
+        );
         const uSnap = await db.collection("Usuarios").doc(clienteUid).get();
         const u = uSnap.exists ? (uSnap.data() || {}) : {};
-        clienteEmail = u.email || u.correo;
-      } catch {}
+        clienteEmail = (u as any).email || (u as any).correo;
+        console.log(
+          "📨 [confirmar-turno] Email encontrado en Usuarios:",
+          clienteEmail
+        );
+      } catch (e) {
+        console.error(
+          "❌ [confirmar-turno] Error buscando usuario para email:",
+          e
+        );
+      }
     }
 
     if (!clienteEmail) {
+      console.warn(
+        "⚠️ [confirmar-turno] Sin email de cliente. No se enviará correo."
+      );
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: "Sin email de cliente",
-        emailConfirmacionIntentadoAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailConfirmacionIntentadoAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
       return { statusCode: 200, body: "Sin email. No se envió." };
     }
 
+    // Verificar mailer
     try {
+      console.log("🔐 [confirmar-turno] Verificando transporter nodemailer...");
       await transporter.verify();
-    } catch {
+      console.log("✅ [confirmar-turno] Transporter verificado");
+    } catch (e) {
+      console.error(
+        "❌ [confirmar-turno] Error verificando transporter:",
+        e
+      );
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: "Mailer no verificado",
-        emailConfirmacionIntentadoAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailConfirmacionIntentadoAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
       return { statusCode: 500, body: "Mailer no verificado" };
     }
@@ -135,9 +223,14 @@ export const handler: Handler = async (event) => {
     const empleadoNombre = t.empleadoNombre || "Empleado";
     const fecha = t.fecha || "";
     const hora = t.hora || "";
-    const slug = t.slugNegocio || negocioNombre.replace(/\s+/g, "-").toLowerCase();
+    const slug =
+      t.slugNegocio ||
+      negocioNombre.replace(/\s+/g, "-").toLowerCase();
 
-    const subject = `✅ Confirmación de turno${servicioNombre ? " • " + servicioNombre : ""} • ${negocioNombre}`;
+    const subject = `✅ Confirmación de turno${
+      servicioNombre ? " • " + servicioNombre : ""
+    } • ${negocioNombre}`;
+
     const text = `
 Hola! Tu turno fue confirmado ✅
 
@@ -182,6 +275,7 @@ Si necesitás cancelar tu turno entrá en https://agendateonline.com/agenda/${sl
 </html>`;
 
     try {
+      console.log("📨 [confirmar-turno] Enviando email a:", clienteEmail);
       await transporter.sendMail({
         from: `"${negocioNombre}" <${process.env.GMAIL_USER}>`,
         to: clienteEmail,
@@ -190,21 +284,32 @@ Si necesitás cancelar tu turno entrá en https://agendateonline.com/agenda/${sl
         html,
       });
 
+      console.log("✅ [confirmar-turno] Email enviado OK a:", clienteEmail);
+
       await ref.update({
         emailConfirmacionEnviado: true,
-        emailConfirmacionEnviadoAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailConfirmacionEnviadoAt:
+          admin.firestore.FieldValue.serverTimestamp(),
         emailConfirmacionError: admin.firestore.FieldValue.delete(),
       });
+
       return { statusCode: 200, body: "OK: email enviado" };
     } catch (e) {
+      console.error(
+        "❌ [confirmar-turno] Error enviando email:",
+        (e as any)?.message || e
+      );
+
       await ref.update({
         emailConfirmacionEnviado: false,
         emailConfirmacionError: String((e as any)?.message || e),
-        emailConfirmacionIntentadoAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailConfirmacionIntentadoAt:
+          admin.firestore.FieldValue.serverTimestamp(),
       });
       return { statusCode: 500, body: "Error enviando confirmación" };
     }
-  } catch {
+  } catch (e) {
+    console.error("💥 [confirmar-turno] Error interno inesperado:", e);
     return { statusCode: 500, body: "Error interno" };
   }
 };
