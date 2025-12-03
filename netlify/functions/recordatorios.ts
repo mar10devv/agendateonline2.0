@@ -1,3 +1,4 @@
+// netlify/functions/recordatorios.ts
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 
@@ -20,6 +21,66 @@ const transporter = nodemailer.createTransport({
 
 const MS_HORA = 60 * 60 * 1000;
 
+// 🌍 Zona horaria y locale por defecto
+// (Si no hay nada en el turno, usamos esto: Uruguay)
+const DEFAULT_TZ = "America/Montevideo";
+const DEFAULT_LOCALE = "es-ES";
+
+// --------- Tipo del turno que leemos de Firestore ---------
+interface TurnoData {
+  inicioTs?: import("firebase-admin").firestore.Timestamp;
+  clienteEmail?: string;
+  clienteNombre?: string;
+  negocioNombre?: string;
+  email24Enviado?: boolean;
+  email1hEnviado?: boolean;
+  horaLocalTexto?: string;
+  zonaHoraria?: string;
+  negocioZonaHoraria?: string;
+  negocioTimezone?: string;
+  locale?: string;
+}
+
+// --------- Helper para formatear la hora local ---------
+function obtenerHoraLocalDesdeTurno(t: TurnoData): string {
+  if (!t.inicioTs) return "";
+
+  // 1) Si ya guardaste la hora lista desde el front, la usamos
+  if (t.horaLocalTexto) return t.horaLocalTexto;
+
+  const fechaTurno: Date = t.inicioTs.toDate();
+
+  // 2) Detectar timezone del turno/negocio
+  const timeZone =
+    t.zonaHoraria ||
+    t.negocioZonaHoraria ||
+    t.negocioTimezone ||
+    DEFAULT_TZ;
+
+  const locale = t.locale || DEFAULT_LOCALE;
+
+  const formatter = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone,
+  });
+
+  const horaLocal = formatter.format(fechaTurno);
+
+  console.log(
+    "[DEBUG HORA]",
+    "UTC:",
+    fechaTurno.toISOString(),
+    "TZ:",
+    timeZone,
+    "->",
+    horaLocal
+  );
+
+  return horaLocal;
+}
+
 exports.handler = async function () {
   try {
     const ahora = new Date();
@@ -27,13 +88,23 @@ exports.handler = async function () {
 
     // Ventanas de búsqueda (más amplias)
     const win24Start = new Date(ahora.getTime() + 23 * MS_HORA);
-    const win24End   = new Date(ahora.getTime() + 25 * MS_HORA);
+    const win24End = new Date(ahora.getTime() + 25 * MS_HORA);
 
     const win1hStart = new Date(ahora.getTime() + 50 * 60 * 1000); // 50 min
-    const win1hEnd   = new Date(ahora.getTime() + 70 * 60 * 1000); // 70 min
+    const win1hEnd = new Date(ahora.getTime() + 70 * 60 * 1000);   // 70 min
 
-    console.log("Ventana 24h:", win24Start.toISOString(), "-", win24End.toISOString());
-    console.log("Ventana 1h:", win1hStart.toISOString(), "-", win1hEnd.toISOString());
+    console.log(
+      "Ventana 24h:",
+      win24Start.toISOString(),
+      "-",
+      win24End.toISOString()
+    );
+    console.log(
+      "Ventana 1h:",
+      win1hStart.toISOString(),
+      "-",
+      win1hEnd.toISOString()
+    );
 
     /* -------- Recordatorio 24h -------- */
     const snap24 = await db
@@ -44,16 +115,22 @@ exports.handler = async function () {
 
     console.log("📌 Turnos encontrados para 24h:", snap24.size);
 
-    for (const doc of snap24.docs) {
-      const t = doc.data();
+    for (const docSnap of snap24.docs) {
+      const t = docSnap.data() as TurnoData;
       if (!t.inicioTs || !t.clienteEmail) continue;
       if (t.email24Enviado) {
         console.log("⏭️ Ya se envió recordatorio 24h a:", t.clienteEmail);
         continue;
       }
 
-      const fechaTurno = t.inicioTs.toDate();
-      console.log("➡️ Enviando recordatorio 24h a:", t.clienteEmail, fechaTurno);
+      const horaLocal = obtenerHoraLocalDesdeTurno(t);
+
+      console.log(
+        "➡️ Enviando recordatorio 24h a:",
+        t.clienteEmail,
+        "horaLocal:",
+        horaLocal
+      );
 
       await transporter.sendMail({
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
@@ -61,11 +138,11 @@ exports.handler = async function () {
         subject: "📅 Recordatorio: tu turno es mañana",
         html: `<p>Hola ${t.clienteNombre || ""},</p>
                <p>Mañana tenés tu turno en <b>${t.negocioNombre || "tu negocio"}</b> 
-               a las <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
+               a las <b>${horaLocal}</b>.</p>
                <hr><p>Este es un mensaje automático, por favor no responder.</p>`,
       });
 
-      await doc.ref.update({ email24Enviado: true });
+      await docSnap.ref.update({ email24Enviado: true });
     }
 
     /* -------- Recordatorio 1h -------- */
@@ -77,16 +154,22 @@ exports.handler = async function () {
 
     console.log("📌 Turnos encontrados para 1h:", snap1h.size);
 
-    for (const doc of snap1h.docs) {
-      const t = doc.data();
+    for (const docSnap of snap1h.docs) {
+      const t = docSnap.data() as TurnoData;
       if (!t.inicioTs || !t.clienteEmail) continue;
       if (t.email1hEnviado) {
         console.log("⏭️ Ya se envió recordatorio 1h a:", t.clienteEmail);
         continue;
       }
 
-      const fechaTurno = t.inicioTs.toDate();
-      console.log("➡️ Enviando recordatorio 1h a:", t.clienteEmail, fechaTurno);
+      const horaLocal = obtenerHoraLocalDesdeTurno(t);
+
+      console.log(
+        "➡️ Enviando recordatorio 1h a:",
+        t.clienteEmail,
+        "horaLocal:",
+        horaLocal
+      );
 
       await transporter.sendMail({
         from: `"AgéndateOnline" <${process.env.GMAIL_USER}>`,
@@ -94,16 +177,19 @@ exports.handler = async function () {
         subject: "⏰ Recordatorio: tu turno en 1 hora",
         html: `<p>Hola ${t.clienteNombre || ""},</p>
                <p>Tu turno en <b>${t.negocioNombre || "tu negocio"}</b> es a las 
-               <b>${fechaTurno.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</b>.</p>
+               <b>${horaLocal}</b>.</p>
                <hr><p>Este es un mensaje automático, por favor no responder.</p>`,
       });
 
-      await doc.ref.update({ email1hEnviado: true });
+      await docSnap.ref.update({ email1hEnviado: true });
     }
 
     return { statusCode: 200, body: "Recordatorios procesados" };
-  } catch (e) {
+  } catch (e: any) {
     console.error("❌ Error en recordatorios:", e);
-    return { statusCode: 500, body: e.message };
+    const message =
+      (e && typeof e === "object" && "message" in e && (e as any).message) ||
+      "Error desconocido";
+    return { statusCode: 500, body: message };
   }
 };
