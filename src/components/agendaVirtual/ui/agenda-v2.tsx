@@ -223,33 +223,43 @@ export default function AgendaVirtualUIv3({
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
-  // 🟡 ¿Hay empleados sin configurar del todo?
-  const hayEmpleadosIncompletos = useMemo(() => {
-    // Tomamos solo los que realmente trabajan
-    const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
+// 🟡 ¿Hay empleados sin configurar del todo?
+const hayEmpleadosIncompletos = useMemo(() => {
+  // Tomamos solo los que realmente trabajan
+  const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
 
-    // Si no hay nadie configurado todavía, consideramos "incompleto"
-    if (lista.length === 0) return true;
+  // Si no hay nadie configurado todavía, consideramos "incompleto"
+  if (lista.length === 0) return true;
 
-    return lista.some((e) => {
-      const cal: any = e.calendario || {};
-      const inicio = cal.inicio as string | undefined;
-      const fin = cal.fin as string | undefined;
-      const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
-      const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
+  return lista.some((e) => {
+    const cal: any = e.calendario || {};
+    const inicio = cal.inicio as string | undefined;
+    const fin = cal.fin as string | undefined;
+    const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
+    const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
 
-      const horarioOk =
-        typeof inicio === "string" &&
-        typeof fin === "string" &&
-        inicio < fin;
+    // 👉 también aceptamos configuración de día y medio
+    const diaYMedio = cal.diaYMedio as any | null;
+    const tieneDiaYMedioValido =
+      diaYMedio &&
+      (typeof diaYMedio.diaCompleto === "string" ||
+        typeof diaYMedio.medioDia === "string");
 
-      const diasOk = diasLibres.length > 0;
-      const trabajosOk = trabajos.length > 0;
+    const horarioOk =
+      typeof inicio === "string" &&
+      typeof fin === "string" &&
+      inicio < fin;
 
-      // Si le falta alguna de las 3 cosas → empleado incompleto
-      return !(horarioOk && diasOk && trabajosOk);
-    });
-  }, [empleadosParaAgenda]);
+    // ✅ ahora es válido si tiene díasLibres O diaYMedio configurado
+    const diasOk = diasLibres.length > 0 || !!tieneDiaYMedioValido;
+
+    const trabajosOk = trabajos.length > 0;
+
+    // Si le falta alguna de las 3 cosas → empleado incompleto
+    return !(horarioOk && diasOk && trabajosOk);
+  });
+}, [empleadosParaAgenda]);
+
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -422,7 +432,7 @@ export default function AgendaVirtualUIv3({
                 />
               ))
             ) : (
-              <p className="opacity-80">No hay servicios cargados.</p>
+              <p className="opacity-80">Esta agenda no tiene servicios.</p>
             )}
           </div>
         );
@@ -582,7 +592,7 @@ export default function AgendaVirtualUIv3({
                     {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
                   </button>
                 ) : (
-                  <p className="opacity-80 text-sm">Ubicación no disponible.</p>
+                  <p className="opacity-80 text-sm">Esta agenda no tiene ubicacion.</p>
                 )}
               </>
             )}
