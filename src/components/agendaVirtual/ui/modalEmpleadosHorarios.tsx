@@ -16,6 +16,8 @@ type HorarioEmpleado = {
   fin: string;
   diasLibres: string[];
   diaYMedio?: DiaYMedio | null;
+  // 🆕 media hora diaria bloqueada (ej: "13:00")
+  pausaMediaHora?: string | null;
 };
 
 type Props = {
@@ -60,10 +62,7 @@ function normalizarHora(
 }
 
 // 💡 Calcula la mitad de una jornada, tolerando undefined
-function calcularMitad(
-  inicio?: string | null,
-  fin?: string | null
-): string {
+function calcularMitad(inicio?: string | null, fin?: string | null): string {
   const ini = normalizarHora(inicio, "09:00");
   const finReal = normalizarHora(fin, "17:00");
 
@@ -111,6 +110,7 @@ export default function ModalHorariosEmpleados({
       fin: horario?.fin || "17:00",
       diasLibres: diasNormalizados,
       diaYMedio: horario?.diaYMedio ?? null,
+      pausaMediaHora: horario?.pausaMediaHora ?? null, // 🆕
     };
   });
 
@@ -129,6 +129,8 @@ export default function ModalHorariosEmpleados({
       fin: horario?.fin || prev.fin || "17:00",
       diasLibres: diasNormalizados,
       diaYMedio: horario?.diaYMedio ?? null,
+      pausaMediaHora:
+        horario?.pausaMediaHora ?? prev.pausaMediaHora ?? null, // 🆕
     }));
   }, [horario, abierto]);
 
@@ -169,6 +171,49 @@ export default function ModalHorariosEmpleados({
             className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
           />
         </div>
+      </div>
+
+      {/* 🆕 Media hora diaria de descanso */}
+      <div className="mb-6">
+        <label className="block text-sm mb-1">Media hora de descanso</label>
+        <div className="flex items-center gap-3">
+          <input
+            type="time"
+            value={tempHorario.pausaMediaHora || ""}
+            onChange={(e) =>
+              setTempHorario({
+                ...tempHorario,
+                pausaMediaHora: e.target.value || null,
+              })
+            }
+            className="px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
+          />
+          <button
+            type="button"
+            onClick={() =>
+              setTempHorario((prev) => ({
+                ...prev,
+                pausaMediaHora: mitadJornada, // sugerimos mitad de jornada
+              }))
+            }
+            className="px-3 py-2 text-xs rounded-lg bg-neutral-800 border border-gray-600 text-gray-200 hover:bg-neutral-700"
+          >
+            Usar mitad de jornada ({mitadJornada})
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setTempHorario((prev) => ({ ...prev, pausaMediaHora: null }))
+            }
+            className="px-3 py-2 text-xs rounded-lg bg-neutral-900 border border-gray-700 text-gray-300 hover:bg-neutral-800"
+          >
+            Sin descanso
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-1">
+          Ese horario quedará bloqueado todos los días laborales (turnos de 30
+          minutos).
+        </p>
       </div>
 
       {/* Días libres */}

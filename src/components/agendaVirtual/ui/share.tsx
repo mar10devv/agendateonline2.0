@@ -1,5 +1,7 @@
 // src/components/agendaVirtual/share.tsx
+import { useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
+import { QRCodeCanvas } from "qrcode.react";
 
 type Props = {
   abierto: boolean;
@@ -8,16 +10,22 @@ type Props = {
 };
 
 export default function ModalShare({ abierto, onCerrar, slug }: Props) {
-  if (!abierto) return null;
-
   const url = `https://agendateonline.com/agenda/${slug}`;
 
-  // Copiamos al portapapeles apenas se abre el modal
-  if (abierto && navigator?.clipboard) {
-    navigator.clipboard.writeText(url).catch((err) =>
-      console.error("❌ Error al copiar al portapapeles:", err)
-    );
-  }
+  // Copiamos al portapapeles apenas se abre el modal (una sola vez por apertura)
+  useEffect(() => {
+    if (!abierto) return;
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .catch((err) =>
+          console.error("❌ Error al copiar al portapapeles:", err)
+        );
+    }
+  }, [abierto, url]);
+
+  if (!abierto) return null;
 
   return (
     <ModalBase
@@ -33,8 +41,19 @@ export default function ModalShare({ abierto, onCerrar, slug }: Props) {
           Ya podés compartirlo con tus clientes.
         </p>
 
+        {/* Link en texto */}
         <div className="w-full bg-neutral-900 px-4 py-2 rounded text-sm text-gray-400 text-center break-all">
           {url}
+        </div>
+
+        {/* QR de la agenda */}
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-gray-400 text-center">
+            Escaneá este código QR para abrir la agenda:
+          </p>
+          <div className="p-3 rounded-2xl bg-black/80 shadow-[0_0_20px_rgba(0,0,0,0.6)]">
+            <QRCodeCanvas value={url} size={160} includeMargin />
+          </div>
         </div>
 
         <button

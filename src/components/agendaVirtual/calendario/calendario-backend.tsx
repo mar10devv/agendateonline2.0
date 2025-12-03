@@ -1,3 +1,5 @@
+// src/components/agendaVirtual/calendario/calendario-backend.ts
+
 import {
   addDoc,
   collection,
@@ -45,6 +47,7 @@ export type EmpleadoAgendaConfig = {
   descansoDiaMedio?: string | null; // ej: "sabado" (medio turno)
   descansoDiaLibre?: string | null; // ej: "viernes" (día libre completo principal)
   descansoTurnoMedio?: "manana" | "tarde" | null;
+  pausaMediaHora?: string | null; // ej: "13:30"
 };
 
 /**
@@ -64,6 +67,7 @@ export type EmpleadoAgendaSource = {
   descansoDiaMedio?: string | null;
   descansoDiaLibre?: string | null;
   descansoTurnoMedio?: "manana" | "tarde" | null;
+  pausaMediaHora?: string | null;
 
   [key: string]: any;
 };
@@ -107,6 +111,8 @@ export type ConfigCalendarioUnificado = {
   descansoDiaMedio?: string | null;
   descansoDiaLibre?: string | null;
   descansoTurnoMedio?: "manana" | "tarde" | null;
+
+  pausaMediaHora?: string | null; // "13:00", "13:30", etc.
 };
 
 /* -------- Turnos ya guardados en Firestore (normalizados) -------- */
@@ -438,6 +444,7 @@ export function combinarConfigCalendario(
         descansoDiaMedio: empFull.descansoDiaMedio ?? null,
         descansoDiaLibre: empFull.descansoDiaLibre ?? null,
         descansoTurnoMedio: empFull.descansoTurnoMedio ?? null,
+        pausaMediaHora: empFull.pausaMediaHora ?? null,
       };
     }
   }
@@ -524,6 +531,15 @@ export function combinarConfigCalendario(
     empFull?.descansoTurnoMedio ??
     null;
 
+  // 🔥 NUEVO: pausa de media hora del empleado
+  let pausaMediaHora =
+    (calEmp as any).pausaMediaHora ??
+    (empleado as any)?.calendario?.pausaMediaHora ??
+    (empleado as any)?.pausaMediaHora ??
+    (empFull as any)?.calendario?.pausaMediaHora ??
+    (empFull as any)?.pausaMediaHora ??
+    null;
+
   // =======================================================
   // 📌 Normalizar diaYMedio desde Firebase (diaCompleto + medioDia)
   // =======================================================
@@ -572,6 +588,8 @@ export function combinarConfigCalendario(
     descansoDiaMedio,
     descansoDiaLibre,
     descansoTurnoMedio,
+    pausaMediaHora:
+      typeof pausaMediaHora === "string" ? pausaMediaHora : null,
   };
 }
 
@@ -718,11 +736,14 @@ export function generarHorariosBase(
     );
     const diaSeleccionadoNorm = normalizarDia(diaSeleccionadoNombre);
 
+    const jornadaInicioMin = start;
+    const jornadaFinMin = end;
+
     const ventana = calcularVentanaMedioDia(
       config,
       diaSeleccionadoNorm,
-      start,
-      end
+      jornadaInicioMin,
+      jornadaFinMin
     );
 
     if (ventana) {
@@ -902,6 +923,11 @@ export function generarSlotsDelDia(
   const ahora = opciones.ahora ? new Date(opciones.ahora) : new Date();
   const minutosPorSlot = opciones.minutosPorSlot || 30;
 
+  const pausaMediaHora =
+    typeof (config as any).pausaMediaHora === "string"
+      ? (config as any).pausaMediaHora
+      : null;
+
   // 👉 si no pasan duracionServicioMin, por defecto usamos el tamaño del slot
   const duracionServicioMin =
     typeof opciones.duracionServicioMin === "number"
@@ -1001,7 +1027,6 @@ export function generarSlotsDelDia(
 
       // ventana que ocuparía el servicio si empieza en este slot
       const finServicioMin = slotInicioMin + duracionServicioMin;
-
       const fin = new Date(inicio.getTime() + duracionServicioMin * 60000);
       const esPasado = inicio < ahora;
 
@@ -1013,6 +1038,19 @@ export function generarSlotsDelDia(
           inicio,
           fin,
           estado: esPasado ? "pasado" : "cerradoNegocio",
+          turnoOcupado: undefined,
+        });
+        continue;
+      }
+
+      // 🟡 Pausa de media hora: slot bloqueado
+      if (pausaMediaHora && hora === pausaMediaHora) {
+        slots.push({
+          fecha,
+          hora,
+          inicio,
+          fin,
+          estado: esPasado ? "pasado" : "bloqueado",
           turnoOcupado: undefined,
         });
         continue;
@@ -1067,6 +1105,19 @@ export function generarSlotsDelDia(
         inicio,
         fin,
         estado: esPasado ? "pasado" : "cerradoNegocio",
+        turnoOcupado: undefined,
+      });
+      continue;
+    }
+
+    // 🟡 Pausa de media hora: slot bloqueado
+    if (pausaMediaHora && hora === pausaMediaHora) {
+      slots.push({
+        fecha,
+        hora,
+        inicio,
+        fin,
+        estado: esPasado ? "pasado" : "bloqueado",
         turnoOcupado: undefined,
       });
       continue;
