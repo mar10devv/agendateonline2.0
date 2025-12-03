@@ -556,13 +556,13 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
             </div>
           ))}
         </div>
-
 {/* Días del mes */}
 <div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
   {dias.map((d, idx) => {
     if (!d) return <div key={idx} className="w-10 h-8" />;
 
-    const esHoy = esMismoDia(d, hoy);
+    const esHoy =
+      d.toDateString() === hoy.toDateString();
     const esPasado =
       d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
@@ -571,26 +571,39 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
     });
     const diaNorm = normalizarDia(nombreDiaLong);
 
-    // ======= USAMOS LO MISMO QUE EL BACKEND =======
-    const diaMedioNormConfig = normalizarDia(config.descansoDiaMedio || "");
-    const esDiaMedio = diaMedioNormConfig && diaMedioNormConfig === diaNorm;
-
+    // ======================
+    // 🔥 Jerarquía de días libres
+    // ======================
     const diasNegocio = (config as any).diasLibresNegocioNorm || [];
     const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
 
+    // RAW (tal cual vienen)
     const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
     const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
 
-    // Si es medio día, NO lo tratamos como libre completo
-    const esLibreNegocio = esDiaMedio ? false : esLibreNegocioRaw;
+    // Detectar si ES el día medio del empleado
+    const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+    const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
+
+    // 👉 El negocio manda SIEMPRE:
+    //    si el negocio lo marca libre, el día se bloquea aunque sea medio día
+    const esLibreNegocio = esLibreNegocioRaw;
+
+    // 👉 El empleado solo aporta día libre completo si NO es su medio día
     const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
 
+    // Día libre total si:
+    //  - negocio lo marca libre, o
+    //  - empleado lo marca libre y NO es medio día
     const esDiaLibre = esLibreNegocio || esLibreEmpleado;
 
     const seleccionado =
       diaSeleccionado && esMismoDia(d, diaSeleccionado);
     const disabled = esPasado || esDiaLibre;
 
+    // ======================
+    // 🎨 ESTILOS DEL DÍA
+    // ======================
     let clases =
       "w-10 h-8 flex items-center justify-center rounded-lg transition ";
 
@@ -600,8 +613,7 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
     } else if (esHoy) {
       clases += "bg-white text-black font-bold";
     } else if (esPasado) {
-      clases +=
-        "text-gray-500 line-through cursor-not-allowed";
+      clases += "text-gray-500 line-through cursor-not-allowed";
     } else if (seleccionado) {
       clases += "bg-indigo-600 text-white font-bold";
     } else {
@@ -632,6 +644,7 @@ const slotsDelDia: SlotCalendario[] = useMemo(() => {
     );
   })}
 </div>
+
 
 
         {/* Slots del día */}

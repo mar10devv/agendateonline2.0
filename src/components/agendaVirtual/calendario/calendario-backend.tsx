@@ -423,7 +423,7 @@ export function combinarConfigCalendario(
   // 1) calendario del empleado que viene por props
   let calEmp: EmpleadoAgendaConfig = empleado?.calendario || {};
 
-  // 2) si viene SIN horarios, usamos el del empFull (fallback a lo guardado en Firestore)
+  // 2) si viene SIN horarios, usamos el del empFull
   if ((!calEmp.inicio && !calEmp.fin) && empFull) {
     if (empFull.calendario) {
       calEmp = {
@@ -441,7 +441,7 @@ export function combinarConfigCalendario(
     }
   }
 
-  // horarios negocio en firestore: "inicio"/"fin"
+  // horarios negocio en firestore
   const horaInicioNeg =
     (confNeg as any).inicio || confNeg.horaInicio || "07:00";
   const horaFinNeg = (confNeg as any).fin || confNeg.horaFin || "20:00";
@@ -452,10 +452,10 @@ export function combinarConfigCalendario(
     .map(mapDiaGeneric)
     .filter(Boolean);
 
-  // ---------- DIAS LIBRES EMPLEADO (solo de ese empleado) ----------
+  // ---------- DIAS LIBRES EMPLEADO (sin contar aún diaYMedio) ----------
   let diasEmpleadoRaw: (string | number)[] = [];
 
-  // prioridad 1: lo que trae empFull.calendario.diasLibres (lo que está en Firestore)
+  // prioridad 1: empFull.calendario.diasLibres
   if (
     empFull &&
     empFull.calendario &&
@@ -467,40 +467,25 @@ export function combinarConfigCalendario(
     ];
   }
 
-  // prioridad 2: empFull.diasLibres en raíz
+  // prioridad 2: empFull.diasLibres
   if (empFull && Array.isArray((empFull as any).diasLibres)) {
-    diasEmpleadoRaw = [
-      ...diasEmpleadoRaw,
-      ...(((empFull as any).diasLibres as (string | number)[]) || []),
-    ];
+    diasEmpleadoRaw = [...diasEmpleadoRaw, ...(empFull as any).diasLibres];
   }
 
   // prioridad 3: calendario recibido por props
   if (calEmp && Array.isArray(calEmp.diasLibres)) {
-    diasEmpleadoRaw = [
-      ...diasEmpleadoRaw,
-      ...(calEmp.diasLibres as (string | number)[]),
-    ];
+    diasEmpleadoRaw = [...diasEmpleadoRaw, ...(calEmp.diasLibres as any[])];
   }
 
-  // prioridad 4: diasLibres en la raíz del empleado recibido por props
+  // prioridad 4: diasLibres en raíz del empleado recibido por props
   if (empleado && Array.isArray((empleado as any).diasLibres)) {
-    diasEmpleadoRaw = [
-      ...diasEmpleadoRaw,
-      ...(((empleado as any).diasLibres as (string | number)[]) || []),
-    ];
+    diasEmpleadoRaw = [...diasEmpleadoRaw, ...(empleado as any).diasLibres];
   }
 
-  // quitamos duplicados
   diasEmpleadoRaw = Array.from(new Set(diasEmpleadoRaw));
-
-  const diasLibresEmpleadoNorm = diasEmpleadoRaw
+  let diasLibresEmpleadoNorm = diasEmpleadoRaw
     .map(mapDiaGeneric)
     .filter(Boolean);
-
-  const diasLibresCombinadosNorm = Array.from(
-    new Set([...diasLibresNegocioNorm, ...diasLibresEmpleadoNorm])
-  );
 
   const modoTurnos: ModoTurnos = confNeg.modoTurnos || "jornada";
 
@@ -514,22 +499,70 @@ export function combinarConfigCalendario(
       ? confNeg.horasSeparacion || 30
       : undefined;
 
-  // prioridad: horario del empleado > horario del negocio
+  // prioridad: horario del empleado
   const inicio = calEmp.inicio || horaInicioNeg;
   const fin = calEmp.fin || horaFinNeg;
 
-  const descansoDiaMedio =
-    calEmp.descansoDiaMedio ?? empleado?.descansoDiaMedio ?? empFull?.calendario?.descansoDiaMedio ?? empFull?.descansoDiaMedio ?? null;
+  // Valores iniciales de descansos
+  let descansoDiaMedio =
+    calEmp.descansoDiaMedio ??
+    empleado?.descansoDiaMedio ??
+    empFull?.calendario?.descansoDiaMedio ??
+    empFull?.descansoDiaMedio ??
+    null;
 
-  const descansoDiaLibre =
-    calEmp.descansoDiaLibre ?? empleado?.descansoDiaLibre ?? empFull?.calendario?.descansoDiaLibre ?? empFull?.descansoDiaLibre ?? null;
+  let descansoDiaLibre =
+    calEmp.descansoDiaLibre ??
+    empleado?.descansoDiaLibre ??
+    empFull?.calendario?.descansoDiaLibre ??
+    empFull?.descansoDiaLibre ??
+    null;
 
-  const descansoTurnoMedio =
+  let descansoTurnoMedio =
     calEmp.descansoTurnoMedio ??
     empleado?.descansoTurnoMedio ??
     empFull?.calendario?.descansoTurnoMedio ??
     empFull?.descansoTurnoMedio ??
     null;
+
+  // =======================================================
+  // 📌 Normalizar diaYMedio desde Firebase (diaCompleto + medioDia)
+  // =======================================================
+  const dy = empFull?.calendario?.diaYMedio;
+  if (dy) {
+    const diaCompletoNorm = normalizarDia(dy.diaCompleto);
+    const medioDiaNorm = normalizarDia(dy.medioDia);
+    const tipo = dy.tipo as "antes" | "despues" | undefined;
+
+    if (diaCompletoNorm) {
+      descansoDiaLibre = diaCompletoNorm;
+    }
+    if (medioDiaNorm) {
+      descansoDiaMedio = medioDiaNorm;
+    }
+
+    if (tipo === "antes") {
+      descansoTurnoMedio = "manana";
+    } else if (tipo === "despues") {
+      descansoTurnoMedio = "tarde";
+    }
+  }
+
+  // 🔥 NUEVO: el día libre completo también cuenta como día libre normal del empleado
+  const descansoDiaLibreNorm = normalizarDia(descansoDiaLibre || "");
+  if (
+    descansoDiaLibreNorm &&
+    !diasLibresEmpleadoNorm.includes(descansoDiaLibreNorm)
+  ) {
+    diasLibresEmpleadoNorm = [
+      ...diasLibresEmpleadoNorm,
+      descansoDiaLibreNorm,
+    ];
+  }
+
+  const diasLibresCombinadosNorm = Array.from(
+    new Set([...diasLibresNegocioNorm, ...diasLibresEmpleadoNorm])
+  );
 
   return {
     inicio,
@@ -545,6 +578,8 @@ export function combinarConfigCalendario(
     descansoTurnoMedio,
   };
 }
+
+
 
 /* =====================================================
    2) Generar días del rango
@@ -596,16 +631,14 @@ export function generarDiasRango(
 
     const diaNorm = normalizarDia(dayNameLong);
 
-    // ¿Este día es el configurado como medio turno?
+    // ¿Este día es el configurado como medio turno del empleado?
     const esDiaMedio = tieneMedioDia && diaMedioNormConfig === diaNorm;
 
-    // Valores crudos según diasLibres negocio/empleado
-    const disabledNegocioRaw = config.diasLibresNegocioNorm.includes(diaNorm);
-    const disabledEmpleadoRaw = config.diasLibresEmpleadoNorm.includes(diaNorm);
+    // 1) Negocio: si está libre, cierra SIEMPRE, aunque sea medio día del empleado
+    const disabledNegocio = config.diasLibresNegocioNorm.includes(diaNorm);
 
-    // ⚠️ Si es medio día, NO lo marcamos como disabled total,
-    // aunque esté en diasLibres por error o por compatibilidad vieja.
-    const disabledNegocio = esDiaMedio ? false : disabledNegocioRaw;
+    // 2) Empleado: si está libre, solo se respeta si NO es su medio día
+    const disabledEmpleadoRaw = config.diasLibresEmpleadoNorm.includes(diaNorm);
     const disabledEmpleado = esDiaMedio ? false : disabledEmpleadoRaw;
 
     const disabled = disabledNegocio || disabledEmpleado;
@@ -888,12 +921,17 @@ export function generarSlotsDelDia(
   const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
   const esDiaMedio = !!diaMedioNorm && diaMedioNorm === diaNorm;
 
-  // ⚠️ Si NO es día de medio turno:
-  //     aplicamos la lógica normal de días libres negocio + empleado.
-  //    (si es medio día, no lo tratamos como día libre completo).
-  if (!esDiaMedio) {
-    if (config.diasLibresNegocioNorm.includes(diaNorm)) return [];
-    if (config.diasLibresEmpleadoNorm.includes(diaNorm)) return [];
+  // 🔥 1) NEGOCIO MANDA SIEMPRE
+  // Si el negocio tiene este día como libre, no se generan slots para nadie,
+  // aunque sea el medio día del empleado.
+  if (config.diasLibresNegocioNorm.includes(diaNorm)) {
+    return [];
+  }
+
+  // 2) DÍAS LIBRES DEL EMPLEADO
+  // Solo bloquean el día completo si NO es su medio día.
+  if (!esDiaMedio && config.diasLibresEmpleadoNorm.includes(diaNorm)) {
+    return [];
   }
 
   // ==========================
@@ -970,6 +1008,7 @@ export function generarSlotsDelDia(
 
   return slots;
 }
+
 
 /* =====================================================
    6) Calendario de rango completo

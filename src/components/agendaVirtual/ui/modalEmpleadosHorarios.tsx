@@ -1,4 +1,5 @@
 // src/components/agendaVirtual/ui/modalHorariosEmpleados.tsx
+
 import { useState, useEffect } from "react";
 import ModalBase from "../../ui/modalGenerico";
 
@@ -11,8 +12,10 @@ type Props = {
     diasLibres: string[];
     diaYMedio?: {
       diaCompleto: string;
+      tipo: "antes" | "despues";
       medioDia: string;
-      horaEntrada: string;
+      inicioMedio: string;
+      finMedio: string;
     } | null;
   };
   onGuardar: (nuevoHorario: any) => void;
@@ -24,6 +27,7 @@ export default function ModalHorariosEmpleados({
   horario,
   onGuardar,
 }: Props) {
+  
   const diasSemana = [
     "Lunes",
     "Martes",
@@ -34,13 +38,35 @@ export default function ModalHorariosEmpleados({
     "Domingo",
   ];
 
-  // ⭐ Estado local
-  const [tempHorario, setTempHorario] = useState(horario);
+  // función para obtener dia anterior/siguiente
+  const getDiaAnterior = (dia: string) => {
+    const idx = diasSemana.indexOf(dia);
+    return diasSemana[(idx - 1 + 7) % 7];
+  };
 
-  // ⭐ Estado para guardar los días EXACTOS que vienen de Firebase
+  const getDiaSiguiente = (dia: string) => {
+    const idx = diasSemana.indexOf(dia);
+    return diasSemana[(idx + 1) % 7];
+  };
+
+  // mitad de la jornada
+  const calcularMitad = (inicio: string, fin: string) => {
+    const [hi, mi] = inicio.split(":").map(Number);
+    const [hf, mf] = fin.split(":").map(Number);
+
+    const inicioMin = hi * 60 + mi;
+    const finMin = hf * 60 + mf;
+    const mitad = Math.floor((inicioMin + finMin) / 2);
+
+    const hh = String(Math.floor(mitad / 60)).padStart(2, "0");
+    const mm = String(mitad % 60).padStart(2, "0");
+
+    return `${hh}:${mm}`;
+  };
+
+  const [tempHorario, setTempHorario] = useState(horario);
   const [diasOriginales, setDiasOriginales] = useState<string[]>([]);
 
-  // ⭐ Se ejecuta al abrir el modal o cambiar de empleado
   useEffect(() => {
     const diasNormalizados = Array.isArray(horario.diasLibres)
       ? horario.diasLibres.map(
@@ -48,7 +74,7 @@ export default function ModalHorariosEmpleados({
         )
       : [];
 
-    setDiasOriginales(diasNormalizados); // ⬅️ Guardamos los días originales
+    setDiasOriginales(diasNormalizados);
 
     setTempHorario({
       ...horario,
@@ -57,6 +83,9 @@ export default function ModalHorariosEmpleados({
   }, [horario, abierto]);
 
   if (!abierto) return null;
+
+  // mitad jornada calculada
+  const mitadJornada = calcularMitad(tempHorario.inicio, tempHorario.fin);
 
   return (
     <ModalBase
@@ -96,16 +125,15 @@ export default function ModalHorariosEmpleados({
       <div className="mb-6">
         <label className="block text-sm mb-3">Días libres</label>
 
-        {/* Modo de selección */}
+        {/* Selector modo */}
         <div className="flex gap-4 mb-4">
-          {/* ⬅️ FIX: restaura diasOriginales cuando volvés a “varios días libres” */}
           <button
             type="button"
             onClick={() =>
               setTempHorario({
                 ...tempHorario,
                 diaYMedio: null,
-                diasLibres: diasOriginales, // ⬅️ restaura días guardados
+                diasLibres: diasOriginales,
               })
             }
             className={`px-4 py-2 rounded-lg border transition ${
@@ -124,9 +152,11 @@ export default function ModalHorariosEmpleados({
                 ...tempHorario,
                 diasLibres: [],
                 diaYMedio: {
-                  diaCompleto: "Viernes",
-                  medioDia: "Sábado",
-                  horaEntrada: "14:00",
+                  diaCompleto: "Lunes",
+                  tipo: "antes",
+                  medioDia: "Domingo",
+                  inicioMedio: tempHorario.inicio,
+                  finMedio: mitadJornada,
                 },
               })
             }
@@ -140,7 +170,7 @@ export default function ModalHorariosEmpleados({
           </button>
         </div>
 
-        {/* Modo 1: varios días */}
+        {/* MODO 1: VARIOS DÍAS */}
         {!tempHorario.diaYMedio && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {diasSemana.map((dia) => {
@@ -176,22 +206,31 @@ export default function ModalHorariosEmpleados({
           </div>
         )}
 
-        {/* Modo 2: un día y medio */}
+        {/* MODO 2: UN DÍA Y MEDIO */}
         {tempHorario.diaYMedio && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
+
+            {/* DÍA COMPLETO */}
             <div>
-              <label className="block text-sm">Día libre completo</label>
+              <label className="block text-sm mb-1">Día libre completo</label>
               <select
                 value={tempHorario.diaYMedio.diaCompleto}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const dia = e.target.value;
+                  const anterior = getDiaAnterior(dia);
+                  const siguiente = getDiaSiguiente(dia);
+
                   setTempHorario({
                     ...tempHorario,
                     diaYMedio: {
-                      ...tempHorario.diaYMedio!,
-                      diaCompleto: e.target.value,
+                      diaCompleto: dia,
+                      tipo: "antes",
+                      medioDia: anterior,
+                      inicioMedio: tempHorario.inicio,
+                      finMedio: mitadJornada,
                     },
-                  })
-                }
+                  });
+                }}
                 className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
               >
                 {diasSemana.map((dia) => (
@@ -202,51 +241,80 @@ export default function ModalHorariosEmpleados({
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm">Medio día libre</label>
-              <select
-                value={tempHorario.diaYMedio.medioDia}
-                onChange={(e) =>
+            {/* OPCIONES VALIDAS */}
+            <div className="flex flex-col gap-3 p-3 bg-neutral-900 rounded-lg">
+
+              <label className="text-sm opacity-80 mb-2">
+                Medio día libre
+              </label>
+
+              {/* Medio día ANTES */}
+              <button
+                type="button"
+                onClick={() => {
+                  const dia = tempHorario.diaYMedio!.diaCompleto;
+                  const anterior = getDiaAnterior(dia);
+
                   setTempHorario({
                     ...tempHorario,
                     diaYMedio: {
-                      ...tempHorario.diaYMedio!,
-                      medioDia: e.target.value,
+                      diaCompleto: dia,
+                      tipo: "antes",
+                      medioDia: anterior,
+                      inicioMedio: tempHorario.inicio,
+                      finMedio: mitadJornada,
                     },
-                  })
-                }
-                className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
+                  });
+                }}
+                className={`
+                  w-full px-4 py-3 rounded-lg border 
+                  ${
+                    tempHorario.diaYMedio.tipo === "antes"
+                      ? "bg-green-600 text-white border-green-600"
+                      : "bg-neutral-800 text-gray-300 border-gray-600"
+                  }
+                `}
               >
-                {diasSemana.map((dia) => (
-                  <option key={dia} value={dia}>
-                    {dia}
-                  </option>
-                ))}
-              </select>
+                {getDiaAnterior(tempHorario.diaYMedio.diaCompleto)} por la mañana
+              </button>
+
+              {/* Medio día DESPUES */}
+              <button
+                type="button"
+                onClick={() => {
+                  const dia = tempHorario.diaYMedio!.diaCompleto;
+                  const siguiente = getDiaSiguiente(dia);
+
+                  setTempHorario({
+                    ...tempHorario,
+                    diaYMedio: {
+                      diaCompleto: dia,
+                      tipo: "despues",
+                      medioDia: siguiente,
+                      inicioMedio: mitadJornada,
+                      finMedio: tempHorario.fin,
+                    },
+                  });
+                }}
+                className={`
+                  w-full px-4 py-3 rounded-lg border 
+                  ${
+                    tempHorario.diaYMedio.tipo === "despues"
+                      ? "bg-green-600 text-white border-green-600"
+                      : "bg-neutral-800 text-gray-300 border-gray-600"
+                  }
+                `}
+              >
+                {getDiaSiguiente(tempHorario.diaYMedio.diaCompleto)} por la tarde
+              </button>
+
             </div>
 
-            <div>
-              <label className="block text-sm">Hora de entrada</label>
-              <input
-                type="time"
-                value={tempHorario.diaYMedio.horaEntrada}
-                onChange={(e) =>
-                  setTempHorario({
-                    ...tempHorario,
-                    diaYMedio: {
-                      ...tempHorario.diaYMedio!,
-                      horaEntrada: e.target.value,
-                    },
-                  })
-                }
-                className="w-full px-3 py-2 bg-neutral-800 border border-gray-700 rounded-md text-white"
-              />
-            </div>
           </div>
         )}
       </div>
 
-      {/* Botones */}
+      {/* BOTONES */}
       <div className="flex justify-end gap-4 pt-4 border-t border-gray-700">
         <button
           onClick={onClose}
