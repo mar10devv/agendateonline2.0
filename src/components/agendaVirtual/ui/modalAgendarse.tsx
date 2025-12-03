@@ -628,9 +628,8 @@ function PasoEmpleados({
   );
 }
 
-
-
 /* ---------- PasoTurnos: usa CalendarioBase (calendario-backend) ---------- */
+
 function PasoTurnos({
   negocio,
   empleado,
@@ -683,7 +682,6 @@ function PasoTurnos({
     </div>
   );
 }
-
 
 /* ---------- PasoConfirmacion con seña + guardado ---------- */
 function PasoConfirmacion({

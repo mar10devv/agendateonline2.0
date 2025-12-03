@@ -517,8 +517,6 @@ export default function CalendarioBase({
     }
   };
 
-
-
   const getSlotTitle = (slot: SlotCalendario) => {
     if (modo === "cliente") {
       if (slot.estado === "libre") return "Seleccionar este horario";
