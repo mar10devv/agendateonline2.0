@@ -485,12 +485,14 @@ export default function CalendarioBase({
       return;
     }
 
-    // 4) Slot bloqueado → callback opcional
+    // 4) Slot bloqueado → abrir modal para DESBLOQUEAR
     if (slot.estado === "bloqueado") {
+      setModalSlot({ visible: true, slot });
       onSlotBloqueadoClick?.(slot);
       return;
     }
   };
+
 
   const getSlotClasses = (slot: SlotCalendario) => {
   const base =
@@ -621,6 +623,37 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
     setCancelandoTurno(false);
   }
 };
+
+  // handler para DESBLOQUEAR un slot bloqueado manualmente
+  const handleDesbloquearSlot = async () => {
+    const slot = modalSlot.slot;
+    if (!slot || !slot.turnoOcupado) return;
+
+    const turno = slot.turnoOcupado;
+    if (!turno.bloqueado) return;
+
+    try {
+      setCancelandoTurno(true);
+
+      await cancelarTurnoBackend({
+        negocioId: negocio.id,
+        turnoId: turno.id,
+        clienteUid: turno.clienteUid ?? null,
+        inicio: turno.inicio,
+      });
+
+      // cerramos modal luego de desbloquear
+      setModalSlot({ visible: false, slot: null });
+    } catch (err: any) {
+      console.error("Error al desbloquear el horario:", err);
+      alert(
+        "Ocurrió un error al desbloquear el horario. Intentá de nuevo en unos segundos."
+      );
+    } finally {
+      setCancelandoTurno(false);
+    }
+  };
+
 
 
   // ======================= RENDER =======================
@@ -1184,51 +1217,78 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
               {modalSlot.slot.fecha.toLocaleDateString("es-ES")}
             </h3>
 
-            <div className="flex flex-col gap-3">
-              <button
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center justify-center gap-2"
-                onClick={() => {
-                  if (onSlotLibreClick && modalSlot.slot) {
-                    onSlotLibreClick(modalSlot.slot);
-                  }
-                  setModalSlot({ visible: false, slot: null });
-                }}
-              >
-                <span>➕</span> Agregar manualmente
-              </button>
+            {/* 👉 Si el slot está LIBRE: opciones para agendar o bloquear */}
+            {modalSlot.slot.estado === "libre" && (
+              <div className="flex flex-col gap-3">
+                <button
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center justify-center gap-2"
+                  onClick={() => {
+                    if (onSlotLibreClick && modalSlot.slot) {
+                      onSlotLibreClick(modalSlot.slot);
+                    }
+                    setModalSlot({ visible: false, slot: null });
+                  }}
+                >
+                  <span>➕</span> Agregar manualmente
+                </button>
 
-              <button
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm flex items-center justify-center gap-2"
-                onClick={async () => {
-                  if (!modalSlot.slot) return;
+                <button
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm flex items-center justify-center gap-2"
+                  onClick={async () => {
+                    if (!modalSlot.slot) return;
 
-                  try {
-                    await bloquearSlotBackend({
-                      usuario: usuarioActual,
-                      negocio,
-                      empleadoId: null,
-                      empleadoNombre: empleadoNombreRef,
-                      fecha: modalSlot.slot.fecha,
-                      hora: modalSlot.slot.hora,
-                      duracionMin: minutosPorSlot,
-                    });
-                  } catch (err: any) {
-                    alert(
-                      err?.message === "NO_PERMISO_AGENDA"
-                        ? "No tenés permisos para modificar esta agenda."
-                        : "Ocurrió un error al bloquear el turno."
-                    );
-                  }
+                    try {
+                      await bloquearSlotBackend({
+                        usuario: usuarioActual,
+                        negocio,
+                        empleadoId: null,
+                        empleadoNombre: empleadoNombreRef,
+                        fecha: modalSlot.slot.fecha,
+                        hora: modalSlot.slot.hora,
+                        duracionMin: minutosPorSlot,
+                      });
+                    } catch (err: any) {
+                      alert(
+                        err?.message === "NO_PERMISO_AGENDA"
+                          ? "No tenés permisos para modificar esta agenda."
+                          : "Ocurrió un error al bloquear el turno."
+                      );
+                    }
 
-                  setModalSlot({ visible: false, slot: null });
-                }}
-              >
-                <span>🚫</span> No trabajar este turno
-              </button>
-            </div>
+                    setModalSlot({ visible: false, slot: null });
+                  }}
+                >
+                  <span>🚫</span> No trabajar este turno
+                </button>
+              </div>
+            )}
+
+            {/* 👉 Si el slot está BLOQUEADO: opción para DESBLOQUEAR */}
+            {modalSlot.slot.estado === "bloqueado" && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-gray-200">
+                  Este horario está <b>bloqueado por el negocio</b>. Podés
+                  volver a habilitarlo para que los clientes puedan reservar.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleDesbloquearSlot}
+                  disabled={cancelandoTurno}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center justify-center gap-2 ${
+                    cancelandoTurno
+                      ? "bg-emerald-700/70 text-emerald-100 cursor-wait"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  }`}
+                >
+                  {cancelandoTurno ? "Desbloqueando..." : "✅ Desbloquear horario"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
     </>
   );
 }
