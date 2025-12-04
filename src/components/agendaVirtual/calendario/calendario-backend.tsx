@@ -9,9 +9,11 @@ import {
   where,
   writeBatch,
   onSnapshot,
-  updateDoc, // 👈 NUEVO
-  deleteDoc, // 👈 PARA cancelarTurnoBackend
+  updateDoc,
+  deleteDoc,
+  getDoc, // 👈 AGREGA ESTO
 } from "firebase/firestore";
+
 
 import { db } from "../../../lib/firebase";
 
@@ -1587,90 +1589,141 @@ export async function cancelarTurnoBackend(opts: {
   clienteUid?: string | null;
   inicio?: Date; // usamos el inicio para intentar matchear el turno del usuario
 }) {
-  const { negocioId, turnoId, clienteUid, inicio } = opts;
+  let { negocioId, turnoId, clienteUid, inicio } = opts;
 
-  // 1) ✅ Borrar turno en la agenda del NEGOCIO (esto libera el slot sí o sí)
-  const refTurnoNegocio = doc(db, "Negocios", negocioId, "Turnos", turnoId);
-  await deleteDoc(refTurnoNegocio);
-
-  // 2) ✅ Intentar borrar turno en la agenda del USUARIO (si tenemos uid)
-  if (!clienteUid) return;
-
-  // 2.a) PRIMERO intentamos borrar por ID directo (misma lógica que AgendaNegocio vieja)
   try {
-    const refTurnoUsuarioDirecto = doc(
+    // 0) Si NO viene clienteUid o inicio, intentamos leer el turno del NEGOCIO
+    //    para completar esos datos automáticamente.
+    try {
+      if (!clienteUid || !inicio) {
+        const refTurnoNegocio = doc(
+          db,
+          "Negocios",
+          negocioId,
+          "Turnos",
+          turnoId
+        );
+        const snapTurno = await getDoc(refTurnoNegocio);
+
+        if (snapTurno.exists()) {
+          const data: any = snapTurno.data();
+
+          if (!clienteUid && data.clienteUid) {
+            clienteUid = data.clienteUid;
+          }
+
+          if (!inicio && (data.inicioTs || data.inicio || data.fecha)) {
+            const posibleInicio = toDateSafe(
+              data.inicioTs ?? data.inicio ?? data.fecha
+            );
+            if (!isNaN(+posibleInicio)) {
+              inicio = posibleInicio;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(
+        "[cancelarTurnoBackend] No se pudo leer el turno del negocio para completar datos",
+        e
+      );
+    }
+
+    // 1) ✅ Borrar turno en la agenda del NEGOCIO
+    //    y el turno en el USUARIO por ID (misma idea que la Agenda vieja)
+    const batch1 = writeBatch(db);
+
+    const refTurnoNegocio = doc(
       db,
-      "Usuarios",
-      clienteUid,
+      "Negocios",
+      negocioId,
       "Turnos",
       turnoId
     );
+    batch1.delete(refTurnoNegocio);
 
-    await deleteDoc(refTurnoUsuarioDirecto);
-
-    console.log(
-      "[cancelarTurnoBackend] Turno borrado en Usuarios por id directo",
-      { clienteUid, turnoId }
-    );
-  } catch (err) {
-    console.warn(
-      "[cancelarTurnoBackend] No se pudo borrar por id directo en Usuarios/",
-      clienteUid,
-      err
-    );
-  }
-
-  // 2.b) FALLBACK: misma idea que teníamos antes -> buscar por negocioId (+ inicio aprox)
-  try {
-    const refTurnosUsuario = collection(db, "Usuarios", clienteUid, "Turnos");
-
-    // buscamos SOLO los turnos de ese negocio
-    const qUser = query(refTurnosUsuario, where("negocioId", "==", negocioId));
-    const snapUser = await getDocs(qUser);
-
-    if (snapUser.empty) {
-      return;
+    if (clienteUid) {
+      const refTurnoUsuarioDirecto = doc(
+        db,
+        "Usuarios",
+        clienteUid,
+        "Turnos",
+        turnoId
+      );
+      batch1.delete(refTurnoUsuarioDirecto);
     }
 
-    const batch = writeBatch(db);
-
-    snapUser.forEach((docSnap) => {
-      const data: any = docSnap.data();
-
-      // tratamos de reconstruir la fecha/hora de inicio
-      const iniDoc = toDateSafe(
-        data.inicioTs ?? data.inicio ?? data.fecha ?? null
-      );
-
-      if (inicio && !isNaN(+iniDoc)) {
-        const diffMs = Math.abs(+iniDoc - +inicio);
-        // si la diferencia es <= 5 minutos, asumimos que es el mismo turno
-        if (diffMs <= 5 * 60 * 1000) {
-          batch.delete(docSnap.ref);
-        }
-      } else {
-        // ⚠️ fallback MUY amplio (igual que antes):
-        // si no tenemos inicio o iniDoc, borramos todos los turnos
-        // de ese negocio en el usuario
-        batch.delete(docSnap.ref);
-      }
-    });
-
-    await batch.commit();
+    await batch1.commit();
     console.log(
-      "[cancelarTurnoBackend] Cleanup extra en Usuarios/ hecho por negocioId/inicio",
-      { clienteUid, negocioId }
+      "[cancelarTurnoBackend] Turno borrado en Negocios y (si hay uid) en Usuarios por id directo",
+      { negocioId, turnoId, clienteUid }
     );
-  } catch (err) {
-    // Si las reglas de Firestore no permiten tocar Usuarios/{cliente},
-    // lo logeamos pero NO rompemos el flujo.
-    console.warn(
-      "[cancelarTurnoBackend] No se pudo borrar el turno en Usuarios/ (fallback)",
-      clienteUid,
-      err
-    );
+
+    // 2) ✅ FALLBACK EXTRA:
+    //    Igual que antes, limpiamos posibles duplicados en Usuarios/{uid}/Turnos
+    //    matcheando por negocioId e inicio (≈ 5 minutos de diferencia).
+    if (clienteUid) {
+      try {
+        const refTurnosUsuario = collection(
+          db,
+          "Usuarios",
+          clienteUid,
+          "Turnos"
+        );
+
+        const qUser = query(
+          refTurnosUsuario,
+          where("negocioId", "==", negocioId)
+        );
+        const snapUser = await getDocs(qUser);
+
+        if (snapUser.empty) {
+          return;
+        }
+
+        const batch2 = writeBatch(db);
+
+        snapUser.forEach((docSnap) => {
+          const data: any = docSnap.data();
+
+          const iniDoc = toDateSafe(
+            data.inicioTs ?? data.inicio ?? data.fecha ?? null
+          );
+
+          if (inicio && !isNaN(+iniDoc)) {
+            const diffMs = Math.abs(+iniDoc - +inicio);
+            // si la diferencia es <= 5 minutos, asumimos que es el mismo turno
+            if (diffMs <= 5 * 60 * 1000) {
+              batch2.delete(docSnap.ref);
+            }
+          } else {
+            // ⚠️ fallback amplio: si no tenemos forma de comparar por tiempo,
+            // borramos todos los turnos de ese negocio en el usuario
+            batch2.delete(docSnap.ref);
+          }
+        });
+
+        await batch2.commit();
+        console.log(
+          "[cancelarTurnoBackend] Cleanup extra en Usuarios/ hecho por negocioId/inicio",
+          { clienteUid, negocioId }
+        );
+      } catch (err) {
+        // Si las reglas no permiten tocar Usuarios/{cliente},
+        // lo logeamos pero NO rompemos el flujo.
+        console.warn(
+          "[cancelarTurnoBackend] No se pudo borrar el turno en Usuarios/ (fallback)",
+          clienteUid,
+          err
+        );
+      }
+    }
+  } catch (e) {
+    console.error("[cancelarTurnoBackend] Error general cancelando turno", e);
+    throw e;
   }
 }
+
 
 /* =====================================================
    8) Cargar / escuchar turnos desde Firestore
