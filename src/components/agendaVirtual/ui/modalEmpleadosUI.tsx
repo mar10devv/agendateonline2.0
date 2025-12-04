@@ -55,6 +55,9 @@ export default function ModalEmpleadosUI({
     {}
   );
 
+  // 🆕 empleado abierto en el acordeón
+  const [empleadoAbierto, setEmpleadoAbierto] = useState<number | null>(null);
+
   const hayEmpleadoSinEditar = config?.empleadosData?.some(
     (emp: Empleado) => !emp.nombre?.trim()
   );
@@ -218,259 +221,472 @@ export default function ModalEmpleadosUI({
     );
   }
 
-  // 🔵 MODO NEGOCIO: editor normal de empleados
+  // 🔵 MODO NEGOCIO: editor normal de empleados (más compacto)
   return (
     <>
       <ModalBase
         abierto={abierto}
         onClose={onCerrar}
         titulo="Configuración de empleados"
-        maxWidth="max-w-4xl"
+        maxWidth="max-w-3xl"
       >
-        {estado === "cargando" && <p>Cargando...</p>}
+        {/* Estados simples arriba */}
+        {estado === "cargando" && (
+          <div className="flex items-center justify-center gap-3 py-8 text-sm text-neutral-300">
+            <LoaderSpinner size={22} />
+            Cargando empleados...
+          </div>
+        )}
+
         {estado === "sin-acceso" && (
-          <p className="text-red-400">🚫 No tienes acceso</p>
+          <p className="text-red-400 py-6 text-sm text-center">
+            🚫 No tienes acceso a la configuración de empleados.
+          </p>
         )}
 
         {(estado === "listo" ||
           estado === "exito" ||
-          estado === "guardando") && config && (
-          <div className="flex flex-col h-[70vh]">
-            <div className="flex-1 overflow-y-auto pr-2">
-              <div className="flex flex-col gap-6">
+          estado === "guardando") &&
+          config && (
+            <div
+              className="
+                flex flex-col gap-4
+                max-h-[80vh]
+                rounded-3xl
+                p-4
+                bg-[var(--color-fondo)]
+                text-[var(--color-texto)]
+                transition-colors
+                duration-300
+              "
+            >
+              {/* LISTA DE EMPLEADOS */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {config.empleadosData.map(
                   (empleado: Empleado, index: number) => {
                     const esDueno = empleado.rol === "dueño";
 
                     const faltaHorario =
-                      !empleado.calendario?.inicio || !empleado.calendario?.fin;
+                      !empleado.calendario?.inicio ||
+                      !empleado.calendario?.fin;
                     const faltaServicios =
                       !Array.isArray(empleado.trabajos) ||
                       empleado.trabajos.length === 0;
 
+                    const abierto = empleadoAbierto === index;
+
                     return (
                       <div
                         key={index}
-                        className="relative rounded-xl p-6 flex flex-col sm:flex-row gap-6 items-center 
-                                 bg-[var(--color-primario)] shadow-lg transition-colors duration-300"
+                        className="
+                          rounded-2xl
+                          bg-[var(--color-primario-oscuro)]/80
+                          border border-white/10
+                          shadow-[0_4px_14px_rgba(0,0,0,0.45)]
+                          overflow-hidden
+                          relative
+                        "
                       >
-                        {/* ❌ Eliminar (excepto dueño) */}
-                        {(soyDueno || soyAdmin) && !esDueno && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEmpleadoAEliminar(index);
-                              setMostrarAviso(true);
-                            }}
-                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600 text-white font-bold"
-                          >
-                            X
-                          </button>
-                        )}
+                        {/* Cabecera compacta tipo acordeón */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEmpleadoAbierto((prev) =>
+                              prev === index ? null : index
+                            )
+                          }
+                          className="
+                            w-full
+                            px-4 py-2.5
+                            flex items-center justify-between gap-3
+                            text-sm
+                            hover:bg-black/20
+                            transition
+                          "
+                        >
+                          <div className="flex flex-col text-left">
+                            <span className="font-medium">
+                              {empleado.nombre || "Nuevo empleado"}
+                            </span>
 
-                        {/* Foto */}
-                        <div className="relative">
-                          <input
-                            id={`fotoPerfil-${index}`}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={false}
-                            onChange={(e) =>
-                              handleFotoPerfil(
-                                index,
-                                e.target.files?.[0] || null
-                              )
-                            }
-                          />
-
-                          <label
-                            htmlFor={`fotoPerfil-${index}`}
-                            className={`w-24 h-24 rounded-full flex items-center justify-center overflow-hidden cursor-pointer bg-neutral-700`}
-                          >
-                            {cargandoFoto[index] ? (
-                              <LoaderSpinner />
-                            ) : empleado.fotoPerfil ? (
-                              <img
-                                src={empleado.fotoPerfil}
-                                alt=""
-                                className="object-cover w-full h-full"
-                              />
-                            ) : (
-                              <span className="text-xl text-gray-400">+</span>
-                            )}
-                          </label>
-                        </div>
-
-                        <div className="flex-1 flex flex-col gap-3">
-                          {/* Nombre */}
-                          <input
-                            type="text"
-                            placeholder="Nombre del empleado"
-                            value={empleado.nombre}
-                            onChange={(e) =>
-                              handleChangeEmpleado(
-                                index,
-                                "nombre",
-                                e.target.value
-                              )
-                            }
-                            disabled={false}
-                            className="w-full px-4 py-2 bg-[var(--color-primario-oscuro)] border border-gray-700 rounded-md text-white transition-colors duración-300"
-                          />
-
-                          {/* Badges */}
-                          <div className="flex gap-2">
-                            {esDueno && (
-                              <span className="px-2 py-1 text-xs font-semibold text-black bg-yellow-400 rounded-full">
-                                🏠 Dueño
+                            <div className="flex flex-wrap gap-2 mt-1 text-[11px] text-neutral-400">
+                              <span>
+                                {esDueno
+                                  ? "Dueño"
+                                  : empleado.rol === "admin"
+                                  ? "Admin"
+                                  : "Empleado"}
                               </span>
-                            )}
 
-                            {empleado.rol === "admin" && (
-                              <span className="px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded-full">
-                                👑 Admin
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Botones */}
-                          {(soyDueno || soyAdmin) && (
-                            <div className="flex flex-wrap gap-3">
-                              <button
-                                onClick={() => setEmpleadoSeleccionado(index)}
+                              <span
                                 className={
                                   faltaHorario
-                                    ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
-                                    : "bg-indigo-600 text-white px-4 py-2 rounded-md"
+                                    ? "text-amber-300"
+                                    : "text-emerald-300"
                                 }
                               >
-                                Configurar horario
-                              </button>
+                                {faltaHorario
+                                  ? "Horario sin configurar"
+                                  : "Horario listo"}
+                              </span>
 
-                              <button
-                                onClick={() => setEmpleadoServicios(index)}
+                              <span
                                 className={
                                   faltaServicios
-                                    ? "bg-yellow-500 text-black px-4 py-2 rounded-md animate-pulse"
-                                    : "bg-purple-600 text-white px-4 py-2 rounded-md"
+                                    ? "text-amber-300"
+                                    : "text-emerald-300"
                                 }
                               >
-                                Configurar servicios
-                              </button>
-
-                              {/* Admin */}
-                              {!esDueno && (
-                                <button
-                                  onClick={() => {
-                                    const correo = prompt(
-                                      "Ingrese el correo Gmail del empleado para hacerlo admin:"
-                                    );
-                                    if (!correo) return;
-
-                                    setConfig((prev: any) => {
-                                      const nuevos = [
-                                        ...prev.empleadosData,
-                                      ];
-                                      if (nuevos[index].rol === "admin") {
-                                        nuevos[index].rol = "empleado";
-                                        nuevos[index].adminEmail = "";
-                                      } else {
-                                        nuevos[index].rol = "admin";
-                                        nuevos[index].adminEmail = correo
-                                          .trim()
-                                          .toLowerCase();
-                                      }
-                                      return {
-                                        ...prev,
-                                        empleadosData: nuevos,
-                                      };
-                                    });
-                                  }}
-                                  className={
-                                    empleado.rol === "admin"
-                                      ? "bg-red-600 text-white px-4 py-2 rounded-md"
-                                      : "bg-green-600 text-white px-4 py-2 rounded-md"
-                                  }
-                                >
-                                  {empleado.rol === "admin"
-                                    ? "Quitar admin"
-                                    : "Agregar admin"}
-                                </button>
-                              )}
-
-                              {/* Soy empleado (solo dueño) */}
-                              {esDueno && (
-                                <button
-                                  onClick={() => {
-                                    setConfig((prev: any) => {
-                                      const nuevos = [
-                                        ...prev.empleadosData,
-                                      ];
-                                      nuevos[index].esEmpleado =
-                                        !nuevos[index].esEmpleado;
-                                      return {
-                                        ...prev,
-                                        empleadosData: nuevos,
-                                      };
-                                    });
-                                  }}
-                                  className={
-                                    empleado.esEmpleado
-                                      ? "bg-gray-600 text-white px-4 py-2 rounded-md"
-                                      : "bg-orange-600 text-white px-4 py-2 rounded-md"
-                                  }
-                                >
-                                  {empleado.esEmpleado
-                                    ? "No empleado"
-                                    : "Soy empleado"}
-                                </button>
-                              )}
+                                {faltaServicios
+                                  ? "Servicios sin asignar"
+                                  : "Servicios asignados"}
+                              </span>
                             </div>
-                          )}
-                        </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {(soyDueno || soyAdmin) && !esDueno && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEmpleadoAEliminar(index);
+                                  setMostrarAviso(true);
+                                }}
+                                className="
+                                  w-7 h-7
+                                  rounded-full
+                                  bg-red-600
+                                  hover:bg-red-700
+                                  text-white
+                                  text-xs
+                                  font-bold
+                                  flex items-center justify-center
+                                "
+                              >
+                                ✕
+                              </button>
+                            )}
+
+                            <span className="text-xs opacity-70">
+                              {abierto ? "▲" : "▼"}
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Contenido editable */}
+                        {abierto && (
+                          <div className="border-t border-white/10 px-4 py-3 text-sm">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              {/* Foto */}
+                              <div className="flex flex-col items-center gap-2 sm:w-1/4">
+                                <input
+                                  id={`fotoPerfil-${index}`}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={false}
+                                  onChange={(e) =>
+                                    handleFotoPerfil(
+                                      index,
+                                      e.target.files?.[0] || null
+                                    )
+                                  }
+                                />
+
+                                <label
+                                  htmlFor={`fotoPerfil-${index}`}
+                                  className="
+                                    w-20 h-20
+                                    rounded-full
+                                    flex items-center justify-center
+                                    overflow-hidden
+                                    cursor-pointer
+                                    bg-neutral-800
+                                    border border-white/10
+                                  "
+                                >
+                                  {cargandoFoto[index] ? (
+                                    <LoaderSpinner size={20} />
+                                  ) : empleado.fotoPerfil ? (
+                                    <img
+                                      src={empleado.fotoPerfil}
+                                      alt=""
+                                      className="object-cover w-full h-full"
+                                    />
+                                  ) : (
+                                    <span className="text-lg text-gray-400">
+                                      +
+                                    </span>
+                                  )}
+                                </label>
+
+                                <span className="text-[11px] text-neutral-400 text-center">
+                                  Cambiar foto
+                                </span>
+                              </div>
+
+                              {/* Datos y acciones */}
+                              <div className="flex-1 flex flex-col gap-3">
+                                {/* Nombre */}
+                                <div className="space-y-1">
+                                  <label className="text-xs text-neutral-300">
+                                    Nombre del empleado
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="Nombre del empleado"
+                                    value={empleado.nombre}
+                                    onChange={(e) =>
+                                      handleChangeEmpleado(
+                                        index,
+                                        "nombre",
+                                        e.target.value
+                                      )
+                                    }
+                                    disabled={false}
+                                    className="
+                                      w-full
+                                      px-3 py-1.5
+                                      bg-transparent
+                                      border-b border-neutral-600
+                                      focus:border-[var(--color-primario)]
+                                      outline-none
+                                      text-sm
+                                    "
+                                  />
+                                </div>
+
+                                {/* Badges rol */}
+<div className="flex flex-wrap gap-2">
+  {esDueno && (
+    <span className="px-2 py-1 text-[11px] font-semibold text-black bg-yellow-400 rounded-full">
+      Creador
+    </span>
+  )}
+
+  {empleado.rol === "admin" && (
+    <span className="px-2 py-1 text-[11px] font-semibold text-white bg-green-600 rounded-full">
+      👑 Admin
+    </span>
+  )}
+
+  {/* 🔵 Solo mostrar si ES el dueño y además trabaja en el negocio */}
+  {esDueno && empleado.esEmpleado && (
+    <span className="px-2 py-1 text-[11px] font-semibold text-white bg-sky-600 rounded-full">
+      Trabaja en este negocio
+    </span>
+  )}
+</div>
+
+                                {/* Botones principales */}
+                                {(soyDueno || soyAdmin) && (
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {/* Config horario */}
+                                    <button
+                                      onClick={() =>
+                                        setEmpleadoSeleccionado(index)
+                                      }
+                                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition
+                                        ${
+                                          faltaHorario
+                                            ? "bg-yellow-500 text-black animate-pulse"
+                                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                        }`}
+                                    >
+                                      Configurar horario
+                                    </button>
+
+                                    {/* Config servicios */}
+                                    <button
+                                      onClick={() =>
+                                        setEmpleadoServicios(index)
+                                      }
+                                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition
+                                        ${
+                                          faltaServicios
+                                            ? "bg-yellow-500 text-black animate-pulse"
+                                            : "bg-purple-600 text-white hover:bg-purple-700"
+                                        }`}
+                                    >
+                                      Configurar servicios
+                                    </button>
+
+                                    {/* Admin ON/OFF (corregido para que correo no sea null) */}
+                                    {!esDueno && (
+                                      <button
+                                        onClick={() => {
+                                          // Si YA es admin, lo quitamos sin pedir correo
+                                          if (empleado.rol === "admin") {
+                                            setConfig((prev: any) => {
+                                              const nuevos = [
+                                                ...prev.empleadosData,
+                                              ];
+                                              nuevos[index].rol = "empleado";
+                                              nuevos[index].adminEmail = "";
+                                              return {
+                                                ...prev,
+                                                empleadosData: nuevos,
+                                              };
+                                            });
+                                            return;
+                                          }
+
+                                          // Si NO es admin, pedimos correo
+                                          const correoRaw = prompt(
+                                            "Ingrese el correo Gmail del empleado para hacerlo admin:"
+                                          );
+
+                                          if (!correoRaw) {
+                                            // canceló o vacío
+                                            return;
+                                          }
+
+                                          const correo = correoRaw
+                                            .trim()
+                                            .toLowerCase();
+
+                                          setConfig((prev: any) => {
+                                            const nuevos = [
+                                              ...prev.empleadosData,
+                                            ];
+                                            nuevos[index].rol = "admin";
+                                            nuevos[index].adminEmail = correo;
+                                            return {
+                                              ...prev,
+                                              empleadosData: nuevos,
+                                            };
+                                          });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition
+                                          ${
+                                            empleado.rol === "admin"
+                                              ? "bg-red-600 hover:bg-red-700 text-white"
+                                              : "bg-green-600 hover:bg-green-700 text-white"
+                                          }`}
+                                      >
+                                        {empleado.rol === "admin"
+                                          ? "Quitar admin"
+                                          : "Hacer admin"}
+                                      </button>
+                                    )}
+
+                                    {/* Soy empleado (solo dueño) */}
+                                    {esDueno && (
+                                      <button
+                                        onClick={() => {
+                                          setConfig((prev: any) => {
+                                            const nuevos = [
+                                              ...prev.empleadosData,
+                                            ];
+                                            nuevos[index].esEmpleado =
+                                              !nuevos[index].esEmpleado;
+                                            return {
+                                              ...prev,
+                                              empleadosData: nuevos,
+                                            };
+                                          });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition
+                                          ${
+                                            empleado.esEmpleado
+                                              ? "bg-gray-600 hover:bg-gray-700 text-white"
+                                              : "bg-orange-600 hover:bg-orange-700 text-white"
+                                          }`}
+                                      >
+                                        {empleado.esEmpleado
+                                          ? "No trabajar en la agenda"
+                                          : "Soy empleado"}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
                 )}
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="flex justify-end gap-3 mt-4 border-t border-gray-700 pt-4">
-              {/* ➕ AGREGAR EMPLEADO */}
-              {(soyDueno || soyAdmin) && (
-                <button
-                  onClick={() =>
-                    setConfig((prev: any) => ({
-                      ...prev,
-                      empleadosData: [
-                        crearEmpleadoVacio(), // 👈 aparece primero en la UI
-                        ...prev.empleadosData,
-                      ],
-                    }))
-                  }
-                  disabled={hayEmpleadoSinEditar}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl"
-                >
-                  ➕ Añadir empleado
-                </button>
-              )}
+              {/* FOOTER COMPACTO */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-neutral-700/70">
+                {(soyDueno || soyAdmin) && (
+                  <button
+                    onClick={() =>
+                      setConfig((prev: any) => ({
+                        ...prev,
+                        empleadosData: [
+                          crearEmpleadoVacio(), // 👈 aparece primero
+                          ...prev.empleadosData,
+                        ],
+                      }))
+                    }
+                    disabled={hayEmpleadoSinEditar}
+                    className="
+                      w-full sm:w-auto
+                      px-4 py-2
+                      rounded-full
+                      text-sm font-medium
+                      border border-white/15
+                      bg-[var(--color-primario-oscuro)]
+                      hover:bg-[var(--color-primario)]
+                      disabled:opacity-50
+                      disabled:cursor-not-allowed
+                      transition
+                    "
+                  >
+                    ➕ Añadir empleado
+                  </button>
+                )}
 
-              <button
-                onClick={handleSubmit}
-                disabled={esGuardando}
-                className="bg-green-600 text-white px-8 py-3 rounded-xl"
-              >
-                {estado === "guardando"
-                  ? "Guardando..."
-                  : estado === "exito"
-                  ? "✅ Guardado con éxito"
-                  : "Guardar cambios"}
-              </button>
+                <div className="flex w-full sm:w-auto justify-end gap-2">
+                  <button
+                    onClick={onCerrar}
+                    className="
+                      px-4 py-2
+                      rounded-full
+                      text-sm
+                      bg-black/40
+                      text-neutral-200
+                      hover:bg-black/60
+                      transition
+                    "
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    onClick={handleSubmit}
+                    disabled={esGuardando}
+                    className={`
+                      px-5 py-2
+                      rounded-full
+                      text-sm font-medium
+                      flex items-center justify-center gap-2
+                      ${
+                        estado === "guardando"
+                          ? "bg-neutral-600 text-neutral-200 cursor-not-allowed"
+                          : estado === "exito"
+                          ? "bg-emerald-600 hover:bg-emerald-700"
+                          : "bg-green-600 hover:bg-green-700"
+                      }
+                    `}
+                  >
+                    {estado === "guardando" && <LoaderSpinner size={16} />}
+
+                    {estado === "guardando"
+                      ? "Guardando..."
+                      : estado === "exito"
+                      ? "✅ Guardado con éxito"
+                      : "Guardar cambios"}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </ModalBase>
 
       {/* Modales secundarios */}
