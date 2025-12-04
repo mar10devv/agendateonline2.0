@@ -159,6 +159,19 @@ export default function AgendaVirtualUIv3({
   usuario,
   esEmprendimiento, // 👈 ahora lo recibimos
 }: Props) {
+
+/* -------- ROLES -------- */
+const esDueno = modo === "dueño";
+const esAdmin = modo === "admin";
+const esCliente = modo === "cliente";
+
+// 👑 Solo el dueño puede tocar perfil general + estadísticas
+const puedeConfigPerfil = esDueno;
+
+// 👑 Solo el dueño puede gestionar servicios y empleados
+const puedeConfigServiciosYEmpleados = esDueno;
+
+
   /* --------  ESTADOS  -------- */
   const [vista, setVista] = useState<string>("agenda");
   const [modalShare, setModalShare] = useState(false);
@@ -924,65 +937,64 @@ export default function AgendaVirtualUIv3({
           })}
         </div>
 
-        {/* CONTENIDO */}
-        <div
-          key={vista}
-          className={`
-            relative
-            w-full max-w-3xl mt-6 p-6 rounded-3xl 
-            bg-[var(--color-primario)]
-            shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-            hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-            transition-all duration-300
-            ${
-              vista === "agenda" && modo === "cliente"
-                ? "min-h-0" 
-                : vista === "ubicacion"
-                ? "min-h-0"
-                : vista === "empleados"
-                ? "min-h-fit"
-                : "min-h-[280px]"
-            }
-          `}
-        >
-          {/* CONFIG PARA EMPLEADOS */}
-          {vista === "empleados" &&
-            (modo === "dueño" || modo === "admin") && (
-              <button
-                onClick={() => {
-                  if (esEmprendimiento) {
-                    // 👉 Emprendimiento: abrimos modal especial
-                    setModalEmprendimiento(true);
-                  } else {
-                    // 👉 Negocio normal: abrimos modal de empleados
-                    setModalEmpleados(true);
-                  }
-                }}
-                className="absolute top-4 right-4 z-20"
-                title={
-                  esEmprendimiento
-                    ? "Configurar emprendimiento"
-                    : "Administrar empleados"
-                }
-              >
-                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-              </button>
-            )}
+{/* CONTENIDO */}
+<div
+  key={vista}
+  className={`
+    relative
+    w-full max-w-3xl mt-6 p-6 rounded-3xl 
+    bg-[var(--color-primario)]
+    shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+    hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+    transition-all duration-300
+    ${
+      vista === "agenda" && modo === "cliente"
+        ? "min-h-0" 
+        : vista === "ubicacion"
+        ? "min-h-0"
+        : vista === "empleados"
+        ? "min-h-fit"
+        : "min-h-[280px]"
+    }
+  `}
+>
+  {/* CONFIG PARA EMPLEADOS (solo DUEÑO) */}
+  {vista === "empleados" && puedeConfigServiciosYEmpleados && (
+    <button
+      onClick={() => {
+        if (esEmprendimiento) {
+          // 👉 Emprendimiento: abrimos modal especial
+          setModalEmprendimiento(true);
+        } else {
+          // 👉 Negocio normal: abrimos modal de empleados
+          setModalEmpleados(true);
+        }
+      }}
+      className="absolute top-4 right-4 z-20"
+      title={
+        esEmprendimiento
+          ? "Configurar emprendimiento"
+          : "Administrar empleados"
+      }
+    >
+      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+    </button>
+  )}
 
-          {/* CONFIG PARA SERVICIOS */}
-          {vista === "servicios" &&
-            (modo === "dueño" || modo === "admin") && (
-              <button
-                onClick={() => setModalServicios(true)}
-                className="absolute top-4 right-4 z-20"
-                title="Administrar servicios"
-              >
-                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-              </button>
-            )}
+  {/* CONFIG PARA SERVICIOS (solo DUEÑO) */}
+  {vista === "servicios" && puedeConfigServiciosYEmpleados && (
+    <button
+      onClick={() => setModalServicios(true)}
+      className="absolute top-4 right-4 z-20"
+      title="Administrar servicios"
+    >
+      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+    </button>
+  )}
 
-          {renderVista()}
-        </div>
+  {renderVista()}
+</div>
+
 
         {/* FOOTER */}
         <div
