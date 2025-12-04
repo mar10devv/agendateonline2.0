@@ -77,6 +77,18 @@ const esTrabajadorReal = (e: EmpleadoAgendaSource): boolean => {
   return true;
 };
 
+// Un turno tiene asistencia pendiente si no tiene estado o está en "pendiente"
+const tieneAsistenciaPendiente = (turno?: TurnoExistente | null): boolean => {
+  if (!turno) return false;
+
+  const estado = (turno as any).asistencia;
+  if (estado === undefined || estado === null) return true;
+
+  const valor = String(estado).trim().toLowerCase();
+  return valor === "" || valor === "pendiente";
+};
+
+
 export default function CalendarioBase({
   modo,
   usuarioActual,
@@ -481,8 +493,8 @@ export default function CalendarioBase({
   };
 
   const getSlotClasses = (slot: SlotCalendario) => {
-    const base =
-      "h-12 w-full rounded-lg text-sm font-semibold flex items-center justify-center transition focus:outline-none";
+  const base =
+    "relative h-12 w-full rounded-lg text-sm font-semibold flex items-center justify-center transition focus:outline-none";
 
     switch (slot.estado) {
       case "libre":
@@ -802,25 +814,44 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
               )}
 
               {slotsDelDia.map((slot, idx) => {
-                const disabledBtn =
-                  (modo === "cliente" && slot.estado !== "libre") ||
-                  (slot.estado === "pasado" && !slot.turnoOcupado);
+  const disabledBtn =
+    (modo === "cliente" && slot.estado !== "libre") ||
+    (slot.estado === "pasado" && !slot.turnoOcupado);
 
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() =>
-                      !disabledBtn && manejarClickSlot(slot)
-                    }
-                    disabled={disabledBtn}
-                    className={getSlotClasses(slot)}
-                    title={getSlotTitle(slot)}
-                  >
-                    {slot.hora}
-                  </button>
-                );
-              })}
+  const mostrarPuntoAmarillo =
+    modo === "negocio" &&
+    slot.estado === "pasado" &&
+    !!slot.turnoOcupado &&
+    tieneAsistenciaPendiente(slot.turnoOcupado || null);
+
+  return (
+    <button
+      key={idx}
+      type="button"
+      onClick={() => !disabledBtn && manejarClickSlot(slot)}
+      disabled={disabledBtn}
+      className={getSlotClasses(slot)}
+      title={getSlotTitle(slot)}
+    >
+      {/* Hora del slot */}
+      <span>{slot.hora}</span>
+
+      {/* 🔔 Punto amarillo parpadeando solo si la asistencia está pendiente */}
+      {mostrarPuntoAmarillo && (
+        <span className="absolute top-1.5 right-1.5">
+          <span className="flex h-2.5 w-2.5">
+            {/* halo animado */}
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            {/* punto central con glow */}
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.9)]"></span>
+          </span>
+        </span>
+      )}
+    </button>
+  );
+})}
+
+
             </div>
           </div>
         ) : (
