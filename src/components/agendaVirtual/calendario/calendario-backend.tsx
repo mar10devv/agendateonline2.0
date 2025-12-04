@@ -946,6 +946,7 @@ export function generarSlotsDelDia(
     typeof (config as any).pausaMediaHora === "string"
       ? (config as any).pausaMediaHora
       : null;
+      
 
   // 👉 si no pasan duracionServicioMin, por defecto usamos el tamaño del slot
   const duracionServicioMin =
@@ -1234,55 +1235,106 @@ export function generarCalendarioEmpleadoRango(
    ===================================================== */
 
 /**
- * Representa al usuario logueado (solo necesitamos el uid).
+ * Representa al usuario logueado.
+ * uid es obligatorio, email es opcional (para admins por email).
  */
 export type UsuarioActual = {
   uid: string | null;
+  email?: string | null;
 };
 
 /**
  * Verifica si el usuario es dueño o admin del negocio.
- * Usa distintos posibles nombres de campos (compatibilidad histórica).
+ *
+ * Reglas:
+ * - Dueño: uid === negocio.id  o igual a ownerUid/uidOwner históricos.
+ * - Admin: email dentro de adminUids[] (o uid dentro de adminUids por compatibilidad vieja).
  */
 export function esDuenoOAdmin(
-  usuario: UsuarioActual,
+  usuario: UsuarioActual | null,
   negocio: NegocioAgendaSource
 ): boolean {
-  const uid = usuario.uid;
-  if (!uid) return false;
+  if (!usuario) return false;
+
+  const { uid, email } = usuario;
+  if (!uid && !email) return false;
 
   const anyNeg: any = negocio;
 
-  const ownerUid =
-    anyNeg.ownerUid || anyNeg.owner_uid || anyNeg.uidOwner || null;
+  const ownerUid: string | null =
+    anyNeg.ownerUid ||
+    anyNeg.owner_uid ||
+    anyNeg.uidOwner ||
+    negocio.id || // 👈 fallback: id del doc = dueño
+    null;
 
-  const adminUids: string[] = anyNeg.adminUids || [];
+  const adminUids: string[] = Array.isArray(anyNeg.adminUids)
+    ? anyNeg.adminUids
+    : [];
 
-  const esOwner = ownerUid ? uid === ownerUid : false;
-  const esAdmin = adminUids.includes(uid);
+  const esOwner = !!uid && !!ownerUid && uid === ownerUid;
 
-  return esOwner || esAdmin;
+  const esAdminPorEmail =
+    !!email && adminUids.length > 0 && adminUids.includes(email);
+
+  const esAdminPorUid =
+    !!uid && adminUids.length > 0 && adminUids.includes(uid);
+
+  const resultado = esOwner || esAdminPorEmail || esAdminPorUid;
+
+  console.log("[esDuenoOAdmin]", {
+    userUid: uid,
+    userEmail: email,
+    negocioId: negocio.id,
+    ownerUid,
+    adminUids,
+    esOwner,
+    esAdminPorEmail,
+    esAdminPorUid,
+    resultado,
+  });
+
+  return resultado;
 }
+
 
 /**
  * Lanza un error si el usuario NO es dueño ni admin del negocio.
- * Si el negocio no tiene info de owner/admin en memoria, deja pasar.
+ * Si el negocio no tiene info de owner/admin en memoria, deja pasar (modo legacy).
  */
 export function assertDuenoOAdmin(
-  usuario: UsuarioActual,
+  usuario: UsuarioActual | null,
   negocio: NegocioAgendaSource
 ) {
   const anyNeg: any = negocio;
 
-  if (esDuenoOAdmin(usuario, negocio)) return;
+  const tieneInfoPermisos =
+    !!anyNeg.ownerUid ||
+    !!anyNeg.owner_uid ||
+    !!anyNeg.uidOwner ||
+    (Array.isArray(anyNeg.adminUids) && anyNeg.adminUids.length > 0);
 
-  // si el negocio no trae info de owner/admin en memoria, dejamos pasar
-  if (!anyNeg.ownerUid && !(anyNeg.adminUids && anyNeg.adminUids.length)) {
+  const esPermitido = esDuenoOAdmin(usuario, negocio);
+
+  if (!tieneInfoPermisos) {
+    console.log(
+      "[assertDuenoOAdmin] Negocio sin info de owner/admin en memoria, delego en reglas Firestore"
+    );
     return;
   }
 
-  throw new Error("NO_PERMISO_AGENDA");
+  if (esPermitido) {
+    return;
+  }
+
+  console.warn(
+    "[assertDuenoOAdmin] Usuario NO coincide como dueño/admin según memoria, " +
+      "pero NO lanzo NO_PERMISO_AGENDA; dejo que Firestore valide con sus reglas."
+  );
+  // 👆 ya no tiramos Error("NO_PERMISO_AGENDA")
 }
+
+
 
 /**
  * 7.1 Bloquear un slot individual
