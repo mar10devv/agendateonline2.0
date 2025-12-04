@@ -522,7 +522,8 @@ export default function CalendarioBase({
         }
 
         // 🔸 PASADO CON reserva → gris PERO marcado con borde y mejor contraste
-        return `${base} bg-neutral-800 text-gray-100 border border-gray-400/80 hover:bg-neutral-700`;
+        return `${base} bg-neutral-800 text-gray-100 border border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)] hover:bg-neutral-700`;
+
 
       default:
         return `${base} bg-neutral-700 text-gray-300`;

@@ -5,7 +5,7 @@ import {
   Wrench,
   Users,
   MapPin,
-  Share2
+  Share2,
 } from "lucide-react";
 
 import CalendarioBase from "../calendario/calendario-diseño";
@@ -17,21 +17,31 @@ import { Instagram, Facebook, Phone } from "lucide-react";
 import ConfigIcon from "../../ui/Config-icono";
 import ModalAgregarServicios from "../modalAgregarServicios";
 import { obtenerDireccion } from "../../../lib/geocoding";
-import { guardarUbicacionNegocio, escucharServicios } from "../backend/agenda-backend";
+import {
+  guardarUbicacionNegocio,
+  escucharServicios,
+} from "../backend/agenda-backend";
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 import CardServicio from "../../ui/cardServicio";
 import ModalEmprendimiento from "./modalEmprendimiento";
 import IconEstadisticas from "../../../assets/estadisticas-svg.svg?url";
 
-import ModalEstadisticas from "../ui/modalEstadisticas"
+import ModalEstadisticas from "../ui/modalEstadisticas";
 import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
 import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";
 import IconUbicacion from "../../../assets/icon-navbar/map.svg?url";
 
 import { db } from "../../../lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 import { useMap } from "react-leaflet";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -154,13 +164,12 @@ export default function AgendaVirtualUIv3({
   const [modalShare, setModalShare] = useState(false);
   const [modalAgendarse, setModalAgendarse] = useState(false);
   const [modalPerfil, setModalPerfil] = useState(false);
-    const [modalEstadisticas, setModalEstadisticas] = useState(false);
+  const [modalEstadisticas, setModalEstadisticas] = useState(false);
   const [modalEmpleados, setModalEmpleados] = useState(false);
   const [ubicacion, setUbicacion] = useState(negocio.ubicacion || null);
   const [estadoUbicacion, setEstadoUbicacion] =
     useState<"idle" | "cargando" | "exito">("idle");
-    const [modalEmprendimiento, setModalEmprendimiento] = useState(false);
-
+  const [modalEmprendimiento, setModalEmprendimiento] = useState(false);
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
@@ -225,43 +234,42 @@ export default function AgendaVirtualUIv3({
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
-// 🟡 ¿Hay empleados sin configurar del todo?
-const hayEmpleadosIncompletos = useMemo(() => {
-  // Tomamos solo los que realmente trabajan
-  const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
+  // 🟡 ¿Hay empleados sin configurar del todo?
+  const hayEmpleadosIncompletos = useMemo(() => {
+    // Tomamos solo los que realmente trabajan
+    const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
 
-  // Si no hay nadie configurado todavía, consideramos "incompleto"
-  if (lista.length === 0) return true;
+    // Si no hay nadie configurado todavía, consideramos "incompleto"
+    if (lista.length === 0) return true;
 
-  return lista.some((e) => {
-    const cal: any = e.calendario || {};
-    const inicio = cal.inicio as string | undefined;
-    const fin = cal.fin as string | undefined;
-    const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
-    const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
+    return lista.some((e) => {
+      const cal: any = e.calendario || {};
+      const inicio = cal.inicio as string | undefined;
+      const fin = cal.fin as string | undefined;
+      const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
+      const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
 
-    // 👉 también aceptamos configuración de día y medio
-    const diaYMedio = cal.diaYMedio as any | null;
-    const tieneDiaYMedioValido =
-      diaYMedio &&
-      (typeof diaYMedio.diaCompleto === "string" ||
-        typeof diaYMedio.medioDia === "string");
+      // 👉 también aceptamos configuración de día y medio
+      const diaYMedio = cal.diaYMedio as any | null;
+      const tieneDiaYMedioValido =
+        diaYMedio &&
+        (typeof diaYMedio.diaCompleto === "string" ||
+          typeof diaYMedio.medioDia === "string");
 
-    const horarioOk =
-      typeof inicio === "string" &&
-      typeof fin === "string" &&
-      inicio < fin;
+      const horarioOk =
+        typeof inicio === "string" &&
+        typeof fin === "string" &&
+        inicio < fin;
 
-    // ✅ ahora es válido si tiene díasLibres O diaYMedio configurado
-    const diasOk = diasLibres.length > 0 || !!tieneDiaYMedioValido;
+      // ✅ ahora es válido si tiene díasLibres O diaYMedio configurado
+      const diasOk = diasLibres.length > 0 || !!tieneDiaYMedioValido;
 
-    const trabajosOk = trabajos.length > 0;
+      const trabajosOk = trabajos.length > 0;
 
-    // Si le falta alguna de las 3 cosas → empleado incompleto
-    return !(horarioOk && diasOk && trabajosOk);
-  });
-}, [empleadosParaAgenda]);
-
+      // Si le falta alguna de las 3 cosas → empleado incompleto
+      return !(horarioOk && diasOk && trabajosOk);
+    });
+  }, [empleadosParaAgenda]);
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
@@ -302,6 +310,54 @@ const hayEmpleadosIncompletos = useMemo(() => {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  // 🔹 Guardar cambios del modal de perfil (nombre, descripción, logo, etc.)
+  const handleGuardarPerfil = async (data: {
+    perfilLogo?: string;
+    descripcion?: string;
+    redes?: {
+      instagram?: string;
+      facebook?: string;
+      telefono?: string;
+    };
+    nombre?: string;
+    slug?: string;
+    nombreArchivoLogo?: string;
+    tamanioArchivoLogo?: number;
+  }) => {
+    try {
+      const ref = doc(db, "Negocios", negocio.id);
+      const payload: any = {};
+
+      if (data.perfilLogo !== undefined) {
+        payload.perfilLogo = data.perfilLogo;
+      }
+      if (data.descripcion !== undefined) {
+        payload.descripcion = data.descripcion;
+      }
+      if (data.redes !== undefined) {
+        payload.redes = data.redes;
+      }
+      if (data.nombre !== undefined) {
+        payload.nombre = data.nombre;
+      }
+      if (data.slug !== undefined) {
+        payload.slug = data.slug;
+      }
+      if (data.nombreArchivoLogo !== undefined) {
+        payload.nombreArchivoLogo = data.nombreArchivoLogo;
+      }
+      if (data.tamanioArchivoLogo !== undefined) {
+        payload.tamanioArchivoLogo = data.tamanioArchivoLogo;
+      }
+
+      if (Object.keys(payload).length > 0) {
+        await updateDoc(ref, payload);
+      }
+    } catch (e) {
+      console.error("Error guardando perfil del negocio:", e);
+    }
   };
 
   /* --------  CARGA REAL DE SERVICIOS  -------- */
@@ -485,7 +541,6 @@ const hayEmpleadosIncompletos = useMemo(() => {
         );
       }
 
-
       case "agenda": {
         const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
 
@@ -594,7 +649,9 @@ const hayEmpleadosIncompletos = useMemo(() => {
                     {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
                   </button>
                 ) : (
-                  <p className="opacity-80 text-sm">Esta agenda no tiene ubicacion.</p>
+                  <p className="opacity-80 text-sm">
+                    Esta agenda no tiene ubicacion.
+                  </p>
                 )}
               </>
             )}
@@ -685,16 +742,16 @@ const hayEmpleadosIncompletos = useMemo(() => {
             <div className="absolute top-4 right-4 flex items-center gap-3">
               {/* Icono estadísticas */}
               <button
-  onClick={() => setModalEstadisticas(true)}
-  className="p-1 rounded-full hover:bg-black/10 transition"
-  title="Ver estadísticas"
->
-  <img
-    src={IconEstadisticas}
-    alt="Estadísticas"
-    className="w-7 h-7 icono-blanco opacity-80 hover:opacity-100 transition"
-  />
-</button>
+                onClick={() => setModalEstadisticas(true)}
+                className="p-1 rounded-full hover:bg-black/10 transition"
+                title="Ver estadísticas"
+              >
+                <img
+                  src={IconEstadisticas}
+                  alt="Estadísticas"
+                  className="w-7 h-7 icono-blanco opacity-80 hover:opacity-100 transition"
+                />
+              </button>
 
               {/* Icono configuración */}
               <button
@@ -706,7 +763,6 @@ const hayEmpleadosIncompletos = useMemo(() => {
               </button>
             </div>
           )}
-
 
           {/* Foto */}
           <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
@@ -723,18 +779,30 @@ const hayEmpleadosIncompletos = useMemo(() => {
           </div>
 
           {/* Nombre */}
-          <h1
-            className="
-              font-euphoria 
-              text-[38px]
-              md:text-[48px]
-              leading-none
-              tracking-wide
-              mt-4
-            "
-          >
-            {negocio.nombre}
-          </h1>
+<h1
+  className="
+    relative
+    font-euphoria
+    text-[38px]
+    md:text-[48px]
+    leading-none
+    tracking-wide
+    mt-4
+    text-white
+  "
+  style={{
+    // 🔥 Sombra más marcada (dos capas)
+    textShadow:
+      "0 4px 14px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.75)",
+    // 🔥 Trazo más visible pero elegante
+    WebkitTextStroke: "1px rgba(255,255,255,0.55)",
+    // opcional, suaviza un poco el borde interno
+    WebkitTextFillColor: "#ffffff",
+  }}
+>
+  {negocio.nombre}
+</h1>
+
 
           {/* Descripción */}
           <p className="opacity-80 text-center mt-4 px-4">
@@ -759,9 +827,7 @@ const hayEmpleadosIncompletos = useMemo(() => {
               href={negocio?.redes?.facebook || "#"}
               target="_blank"
               className={`p-2 rounded-full border border-white/40 ${
-                negocio?.redes?.facebook
-                  ? ""
-                  : "opacity-50 pointer-events-none"
+                negocio?.redes?.facebook ? "" : "opacity-50 pointer-events-none"
               }`}
             >
               <Facebook className="w-4 h-4" />
@@ -774,9 +840,7 @@ const hayEmpleadosIncompletos = useMemo(() => {
                   : "#"
               }
               className={`p-2 rounded-full border border-white/40 ${
-                negocio?.redes?.telefono
-                  ? ""
-                  : "opacity-50 pointer-events-none"
+                negocio?.redes?.telefono ? "" : "opacity-50 pointer-events-none"
               }`}
             >
               <Phone className="w-4 h-4" />
@@ -860,7 +924,6 @@ const hayEmpleadosIncompletos = useMemo(() => {
           })}
         </div>
 
-
         {/* CONTENIDO */}
         <div
           key={vista}
@@ -882,36 +945,41 @@ const hayEmpleadosIncompletos = useMemo(() => {
             }
           `}
         >
-{/* CONFIG PARA EMPLEADOS */}
-{vista === "empleados" && (modo === "dueño" || modo === "admin") && (
-  <button
-    onClick={() => {
-      if (esEmprendimiento) {
-        // 👉 Emprendimiento: abrimos modal especial
-        setModalEmprendimiento(true);
-      } else {
-        // 👉 Negocio normal: abrimos modal de empleados
-        setModalEmpleados(true);
-      }
-    }}
-    className="absolute top-4 right-4 z-20"
-    title={esEmprendimiento ? "Configurar emprendimiento" : "Administrar empleados"}
-  >
-    <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-  </button>
-)}
-
+          {/* CONFIG PARA EMPLEADOS */}
+          {vista === "empleados" &&
+            (modo === "dueño" || modo === "admin") && (
+              <button
+                onClick={() => {
+                  if (esEmprendimiento) {
+                    // 👉 Emprendimiento: abrimos modal especial
+                    setModalEmprendimiento(true);
+                  } else {
+                    // 👉 Negocio normal: abrimos modal de empleados
+                    setModalEmpleados(true);
+                  }
+                }}
+                className="absolute top-4 right-4 z-20"
+                title={
+                  esEmprendimiento
+                    ? "Configurar emprendimiento"
+                    : "Administrar empleados"
+                }
+              >
+                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+              </button>
+            )}
 
           {/* CONFIG PARA SERVICIOS */}
-          {vista === "servicios" && (modo === "dueño" || modo === "admin") && (
-            <button
-              onClick={() => setModalServicios(true)}
-              className="absolute top-4 right-4 z-20"
-              title="Administrar servicios"
-            >
-              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-            </button>
-          )}
+          {vista === "servicios" &&
+            (modo === "dueño" || modo === "admin") && (
+              <button
+                onClick={() => setModalServicios(true)}
+                className="absolute top-4 right-4 z-20"
+                title="Administrar servicios"
+              >
+                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+              </button>
+            )}
 
           {renderVista()}
         </div>
@@ -953,24 +1021,24 @@ const hayEmpleadosIncompletos = useMemo(() => {
             slug={negocio.slug}
           />
         )}
-{modalAgendarse && (
-  <ModalAgendarse
-    abierto={modalAgendarse}
-    onClose={() => setModalAgendarse(false)}
-    negocio={{ 
-      ...negocio,
-      esEmprendimiento, // 👈 le pasamos el flag que ya tenés en AgendaVirtualUIv3
-    }}
-  />
-)}
 
+        {modalAgendarse && (
+          <ModalAgendarse
+            abierto={modalAgendarse}
+            onClose={() => setModalAgendarse(false)}
+            negocio={{
+              ...negocio,
+              esEmprendimiento, // 👈 le pasamos el flag que ya tenés en AgendaVirtualUIv3
+            }}
+          />
+        )}
 
         {modalPerfil && (
           <ModalPerfil
             abierto={modalPerfil}
             onCerrar={() => setModalPerfil(false)}
             negocio={negocio}
-            onGuardar={() => {}}
+            onGuardar={handleGuardarPerfil}
           />
         )}
 
@@ -993,15 +1061,15 @@ const hayEmpleadosIncompletos = useMemo(() => {
         )}
 
         {modalServicios && (
-  <ModalAgregarServicios
-    abierto={modalServicios}
-    onCerrar={() => setModalServicios(false)}
-    negocioId={negocio.id}
-    esEmprendimiento={esEmprendimiento} // 👈 pasar el flag
-  />
-)}
+          <ModalAgregarServicios
+            abierto={modalServicios}
+            onCerrar={() => setModalServicios(false)}
+            negocioId={negocio.id}
+            esEmprendimiento={esEmprendimiento} // 👈 pasar el flag
+          />
+        )}
 
-{modalEstadisticas && (
+        {modalEstadisticas && (
           <ModalEstadisticas
             abierto={modalEstadisticas}
             onCerrar={() => setModalEstadisticas(false)}
@@ -1010,8 +1078,6 @@ const hayEmpleadosIncompletos = useMemo(() => {
             turnos={turnos}
           />
         )}
-
-
       </div>
     </>
   );

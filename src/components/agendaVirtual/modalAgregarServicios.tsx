@@ -14,7 +14,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import ModalBase from "../ui/modalGenerico";
-import InputAnimado from "../ui/InputAnimado";
 import LoaderSpinner from "../ui/loaderSpinner";
 import AddIcon from "../../assets/add.svg?url";
 
@@ -30,7 +29,7 @@ type Props = {
   abierto: boolean;
   onCerrar: () => void;
   negocioId: string;
-  esEmprendimiento: boolean; // 👈 importante
+  esEmprendimiento: boolean;
 };
 
 export default function ModalAgregarServicios({
@@ -64,9 +63,6 @@ export default function ModalAgregarServicios({
     return `${h} hr ${m} min`;
   };
 
-  // ============================================
-  // Detectar servicio vacío
-  // ============================================
   const esServicioVacio = (s: Servicio) => {
     return (
       s.servicio.trim() === "" &&
@@ -75,16 +71,10 @@ export default function ModalAgregarServicios({
     );
   };
 
-  // ============================================
-  // Eliminar TODOS los servicios nuevos vacíos
-  // ============================================
   const limpiarServiciosVacios = () => {
     setServicios((prev) => prev.filter((s) => s.id || !esServicioVacio(s)));
   };
 
-  // ============================================
-  // Expandir/minimizar y eliminar vacíos
-  // ============================================
   const toggleExpand = (i: number) => {
     setServicios((prevServicios) => {
       let nuevaLista = [...prevServicios];
@@ -139,9 +129,6 @@ export default function ModalAgregarServicios({
     );
   };
 
-  // ============================================
-  // Agregar servicio
-  // ============================================
   const handleAgregar = () => {
     limpiarServiciosVacios();
     setServicios((prev) => [
@@ -151,9 +138,6 @@ export default function ModalAgregarServicios({
     setAbiertoIndex(0);
   };
 
-  // ============================================
-  // Eliminar manualmente
-  // ============================================
   const handleEliminar = async (index: number) => {
     const servicio = servicios[index];
     try {
@@ -172,7 +156,7 @@ export default function ModalAgregarServicios({
   };
 
   // ============================================
-  // Guardar
+  // GUARDAR (y refrescar si hay nuevos)
   // ============================================
   const handleGuardar = async () => {
     limpiarServiciosVacios();
@@ -214,10 +198,7 @@ export default function ModalAgregarServicios({
         }
       }
 
-      // ============================================
-      // Vincular servicios nuevos al único empleado
-      // usando empleadosData dentro del negocio
-      // ============================================
+      // Vincular servicios nuevos al único empleado (emprendimiento)
       if (esEmprendimiento && nuevosServiciosIds.length > 0) {
         const snapNegocio = await getDoc(negocioRef);
 
@@ -228,7 +209,6 @@ export default function ModalAgregarServicios({
             : [];
 
           if (empleadosData.length > 0) {
-            // buscamos empleado principal (esEmpleado === true) o el primero
             let idxPrincipal = empleadosData.findIndex(
               (e) => e && e.esEmpleado === true
             );
@@ -262,8 +242,20 @@ export default function ModalAgregarServicios({
         }
       }
 
+      const hayNuevos = nuevosServiciosIds.length > 0;
+
       setEstadoBoton("exito");
-      setTimeout(() => setEstadoBoton("normal"), 3000);
+      setTimeout(() => {
+        setEstadoBoton("normal");
+        // cerramos el modal
+        limpiarServiciosVacios();
+        onCerrar();
+
+        // si se agregaron servicios nuevos, refrescamos la web
+        if (hayNuevos) {
+          window.location.reload();
+        }
+      }, 600);
     } catch (err) {
       console.error("❌ Error guardando servicios:", err);
       setEstadoBoton("error");
@@ -283,65 +275,146 @@ export default function ModalAgregarServicios({
       abierto={abierto}
       onClose={cerrarModal}
       titulo="Servicios del negocio"
-      maxWidth="max-w-3xl"
+      maxWidth="max-w-2xl"
     >
       <div
-        className="flex flex-col max-h-[90vh] rounded-2xl p-4 transition-colors duration-300 overflow-hidden"
-        style={{ backgroundColor: "var(--color-fondo)", color: "#fff" }}
+        className="
+          flex flex-col gap-4
+          max-h-[80vh]
+          rounded-3xl
+          p-4
+          bg-[var(--color-fondo)]
+          text-[var(--color-texto)]
+          transition-colors
+          duration-300
+        "
       >
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+        {/* Lista */}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
           {cargando ? (
-            <p className="text-gray-300">Cargando servicios...</p>
+            <div className="flex items-center justify-center py-10 gap-3 text-sm text-neutral-300">
+              <LoaderSpinner size={22} />
+              Cargando servicios...
+            </div>
           ) : servicios.length === 0 ? (
-            <p className="text-gray-400 text-sm">
-              No hay servicios cargados aún.
+            <p className="text-neutral-400 text-sm py-4">
+              No hay servicios cargados aún. Añadí el primero con el botón de abajo.
             </p>
           ) : (
             servicios.map((serv, i) => (
               <div
                 key={serv.id || i}
-                className="rounded-xl border border-white/10 bg-black/20"
+                className="
+                  rounded-2xl
+                  bg-[var(--color-primario-oscuro)]/80
+                  border border-white/10
+                  shadow-[0_4px_14px_rgba(0,0,0,0.45)]
+                  overflow-hidden
+                "
               >
+                {/* Cabecera compacta */}
                 <button
                   onClick={() => toggleExpand(i)}
-                  className="w-full text-left px-4 py-3 flex justify-between items-center text-white font-medium"
+                  className="
+                    w-full
+                    px-4 py-2.5
+                    flex items-center justify-between gap-3
+                    text-sm
+                    hover:bg-black/20
+                    transition
+                  "
                 >
-                  <span>{serv.servicio || "Nuevo servicio"}</span>
-                  <span className="text-xl">
+                  <div className="flex flex-col text-left">
+                    <span className="font-medium">
+                      {serv.servicio || "Nuevo servicio"}
+                    </span>
+                    <span className="text-[11px] text-neutral-400">
+                      {serv.precio === "" || serv.precio === 0
+                        ? "Sin precio"
+                        : `$ ${serv.precio}`}{" "}
+                      · {formatearDuracion(serv.duracion)}
+                    </span>
+                  </div>
+
+                  <span className="text-xs opacity-70">
                     {abiertoIndex === i ? "▲" : "▼"}
                   </span>
                 </button>
 
+                {/* Contenido editable */}
                 {abiertoIndex === i && (
-                  <div className="p-4 flex flex-col gap-4 bg-black/30 rounded-b-xl">
-                    <InputAnimado
-                      label="Nombre del servicio"
-                      id={`nombre-${i}`}
-                      value={serv.servicio}
-                      onChange={(e) =>
-                        handleChange(i, "servicio", e.target.value)
-                      }
-                    />
+                  <div className="px-4 pb-3 pt-2 space-y-3 border-t border-white/10 text-sm">
+                    {/* Nombre */}
+                    <div className="space-y-1">
+                      <label
+                        htmlFor={`nombre-${i}`}
+                        className="text-xs text-neutral-300"
+                      >
+                        Nombre del servicio
+                      </label>
+                      <input
+                        id={`nombre-${i}`}
+                        type="text"
+                        value={serv.servicio}
+                        onChange={(e) =>
+                          handleChange(i, "servicio", e.target.value)
+                        }
+                        className="
+                          w-full
+                          bg-transparent
+                          border-b border-neutral-500
+                          focus:border-[var(--color-primario)]
+                          outline-none
+                          text-sm
+                          py-1
+                        "
+                        placeholder="Corte, color, depilación..."
+                      />
+                    </div>
 
-                    <InputAnimado
-                      label="Precio"
-                      id={`precio-${i}`}
-                      value={serv.precio === 0 ? "" : String(serv.precio)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        handleChange(
-                          i,
-                          "precio",
-                          val === "" ? "" : Number(val)
-                        );
-                      }}
-                    />
+                    {/* Precio */}
+                    <div className="space-y-1">
+                      <label
+                        htmlFor={`precio-${i}`}
+                        className="text-xs text-neutral-300"
+                      >
+                        Precio
+                      </label>
+                      <input
+                        id={`precio-${i}`}
+                        type="number"
+                        value={serv.precio === 0 ? "" : String(serv.precio)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleChange(
+                            i,
+                            "precio",
+                            val === "" ? "" : Number(val)
+                          );
+                        }}
+                        className="
+                          w-full
+                          bg-transparent
+                          border-b border-neutral-500
+                          focus:border-[var(--color-primario)]
+                          outline-none
+                          text-sm
+                          py-1
+                        "
+                        placeholder="0"
+                      />
+                    </div>
 
                     {/* SLIDER DURACIÓN */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm text-gray-300">
-                        Duración
-                      </label>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-neutral-300">
+                          Duración estimada
+                        </span>
+                        <span className="text-xs font-medium text-neutral-100">
+                          {formatearDuracion(serv.duracion)}
+                        </span>
+                      </div>
 
                       <input
                         type="range"
@@ -357,21 +430,48 @@ export default function ModalAgregarServicios({
                           const nuevaDuracion = duraciones[index];
                           handleChange(i, "duracion", nuevaDuracion);
                         }}
-                        className="w-full accent-green-500"
+                        className="w-full accent-[var(--color-primario)]"
                       />
-
-                      <p className="text-gray-200 text-sm font-medium mt-1">
-                        {formatearDuracion(serv.duracion)}
-                      </p>
                     </div>
 
-                    {/* BOTÓN ELIMINAR */}
-                    <div className="w-[calc(100%+2rem)] -ml-4 mt-3 pt-3 border-t border-white/10">
+                    {/* Eliminar (izquierda) + Listo (derecha) */}
+                    <div className="flex justify-end gap-2 pt-2">
                       <button
+                        type="button"
                         onClick={() => handleEliminar(i)}
-                        className="w-full py-2 rounded-b-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md transition text-center"
+                        className="
+                          px-4 py-1.5
+                          rounded-full
+                          text-xs
+                          bg-red-600
+                          hover:bg-red-700
+                          text-white
+                          font-medium
+                          transition
+                        "
                       >
-                        ✕
+                        Eliminar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAbiertoIndex((prev) =>
+                            prev === i ? null : prev
+                          )
+                        }
+                        className="
+                          px-4 py-1.5
+                          rounded-full
+                          text-xs
+                          bg-[var(--color-primario)]
+                          hover:brightness-110
+                          text-white
+                          font-medium
+                          transition
+                        "
+                      >
+                        Listo
                       </button>
                     </div>
                   </div>
@@ -381,52 +481,72 @@ export default function ModalAgregarServicios({
           )}
         </div>
 
-        <div className="mt-4">
+        {/* Botones inferiores */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
           <button
             onClick={handleAgregar}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg shadow font-medium transition flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: "var(--color-primario)",
-              color: "#fff",
-            }}
+            className="
+              w-full sm:w-auto
+              px-4 py-2
+              rounded-full
+              flex items-center justify-center gap-2
+              text-sm font-medium
+              border border-white/15
+              bg-[var(--color-primario-oscuro)]
+              hover:bg-[var(--color-primario)]
+              transition
+            "
           >
             <img src={AddIcon} alt="Añadir" className="w-4 h-4 invert" />
             Añadir servicio
           </button>
-        </div>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={cerrarModal}
-            className="px-5 py-2 rounded-lg bg-black/40 text-gray-200 hover:bg-black/60 transition"
-          >
-            Cancelar
-          </button>
+          <div className="flex w-full sm:w-auto justify-end gap-2">
+            <button
+              onClick={cerrarModal}
+              className="
+                px-4 py-2
+                rounded-full
+                text-sm
+                bg-black/40
+                text-neutral-200
+                hover:bg-black/60
+                transition
+              "
+            >
+              Cancelar
+            </button>
 
-          <button
-            onClick={handleGuardar}
-            disabled={estadoBoton === "guardando"}
-            className={`px-6 py-2 rounded-lg text-white font-medium transition flex items-center justify-center gap-2
-              ${
-                estadoBoton === "guardando"
-                  ? "bg-gray-500 cursor-not-allowed"
-                  : estadoBoton === "exito"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : estadoBoton === "error"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
-          >
-            {estadoBoton === "guardando" && <LoaderSpinner size={18} />}
+            <button
+              onClick={handleGuardar}
+              disabled={estadoBoton === "guardando"}
+              className={`
+                px-5 py-2
+                rounded-full
+                text-sm font-medium
+                flex items-center justify-center gap-2
+                ${
+                  estadoBoton === "guardando"
+                    ? "bg-neutral-600 text-neutral-200 cursor-not-allowed"
+                    : estadoBoton === "exito"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : estadoBoton === "error"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-[var(--color-primario)] hover:brightness-110"
+                }
+              `}
+            >
+              {estadoBoton === "guardando" && <LoaderSpinner size={16} />}
 
-            {estadoBoton === "guardando"
-              ? "Guardando cambios..."
-              : estadoBoton === "exito"
-              ? "✅ Se guardó correctamente"
-              : estadoBoton === "error"
-              ? "❌ Se produjo un error"
-              : "Guardar cambios"}
-          </button>
+              {estadoBoton === "guardando"
+                ? "Guardando..."
+                : estadoBoton === "exito"
+                ? "✔ Guardado"
+                : estadoBoton === "error"
+                ? "Error al guardar"
+                : "Guardar cambios"}
+            </button>
+          </div>
         </div>
       </div>
     </ModalBase>
