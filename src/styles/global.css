@@ -353,3 +353,17 @@ body[data-tema="gradient"] {
 .icono-blanco {
   filter: brightness(0) invert(1);
 }
+
+
+@keyframes icon-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+.icon-alerta-breath {
+  animation: icon-breathe 1.8s ease-in-out infinite;
+}

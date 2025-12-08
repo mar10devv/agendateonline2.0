@@ -124,13 +124,57 @@ export default function AgendaVirtual({ slug }: Props) {
     );
   }
 
-  if (!negocio) {
-    return (
-      <div className="text-red-500 text-center p-10">
-        ⚠️ No se encontró el negocio con el slug "{slug}"
+if (!negocio) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 to-black px-4">
+      <div
+        className="
+          max-w-md w-full
+          rounded-3xl
+          border border-white/15
+          bg-white/5
+          backdrop-blur-xl
+          shadow-[0_0_60px_rgba(255,255,255,0.18)]
+          px-6 py-7
+          text-center
+          space-y-4
+        "
+      >
+        {/* Icono de alerta (sin círculo, animado) */}
+        <div className="mx-auto flex items-center justify-center">
+          <span className="icon-alerta-breath text-4xl md:text-5xl">⚠️</span>
+        </div>
+
+        {/* Título */}
+        <h1 className="text-lg md:text-xl font-semibold text-neutral-50">
+          No encontramos esta agenda
+        </h1>
+
+        {/* Detalle del error */}
+        <p className="text-sm text-neutral-200">
+          No existe ningún negocio con el enlace:
+          <span className="block mt-1 font-mono text-red-300 break-all">
+            "{slug}"
+          </span>
+        </p>
+
+        <p className="text-xs text-neutral-300">
+          Verificá que el link esté bien escrito o pedile al dueño que te
+          comparta el enlace correcto.
+        </p>
+
+        {/* Botón para volver */}
+        <a
+          href="/"
+          className="inline-flex items-center justify-center rounded-xl bg-neutral-100 text-neutral-900 hover:bg-white px-4 py-2 text-sm font-medium transition"
+        >
+          Volver al inicio
+        </a>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   // 👇 Flag para saber si esta agenda es un EMPRENDIMIENTO
   const esEmprendimiento = negocio.tipoAgenda === "emprendimiento";
