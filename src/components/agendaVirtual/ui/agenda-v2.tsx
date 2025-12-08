@@ -221,6 +221,31 @@ const puedeConfigServiciosYEmpleados = esDueno;
   const [serviciosState, setServiciosState] = useState<Servicio[]>([]);
   const [modalServicios, setModalServicios] = useState(false);
 
+  // 🧮 Ordenar servicios: más nuevo → más viejo (usando createdAt)
+  const serviciosOrdenados = useMemo(() => {
+    if (!serviciosState || serviciosState.length === 0) return [];
+
+    return [...serviciosState].sort((a: any, b: any) => {
+      const ta =
+        a.createdAt?.toMillis?.() ??
+        (a.createdAt?.seconds
+          ? a.createdAt.seconds * 1000
+          : typeof a.createdAt === "number"
+          ? a.createdAt
+          : 0);
+
+      const tb =
+        b.createdAt?.toMillis?.() ??
+        (b.createdAt?.seconds
+          ? b.createdAt.seconds * 1000
+          : typeof b.createdAt === "number"
+          ? b.createdAt
+          : 0);
+
+      return tb - ta; // 👈 más nuevo primero
+    });
+  }, [serviciosState]);
+
   /* -------- EMPLEADOS ACTIVOS (DUEÑO SOLO SI ES EMPLEADO) -------- */
 
   const empleadosFuente = useMemo<Empleado[]>(() => {
@@ -537,9 +562,9 @@ case "servicios":
         <CardServicioAgregar onClick={() => setModalServicios(true)} />
       )}
 
-      {/* Cards de servicios existentes */}
-      {serviciosState.length > 0 &&
-        serviciosState.map((s) => (
+            {/* Cards de servicios existentes (ordenados) */}
+      {serviciosOrdenados.length > 0 &&
+        serviciosOrdenados.map((s) => (
           <CardServicio
             key={s.id || s.servicio}
             nombre={s.servicio}
@@ -547,6 +572,7 @@ case "servicios":
             duracion={s.duracion}
           />
         ))}
+
 
       {/* Mensaje SOLO para clientes cuando no hay servicios */}
       {esCliente && serviciosState.length === 0 && (

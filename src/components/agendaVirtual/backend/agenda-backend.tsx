@@ -15,6 +15,8 @@ import {
   updateDoc,
   addDoc,
   onSnapshot,
+  orderBy,        // 👈 nuevo
+  serverTimestamp // 👈 nuevo
 } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 
@@ -373,7 +375,8 @@ export async function agregarServicio(
   await addDoc(preciosRef, {
     servicio: servicio.nombre,
     precio: servicio.precio,
-    duracion: servicio.duracion || 0,
+    duracion: servicio.duracion || 30,
+    createdAt: serverTimestamp(), // 👈 MISMO NOMBRE QUE EN EL MODAL
   });
 }
 
@@ -394,9 +397,17 @@ export async function escucharServicios(
   const preciosRef = collection(db, "Negocios", negocioId, "Precios");
 
   const unsubscribe = onSnapshot(preciosRef, (snapshot) => {
-    const servicios = snapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as Servicio)
-    );
+    const servicios = snapshot.docs.map((d) => {
+      const data: any = d.data();
+      return {
+        id: d.id,
+        servicio: data.servicio || "",
+        precio: data.precio || 0,
+        duracion: data.duracion || 30,
+        createdAt: data.createdAt ?? null, // 👈 mismo campo que el modal
+      } as Servicio;
+    });
+
     callback(servicios);
   });
 
