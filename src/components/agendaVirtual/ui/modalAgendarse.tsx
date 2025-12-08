@@ -212,9 +212,7 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
         );
     } catch {
       if (u.email)
-        negSnaps.push(
-          await getDocs(query(refNeg, where("clienteEmail", "==", u.email)))
-        );
+        negSnaps.push(await getDocs(query(refNeg, where("clienteEmail", "==", u.email))));
     }
 
     for (const s of negSnaps) {
@@ -241,8 +239,7 @@ const empleadoTieneDescansoConfigurado = (e: Empleado): boolean => {
   const diasLibres = cal.diasLibres;
   const diaYMedio = cal.diaYMedio;
 
-  const tieneListaDias =
-    Array.isArray(diasLibres) && diasLibres.length > 0;
+  const tieneListaDias = Array.isArray(diasLibres) && diasLibres.length > 0;
 
   const tieneDiaYMedio =
     !!diaYMedio &&
@@ -281,7 +278,6 @@ function getAvatarUrl(e: Empleado): string | null {
   return null;
 }
 
-
 export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [paso, setPaso] = useState(1);
   const [servicio, setServicio] = useState<Servicio | null>(null);
@@ -293,6 +289,9 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   );
   const [cargandoCheck, setCargandoCheck] = useState(false);
   const [bloqueo, setBloqueo] = useState<Bloqueo>({ activo: false, inicio: null, fin: null });
+
+  // 🆕 Resumen para el mensaje final
+  const [resumenTurno, setResumenTurno] = useState<{ fecha: string; hora: string } | null>(null);
 
   const siguiente = () => setPaso((p) => p + 1);
   const volver = () => setPaso((p) => p - 1);
@@ -392,7 +391,6 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
                       setServicio(null);
                       setEmpleado(null);
                       setTurno(null);
-                      alert("Tu turno fue cancelado y el horario quedó libre.");
                     } catch (err) {
                       console.error("Error cancelando turno:", err);
                       alert("Hubo un error al cancelar el turno.");
@@ -455,13 +453,16 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
                 requiereSenia={requiereSenia}
                 porcentajeSenia={porcentajeSenia}
                 onBack={() => setPaso(3)}
-                onSaved={() => {
+                onSaved={(data: { fecha: string; hora: string }) => {
+                  setResumenTurno(data);
                   setPaso(5);
                 }}
               />
             )}
 
-            {paso === 5 && <PasoFinal negocio={negocio} onClose={onClose} />}
+            {paso === 5 && (
+              <PasoFinal negocio={negocio} resumen={resumenTurno} onClose={onClose} />
+            )}
           </>
         )}
       </div>
@@ -545,9 +546,7 @@ function PasoEmpleados({
     const disponibles = negocio.empleadosData.filter(
       (emp: Empleado) =>
         Array.isArray(emp.trabajos) &&
-        emp.trabajos.some(
-          (t: string) => String(t).trim() === String(servicio.id).trim()
-        )
+        emp.trabajos.some((t: string) => String(t).trim() === String(servicio.id).trim())
     );
 
     setFiltrados(disponibles);
@@ -582,9 +581,7 @@ function PasoEmpleados({
       </p>
 
       {error && (
-        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">
-          {error}
-        </p>
+        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">{error}</p>
       )}
 
       {filtrados.length > 0 ? (
@@ -643,8 +640,7 @@ function PasoTurnos({
   onSelect: (t: { hora: string; fecha: Date }) => void;
   onBack: () => void;
 }) {
-  const minutosPorSlot =
-    negocio.configuracionAgenda?.horasSeparacion ?? 30;
+  const minutosPorSlot = negocio.configuracionAgenda?.horasSeparacion ?? 30;
 
   return (
     <div>
@@ -655,7 +651,7 @@ function PasoTurnos({
       <div className="flex justify-center mb-6">
         <CalendarioBase
           modo="cliente"
-          usuarioActual={{} as any}        // en modo cliente no usamos permisos
+          usuarioActual={{} as any} // en modo cliente no usamos permisos
           negocio={negocio as any}
           empleado={empleado as any}
           empleados={(negocio.empleadosData || []) as any}
@@ -822,8 +818,8 @@ function PasoConfirmacion({
         }),
       });
 
-      alert("✅ Turno guardado y email enviado correctamente.");
-      onSaved?.();
+      // 👉 Enviamos datos al PasoFinal (sin alert feo)
+      onSaved?.({ fecha: fechaTexto, hora: horaTexto });
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
       alert("No se pudo guardar el turno. Intenta nuevamente.");
@@ -905,15 +901,58 @@ function PasoConfirmacion({
   );
 }
 
-function PasoFinal({ negocio, onClose }: any) {
+function PasoFinal({
+  negocio,
+  resumen,
+  onClose,
+}: {
+  negocio: any;
+  resumen: { fecha: string; hora: string } | null;
+  onClose: () => void;
+}) {
+  const tieneUbicacion =
+    negocio?.ubicacion && negocio.ubicacion.lat && negocio.ubicacion.lng;
+
   return (
-    <div className="text-center">
-      <h2 className="text-xl font-semibold mb-4">
-        ✅ Turno agendado con éxito
+    <div className="text-center py-4 space-y-4">
+      <h2 className="text-xl font-semibold text-emerald-400">
+        🎉 ¡Listo! Tu turno fue confirmado
       </h2>
-      <p className="mb-4">Te esperamos en {negocio.nombre}</p>
+
+      <p className="text-sm text-gray-200">
+        {resumen ? (
+          <>
+            Tu turno está agendado para el día{" "}
+            <span className="font-semibold">{resumen.fecha}</span> a las{" "}
+            <span className="font-semibold">{resumen.hora}</span>.
+          </>
+        ) : (
+          "Tu turno fue confirmado correctamente."
+        )}
+      </p>
+
+      <p className="text-xs text-gray-400 max-w-sm mx-auto">
+        Te pedimos que asistas a tiempo para no perder tu lugar. Si no podés
+        venir, recordá cancelar tu turno con anticipación.
+      </p>
+
+      {tieneUbicacion && (
+        <div className="mt-2 w-full rounded-xl overflow-hidden border border-neutral-700 bg-neutral-900/60">
+          <iframe
+            title="Mapa ubicación del negocio"
+            src={`https://www.google.com/maps?q=${negocio.ubicacion.lat},${negocio.ubicacion.lng}&hl=es&z=16&output=embed`}
+            className="w-full h-56"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+          <div className="px-3 py-2 text-xs text-gray-300 text-left">
+            {negocio.ubicacion.direccion}
+          </div>
+        </div>
+      )}
+
       <button
-        className="mt-6 w-full py-2 bg-purple-600 rounded-xl"
+        className="mt-2 w-full py-2 bg-purple-600 rounded-xl hover:bg-purple-500 transition"
         onClick={onClose}
       >
         Cerrar
