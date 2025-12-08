@@ -633,102 +633,147 @@ case "servicios":
         );
       }
 
-      case "ubicacion":
+      case "ubicacion": {
+        const esDuenoOAdminLocal = modo === "dueño" || modo === "admin";
+        const esClienteLocal = modo === "cliente";
+
         return (
-          <div className="w-full">
-            {/* Título */}
-            <h2 className="text-lg font-semibold mb-4 text-[var(--color-texto)]">
-              {modo === "dueño" || modo === "admin"
-                ? "Mi ubicación"
-                : `Ubicación de ${negocio.nombre}`}
-            </h2>
-
-            {/* Si NO existe ubicación */}
+          <div className="w-full space-y-4">
+            {/* 🔹 CARD SOLO CUANDO NO HAY UBICACIÓN (dueño/admin) */}
             {!ubicacion && (
-              <>
-                {modo === "dueño" || modo === "admin" ? (
-                  <button
-                    onClick={handleGuardarUbicacion}
-                    disabled={estadoUbicacion === "cargando"}
-                    className={`
-                      px-4 py-2 rounded-md flex items-center justify-center gap-2
-                      font-medium transition-all
-                      ${
-                        estadoUbicacion === "cargando"
-                          ? "bg-[var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
-                          : estadoUbicacion === "exito"
-                          ? "bg-green-600 text-white"
-                          : "bg-[var(--color-primario-oscuro)] hover:opacity-90 text-[var(--color-texto)]"
-                      }
-                    `}
-                  >
-                    {estadoUbicacion === "cargando" && (
-                      <>
-                        <LoaderSpinner size={20} color="white" />
-                        Cargando nueva ubicación...
-                      </>
-                    )}
-                    {estadoUbicacion === "exito" &&
-                      "✅ Se ha cambiado la ubicación"}
-                    {estadoUbicacion === "idle" && "📍 Agregar ubicación"}
-                  </button>
-                ) : (
-                  <p className="opacity-80 text-sm">
-                    Esta agenda no tiene ubicacion.
-                  </p>
-                )}
-              </>
-            )}
+              <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 px-5 py-4 shadow-lg">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  {/* Izquierda: icono + textos */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/50 bg-white/5">
+                      <MapPin className="h-5 w-5 text-white" />
+                    </div>
 
-            {/* Si SÍ existe ubicación */}
-            {ubicacion && (
-              <div className="flex flex-col gap-4">
-                {/* MAPA REUTILIZABLE */}
-                <div className="w-full flex justify-center">
-                  <ComponenteMapa
-                    ubicacion={ubicacion}
-                    modo={modo}
-                    negocioSlug={negocio.slug}
-                    onUbicacionActualizada={(u) => setUbicacion(u)}
-                    height="h-64"
-                  />
-                </div>
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-semibold text-white">
+                        {esDuenoOAdminLocal
+                          ? "Mi ubicación"
+                          : `Ubicación de ${negocio.nombre}`}
+                      </h2>
 
-                {/* Botón actualizar ubicación */}
-                {(modo === "dueño" || modo === "admin") && (
-                  <div className="flex justify-end">
+                      <p className="text-sm text-neutral-300">
+                        La ubicación se mostrará en el mapa y tus clientes
+                        podrán abrirla en Google Maps para llegar más fácil.
+                      </p>
+
+                      {esDuenoOAdminLocal ? (
+                        <span className="mt-2 inline-flex items-center gap-2 rounded-full border border-dashed border-neutral-600 bg-neutral-900/80 px-3 py-1 text-xs text-neutral-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                          Aún no configuraste la ubicación
+                        </span>
+                      ) : (
+                        <p className="mt-2 text-xs text-neutral-400">
+                          Esta agenda todavía no tiene una ubicación configurada.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Botón acción (solo dueño/admin) */}
+                  {esDuenoOAdminLocal && (
                     <button
                       onClick={handleGuardarUbicacion}
                       disabled={estadoUbicacion === "cargando"}
                       className={`
-                        px-3 py-1.5 text-sm rounded-md flex items-center gap-2
-                        transition-all font-medium
+                        inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-medium
+                        shadow-md transition
                         ${
                           estadoUbicacion === "cargando"
-                            ? "bg-[var(--color-primario-oscuro)] opacity-60 text-[var(--color-texto)]"
+                            ? "bg-[var(--color-primario-oscuro)] opacity-70 cursor-wait text-[var(--color-texto)]"
                             : estadoUbicacion === "exito"
-                            ? "bg-green-600 text-white"
-                            : "bg-[var(--color-primario-oscuro)] hover:opacity-90 text-[var(--color-texto)]"
+                            ? "bg-green-600 text-white hover:bg-green-500 hover:shadow-green-400/40"
+                            : "border border-white/60 bg-white/10 text-white hover:bg-white/20 hover:shadow-[0_0_16px_rgba(255,255,255,0.35)] active:scale-[0.97]"
                         }
                       `}
                     >
                       {estadoUbicacion === "cargando" && (
                         <>
-                          <LoaderSpinner size={14} color="white" />
-                          Buscando nueva ubicación...
+                          <LoaderSpinner size={18} color="white" />
+                          Buscando ubicación...
                         </>
                       )}
-                      {estadoUbicacion === "exito" &&
-                        "✅ Ubicación actualizada"}
-                      {estadoUbicacion === "idle" &&
-                        "📍 Actualizar ubicación"}
+
+                      {estadoUbicacion === "exito" && (
+                        <>
+                          <MapPin className="h-4 w-4 text-white" />
+                          Ubicación guardada
+                        </>
+                      )}
+
+                      {estadoUbicacion === "idle" && (
+                        <>
+                          <MapPin className="h-4 w-4 text-white" />
+                          Agregar ubicación
+                        </>
+                      )}
                     </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 🔹 MAPA + BOTÓN SOLO CUANDO SÍ HAY UBICACIÓN */}
+            {ubicacion && (
+              <div className="space-y-3">
+                {/* Título según rol */}
+                <h2 className="text-lg font-semibold text-[var(--color-texto)]">
+                  {esDuenoOAdminLocal
+                    ? "Mi ubicación"
+                    : `Ubicación de ${negocio.nombre}`}
+                </h2>
+
+                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
+                  <div className="w-full flex justify-center">
+                    <ComponenteMapa
+                      ubicacion={ubicacion}
+                      modo={modo}
+                      negocioSlug={negocio.slug}
+                      onUbicacionActualizada={(u) => setUbicacion(u)}
+                      height="h-72"
+                    />
                   </div>
-                )}
+
+                  {esDuenoOAdminLocal && (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        onClick={handleGuardarUbicacion}
+                        disabled={estadoUbicacion === "cargando"}
+                        className={`
+                          px-3 py-1.5 text-xs sm:text-sm rounded-full flex items-center gap-2
+                          font-medium transition-all
+                          ${
+                            estadoUbicacion === "cargando"
+                              ? "bg-[var(--color-primario-oscuro)] opacity-70 cursor-wait text-[var(--color-texto)]"
+                              : estadoUbicacion === "exito"
+                              ? "bg-green-600 text-white hover:bg-green-500"
+                              : "border border-white/50 bg-white/5 text-white hover:bg-white/15"
+                          }
+                        `}
+                      >
+                        {estadoUbicacion === "cargando" && (
+                          <>
+                            <LoaderSpinner size={14} color="white" />
+                            Actualizando...
+                          </>
+                        )}
+                        {estadoUbicacion === "exito" &&
+                          "✅ Ubicación actualizada"}
+                        {estadoUbicacion === "idle" &&
+                          "📍 Actualizar ubicación"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         );
+      }
 
       default:
         return null;
