@@ -288,8 +288,19 @@ const puedeConfigServiciosYEmpleados = esDueno;
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
-    if (!navigator.geolocation) {
+    // Si estamos en SSR o no existe navigator, salimos
+    if (typeof window === "undefined" || typeof navigator === "undefined") {
+      console.error("Navigator no está disponible en este entorno.");
+      return;
+    }
+
+    if (!("geolocation" in navigator)) {
       console.error("Tu navegador no soporta geolocalización.");
+      // Nos aseguramos de no dejar el botón en 'cargando'
+      setEstadoUbicacion("idle");
+      alert(
+        "Tu navegador no soporta geolocalización o está desactivada. Configura la ubicación manualmente."
+      );
       return;
     }
 
@@ -300,7 +311,13 @@ const puedeConfigServiciosYEmpleados = esDueno;
         try {
           const { latitude, longitude } = pos.coords;
 
-          const direccion = await obtenerDireccion(latitude, longitude);
+          let direccion = "";
+          try {
+            // Si falla obtenerDireccion, no rompemos todo
+            direccion = await obtenerDireccion(latitude, longitude);
+          } catch (e) {
+            console.error("No se pudo obtener la dirección legible:", e);
+          }
 
           const nuevaUbicacion = {
             lat: latitude,
@@ -317,13 +334,21 @@ const puedeConfigServiciosYEmpleados = esDueno;
         } catch (error) {
           console.error("Error guardando ubicación:", error);
           setEstadoUbicacion("idle");
+          alert("Ocurrió un error al guardar la ubicación.");
         }
       },
       (err) => {
         console.error("Error al obtener ubicación:", err);
         setEstadoUbicacion("idle");
+        alert(
+          "No pudimos obtener tu ubicación. Verifica los permisos de ubicación del navegador."
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      {
+        enableHighAccuracy: true,
+        timeout: 10000, // 10s → si no responde, dispara el callback de error
+        maximumAge: 0,
+      }
     );
   };
 
@@ -473,6 +498,18 @@ const puedeConfigServiciosYEmpleados = esDueno;
       setMostrarModalConfigAgenda(false);
     }
   }, [negocio, modo]);
+
+    // 📍 Abrir ubicación en Google Maps
+  const handleAbrirEnGoogleMaps = () => {
+    if (!ubicacion) return;
+
+    const { lat, lng } = ubicacion;
+    if (!lat || !lng) return;
+
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    window.open(url, "_blank");
+  };
+
 
   /* --------  NAVBAR  -------- */
 
@@ -635,7 +672,6 @@ case "servicios":
 
       case "ubicacion": {
         const esDuenoOAdminLocal = modo === "dueño" || modo === "admin";
-        const esClienteLocal = modo === "cliente";
 
         return (
           <div className="w-full space-y-4">
@@ -717,7 +753,7 @@ case "servicios":
               </div>
             )}
 
-            {/* 🔹 MAPA + BOTÓN SOLO CUANDO SÍ HAY UBICACIÓN */}
+            {/* 🔹 MAPA + BOTONES SOLO CUANDO SÍ HAY UBICACIÓN */}
             {ubicacion && (
               <div className="space-y-3">
                 {/* Título según rol */}
@@ -738,8 +774,19 @@ case "servicios":
                     />
                   </div>
 
-                  {esDuenoOAdminLocal && (
-                    <div className="mt-3 flex justify-end">
+                  {/* Botones abajo a la derecha */}
+                  <div className="mt-3 flex justify-end gap-2">
+                    {/* Ver en Google Maps (todos los roles) */}
+                    <button
+                      onClick={handleAbrirEnGoogleMaps}
+                      className="px-3 py-1.5 text-xs sm:text-sm rounded-full flex items-center gap-2 font-medium border border-white/60 bg-white/10 text-white hover:bg-white/20 transition"
+                    >
+                      <MapPin className="h-3 w-3" />
+                      Ver en Google Maps
+                    </button>
+
+                    {/* Actualizar ubicación (solo dueño/admin) */}
+                    {esDuenoOAdminLocal && (
                       <button
                         onClick={handleGuardarUbicacion}
                         disabled={estadoUbicacion === "cargando"}
@@ -766,8 +813,8 @@ case "servicios":
                         {estadoUbicacion === "idle" &&
                           "📍 Actualizar ubicación"}
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             )}
