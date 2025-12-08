@@ -38,7 +38,7 @@ export default function ModalShare({ abierto, onCerrar, slug }: Props) {
         <p className="text-center text-gray-200 text-lg">
           ✅ Se copió el enlace de tu agenda.
           <br />
-          Ya podés compartirlo con tus clientes.
+          Ya podés compartirlo.
         </p>
 
         {/* Link en texto */}

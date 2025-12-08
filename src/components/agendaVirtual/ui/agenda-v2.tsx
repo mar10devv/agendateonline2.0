@@ -13,7 +13,6 @@ import ModalAgendarse from "./modalAgendarse";
 import ModalShare from "./share";
 import ModalPerfil from "../ui/modalPerfil";
 import ModalEmpleadosUI from "./modalEmpleadosUI";
-import { Instagram, Facebook, Phone } from "lucide-react";
 import ConfigIcon from "../../ui/Config-icono";
 import ModalAgregarServicios from "../modalAgregarServicios";
 import { obtenerDireccion } from "../../../lib/geocoding";
@@ -925,50 +924,16 @@ case "servicios":
             {negocio.descripcion || "Sin descripción."}
           </p>
 
-          {/* Redes */}
-          <div className="flex gap-3 justify-center mt-3">
-            <a
-              href={negocio?.redes?.instagram || "#"}
-              target="_blank"
-              className={`p-2 rounded-full border border-white/40 ${
-                negocio?.redes?.instagram
-                  ? ""
-                  : "opacity-50 pointer-events-none"
-              }`}
-            >
-              <Instagram className="w-4 h-4" />
-            </a>
-
-            <a
-              href={negocio?.redes?.facebook || "#"}
-              target="_blank"
-              className={`p-2 rounded-full border border-white/40 ${
-                negocio?.redes?.facebook ? "" : "opacity-50 pointer-events-none"
-              }`}
-            >
-              <Facebook className="w-4 h-4" />
-            </a>
-
-            <a
-              href={
-                negocio?.redes?.telefono
-                  ? `tel:${negocio.redes.telefono}`
-                  : "#"
-              }
-              className={`p-2 rounded-full border border-white/40 ${
-                negocio?.redes?.telefono ? "" : "opacity-50 pointer-events-none"
-              }`}
-            >
-              <Phone className="w-4 h-4" />
-            </a>
-
+                   {/* Botón para compartir agenda */}
+          <div className="flex justify-center mt-3">
             <button
               onClick={() => setModalShare(true)}
-              className="p-2 rounded-full border border-white/40"
+              className="p-2 rounded-full border border-white/40 hover:bg-black/10 transition"
             >
               <Share2 className="w-4 h-4" />
             </button>
           </div>
+
         </div>
 
         {/* NAV */}
