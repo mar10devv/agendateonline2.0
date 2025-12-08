@@ -702,13 +702,16 @@ export function generarHorariosBase(
 ): string[] {
   const horariosBase: string[] = [];
 
+  // 👉 Inicio normal
   const [hIni, mIni] = config.inicio.split(":").map(Number);
-  const [hFin, mFin] = config.fin.split(":").map(Number);
+  const start = (hIni || 0) * 60 + (mIni || 0);
 
-  const start = hIni * 60 + mIni;
-  const end = hFin * 60 + mFin;
+  // 👉 Fin: si es 00:00 lo tratamos como 24:00 (fin del día)
+  const [hFinRaw, mFinRaw] = config.fin.split(":").map(Number);
+  const hFinNorm = hFinRaw === 0 && mFinRaw === 0 ? 24 : (hFinRaw || 0);
+  const end = hFinNorm * 60 + (mFinRaw || 0);
+
   const totalMinutes = end - start;
-
   if (totalMinutes <= 0) {
     return [];
   }
@@ -948,7 +951,6 @@ export function generarSlotsDelDia(
     typeof (config as any).pausaMediaHora === "string"
       ? (config as any).pausaMediaHora
       : null;
-      
 
   // 👉 si no pasan duracionServicioMin, por defecto usamos el tamaño del slot
   const duracionServicioMin =
@@ -964,7 +966,11 @@ export function generarSlotsDelDia(
 
   // Jornada completa del empleado/negocio en minutos
   const jornadaInicioMin = toMin(config.inicio);
-  const jornadaFinMin = toMin(config.fin);
+
+  // 👉 Fin: si es 00:00 lo tratamos como 24:00 (fin del día)
+  const [hFinRaw, mFinRaw] = config.fin.split(":").map(Number);
+  const hFinNorm = hFinRaw === 0 && mFinRaw === 0 ? 24 : (hFinRaw || 0);
+  const jornadaFinMin = hFinNorm * 60 + (mFinRaw || 0);
 
   if (jornadaFinMin <= jornadaInicioMin) {
     return [];
@@ -975,14 +981,11 @@ export function generarSlotsDelDia(
   const esDiaMedio = !!diaMedioNorm && diaMedioNorm === diaNorm;
 
   // 🔥 1) NEGOCIO MANDA SIEMPRE
-  // Si el negocio tiene este día como libre, no se generan slots para nadie,
-  // aunque sea el medio día del empleado.
   if (config.diasLibresNegocioNorm.includes(diaNorm)) {
     return [];
   }
 
-  // 2) DÍAS LIBRES DEL EMPLEADO
-  // Solo bloquean el día completo si NO es su medio día.
+  // 2) DÍAS LIBRES DEL EMPLEADO (salvo su medio día)
   if (!esDiaMedio && config.diasLibresEmpleadoNorm.includes(diaNorm)) {
     return [];
   }
@@ -993,7 +996,6 @@ export function generarSlotsDelDia(
   let inicioJ = jornadaInicioMin;
   let finJ = jornadaFinMin;
 
-  // Usamos la misma lógica de medio día que en generarHorariosBase
   const ventanaMedio = calcularVentanaMedioDia(
     config,
     diaNorm,
@@ -1001,12 +1003,10 @@ export function generarSlotsDelDia(
     jornadaFinMin
   );
 
-  // Si es el día de medio turno y tenemos ventana válida, recortamos jornada
   if (esDiaMedio && ventanaMedio) {
     inicioJ = ventanaMedio.inicioMin;
     finJ = ventanaMedio.finMin;
 
-    // Seguridad: si algo quedó raro, volvemos a jornada completa
     if (finJ <= inicioJ) {
       inicioJ = jornadaInicioMin;
       finJ = jornadaFinMin;
@@ -1028,7 +1028,6 @@ export function generarSlotsDelDia(
 
   // ==========================
   //   MODO PERSONALIZADO
-  //   -> X clientesPorDia distribuidos en la jornada
   // ==========================
   if (
     config.modoTurnos === "personalizado" &&
@@ -1047,12 +1046,10 @@ export function generarSlotsDelDia(
       const hora = minToHHMM(slotInicioMin);
       const inicio = combinarFechaHora(fecha, hora);
 
-      // ventana que ocuparía el servicio si empieza en este slot
       const finServicioMin = slotInicioMin + duracionServicioMin;
       const fin = new Date(inicio.getTime() + duracionServicioMin * 60000);
       const esPasado = inicio < ahora;
 
-      // si el servicio no entra dentro de la jornada real, lo marcamos como cerrado
       if (finServicioMin > finJ) {
         slots.push({
           fecha,
@@ -1065,7 +1062,6 @@ export function generarSlotsDelDia(
         continue;
       }
 
-      // 🟡 Pausa de media hora: slot bloqueado
       if (pausaMediaHora && hora === pausaMediaHora) {
         slots.push({
           fecha,
@@ -1078,7 +1074,6 @@ export function generarSlotsDelDia(
         continue;
       }
 
-      // ¿Algún turno cubre este rango completo del servicio?
       const covering = reservasDia.find((t) =>
         solapan(+inicio, +fin, t.i, t.f)
       );
@@ -1108,18 +1103,15 @@ export function generarSlotsDelDia(
 
   // ==========================
   //   MODO JORNADA (normal)
-  //   -> slots cada minutosPorSlot
   // ==========================
   for (let m = inicioJ; m < finJ; m += minutosPorSlot) {
     const hora = minToHHMM(m);
     const inicio = combinarFechaHora(fecha, hora);
 
-    // ventana completa que ocuparía el servicio
     const finServicioMin = m + duracionServicioMin;
     const fin = new Date(inicio.getTime() + duracionServicioMin * 60000);
     const esPasado = inicio < ahora;
 
-    // si el servicio no entra en la jornada (ej: cierre 20:00 y servicio 1h30 → 19:00 OK, 19:30 no)
     if (finServicioMin > finJ) {
       slots.push({
         fecha,
@@ -1132,7 +1124,6 @@ export function generarSlotsDelDia(
       continue;
     }
 
-    // 🟡 Pausa de media hora: slot bloqueado
     if (pausaMediaHora && hora === pausaMediaHora) {
       slots.push({
         fecha,
@@ -1145,7 +1136,6 @@ export function generarSlotsDelDia(
       continue;
     }
 
-    // ¿Algún turno cubre este rango completo del servicio?
     const covering = reservasDia.find((t) =>
       solapan(+inicio, +fin, t.i, t.f)
     );
@@ -1172,6 +1162,7 @@ export function generarSlotsDelDia(
 
   return slots;
 }
+
 
 /* =====================================================
    6) Calendario de rango completo

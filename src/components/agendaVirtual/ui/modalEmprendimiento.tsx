@@ -23,6 +23,7 @@ type NegocioBasico = {
   id: string;
   nombre: string;
   slug: string;
+  tipoAgenda?: string; // 👈 importante para saber si es "emprendimiento"
   configuracionAgenda?: {
     diasLibres?: string[];
     horaInicio?: string;
@@ -75,6 +76,31 @@ export default function ModalEmprendimiento({
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
 
+  // ============================
+  // 🔢 Validación de horarios
+  // ============================
+
+  // "HH:mm" -> minutos desde 0:00
+  const aMinutos = (h: string | undefined) => {
+    if (!h) return null;
+    const [hh, mm] = h.split(":").map(Number);
+    // Caso especial: 00:00 lo tratamos como 24:00 (fin del día)
+    const horas = hh === 0 && mm === 0 ? 24 : hh;
+    return horas * 60 + mm;
+  };
+
+  const minutosInicio = aMinutos(horaInicio);
+  const minutosFin = aMinutos(horaFin);
+
+  const horarioInvalido =
+    minutosInicio === null ||
+    minutosFin === null ||
+    minutosInicio >= minutosFin;
+
+  const clientesInvalidos =
+    modoTurnos === "personalizado" &&
+    (!clientesPorDia || clientesPorDia <= 0);
+
   if (!abierto) return null;
 
   const toggleDia = (dia: string) => {
@@ -101,10 +127,16 @@ export default function ModalEmprendimiento({
         clientesPorDia: turnosPorDiaFinal,
       };
 
-      // 🔹 Sincronizar también el calendario del primer empleado (emprendedor)
-      let empleadosActualizados: EmpleadoBasico[] | undefined = negocio.empleadosData;
+      // 🔹 Solo si es EMPRENDIMIENTO → sincronizar calendario del ÚNICO empleado
+      let empleadosActualizados: EmpleadoBasico[] | undefined = undefined;
 
-      if (Array.isArray(negocio.empleadosData) && negocio.empleadosData.length > 0) {
+      const esEmprendimiento = negocio.tipoAgenda === "emprendimiento";
+
+      if (
+        esEmprendimiento &&
+        Array.isArray(negocio.empleadosData) &&
+        negocio.empleadosData.length > 0
+      ) {
         const [primerEmpleado, ...resto] = negocio.empleadosData;
 
         const nuevoCalendario = {
@@ -126,6 +158,7 @@ export default function ModalEmprendimiento({
         configuracionAgenda: nuevaConfig,
       };
 
+      // 👇 Solo tocamos empleadosData si calculamos algo arriba
       if (empleadosActualizados) {
         payload.empleadosData = empleadosActualizados;
       }
@@ -144,11 +177,6 @@ export default function ModalEmprendimiento({
       setGuardando(false);
     }
   };
-
-  const horarioInvalido = !horaInicio || !horaFin || horaInicio >= horaFin;
-  const clientesInvalidos =
-    modoTurnos === "personalizado" &&
-    (!clientesPorDia || clientesPorDia <= 0);
 
   return (
     <ModalBase
@@ -255,7 +283,7 @@ export default function ModalEmprendimiento({
         {/* Días libres */}
         <div>
           <label className="block text-xs mb-2 text-gray-400">
-            Días libres del emprendimiento
+            Días cerrados
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {DIAS_SEMANA.map((dia) => {
