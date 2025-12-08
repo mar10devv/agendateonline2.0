@@ -159,18 +159,19 @@ export default function AgendaVirtualUIv3({
   usuario,
   esEmprendimiento, // 👈 ahora lo recibimos
 }: Props) {
-  /* -------- ROLES -------- */
-  const esDueno = modo === "dueño";
-  const esAdmin = modo === "admin";
-  const esCliente = modo === "cliente";
 
-  const esDuenoOAdmin = esDueno || esAdmin; // 👈 NUEVO
+/* -------- ROLES -------- */
+const esDueno = modo === "dueño";
+const esAdmin = modo === "admin";
+const esCliente = modo === "cliente";
 
-  // 👑 Solo el dueño puede tocar perfil general + estadísticas
-  const puedeConfigPerfil = esDueno;
+const esDuenoOAdmin = esDueno || esAdmin; // 👈 NUEVO
 
-  // 👑 Solo el dueño puede gestionar servicios y empleados (tuerquita)
-  const puedeConfigServiciosYEmpleados = esDueno;
+// 👑 Solo el dueño puede tocar perfil general + estadísticas
+const puedeConfigPerfil = esDueno;
+
+// 👑 Solo el dueño puede gestionar servicios y empleados (tuerquita)
+const puedeConfigServiciosYEmpleados = esDueno;
 
   /* --------  ESTADOS  -------- */
   const [vista, setVista] = useState<string>("agenda");
@@ -522,7 +523,7 @@ export default function AgendaVirtualUIv3({
     }
   }, [negocio, modo]);
 
-  // 📍 Abrir ubicación en Google Maps
+    // 📍 Abrir ubicación en Google Maps
   const handleAbrirEnGoogleMaps = () => {
     if (!ubicacion) return;
 
@@ -532,6 +533,7 @@ export default function AgendaVirtualUIv3({
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     window.open(url, "_blank");
   };
+
 
   /* --------  NAVBAR  -------- */
 
@@ -551,31 +553,33 @@ export default function AgendaVirtualUIv3({
 
   const renderVista = () => {
     switch (vista) {
-      case "servicios":
-        return (
-          <div className="flex flex-wrap gap-6 justify-start">
-            {/* 👉 Card "+" SIEMPRE PRIMERO y SOLO dueño/admin */}
-            {esDuenoOAdmin && (
-              <CardServicioAgregar onClick={() => setModalServicios(true)} />
-            )}
+
+case "servicios":
+  return (
+    <div className="flex flex-wrap gap-6 justify-start">
+      {/* 👉 Card "+" SIEMPRE PRIMERO y SOLO dueño/admin */}
+      {esDuenoOAdmin && (
+        <CardServicioAgregar onClick={() => setModalServicios(true)} />
+      )}
 
             {/* Cards de servicios existentes (ordenados) */}
-            {serviciosOrdenados.length > 0 &&
-              serviciosOrdenados.map((s) => (
-                <CardServicio
-                  key={s.id || s.servicio}
-                  nombre={s.servicio}
-                  precio={s.precio}
-                  duracion={s.duracion}
-                />
-              ))}
+      {serviciosOrdenados.length > 0 &&
+        serviciosOrdenados.map((s) => (
+          <CardServicio
+            key={s.id || s.servicio}
+            nombre={s.servicio}
+            precio={s.precio}
+            duracion={s.duracion}
+          />
+        ))}
 
-            {/* Mensaje SOLO para clientes cuando no hay servicios */}
-            {esCliente && serviciosState.length === 0 && (
-              <p className="opacity-80">Esta agenda no tiene servicios.</p>
-            )}
-          </div>
-        );
+
+      {/* Mensaje SOLO para clientes cuando no hay servicios */}
+      {esCliente && serviciosState.length === 0 && (
+        <p className="opacity-80">Esta agenda no tiene servicios.</p>
+      )}
+    </div>
+  );
 
       case "empleados": {
         // Fuente base
@@ -698,7 +702,7 @@ export default function AgendaVirtualUIv3({
           <div className="w-full space-y-4">
             {/* 🔹 CARD SOLO CUANDO NO HAY UBICACIÓN (dueño/admin) */}
             {!ubicacion && (
-              <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 px-5 py-4 shadow-[0_4px_14px_rgba(0,0,0,0.45)] sm:shadow-[0_8px_24px_rgba(0,0,0,0.55)]">
+              <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 px-5 py-4 shadow-lg">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   {/* Izquierda: icono + textos */}
                   <div className="flex items-start gap-3">
@@ -784,7 +788,7 @@ export default function AgendaVirtualUIv3({
                     : `Ubicación de ${negocio.nombre}`}
                 </h2>
 
-                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4 shadow-[0_4px_14px_rgba(0,0,0,0.45)] sm:shadow-[0_8px_24px_rgba(0,0,0,0.55)]">
+                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-3 sm:p-4">
                   <div className="w-full flex justify-center">
                     <ComponenteMapa
                       ubicacion={ubicacion}
@@ -867,10 +871,8 @@ export default function AgendaVirtualUIv3({
             w-full max-w-3xl 
             bg-[var(--color-primario)]
             rounded-3xl p-6 flex flex-col items-center 
-            shadow-[0_4px_14px_rgba(0,0,0,0.35)]
-            sm:shadow-[0_10px_26px_rgba(0,0,0,0.55)]
-            hover:shadow-[0_6px_18px_rgba(0,0,0,0.40)]
-            sm:hover:shadow-[0_14px_32px_rgba(0,0,0,0.60)]
+            shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+            hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
             transition-all duration-300
             relative
             text-[var(--color-texto)]
@@ -917,34 +919,40 @@ export default function AgendaVirtualUIv3({
             )}
           </div>
 
-          {/* Nombre */}
-          <h1
-            className="
+{/* Nombre */}
+<h1
+  className="
     relative
     font-euphoria
-    text-[38px]
+    text-[34px]
     md:text-[48px]
     leading-none
     tracking-wide
     mt-4
     text-white
   "
-            style={{
-              textShadow:
-                "0 4px 14px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.75)",
-              WebkitTextStroke: "1px rgba(255,255,255,0.55)",
-              WebkitTextFillColor: "#ffffff",
-            }}
-          >
-            {negocio.nombre}
-          </h1>
+  style={{
+    // ⭐ Sombra mucho más suave
+    textShadow: "0 2px 6px rgba(0,0,0,0.45)",
+
+    // ⭐ Trazo finito y clarito (casi imperceptible en mobile)
+    WebkitTextStroke: "0.3px rgba(255,255,255,0.30)",
+
+    // Relleno blanco normal
+    WebkitTextFillColor: "#ffffff",
+  }}
+>
+  {negocio.nombre}
+</h1>
+
+
 
           {/* Descripción */}
           <p className="opacity-80 text-center mt-4 px-4">
             {negocio.descripcion || "Sin descripción."}
           </p>
 
-          {/* Botón para compartir agenda */}
+                   {/* Botón para compartir agenda */}
           <div className="flex justify-center mt-3">
             <button
               onClick={() => setModalShare(true)}
@@ -953,6 +961,7 @@ export default function AgendaVirtualUIv3({
               <Share2 className="w-4 h-4" />
             </button>
           </div>
+
         </div>
 
         {/* NAV */}
@@ -961,10 +970,8 @@ export default function AgendaVirtualUIv3({
     w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
     bg-[var(--color-primario-oscuro)]
     text-[var(--color-texto)]
-    shadow-[0_3px_10px_rgba(0,0,0,0.35)]
-    sm:shadow-[0_6px_16px_rgba(0,0,0,0.45)]
-    hover:shadow-[0_6px_18px_rgba(0,0,0,0.40)]
-    sm:hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
+    shadow-[0_6px_16px_rgba(0,0,0,0.40)]
+    hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
     transition-all duration-300
   "
         >
@@ -1026,17 +1033,15 @@ export default function AgendaVirtualUIv3({
           })}
         </div>
 
-        {/* CONTENIDO */}
-        <div
-          key={vista}
-          className={`
+{/* CONTENIDO */}
+<div
+  key={vista}
+  className={`
     relative
     w-full max-w-3xl mt-6 p-6 rounded-3xl 
     bg-[var(--color-primario)]
-    shadow-[0_4px_14px_rgba(0,0,0,0.35)]
-    sm:shadow-[0_8px_22px_rgba(0,0,0,0.52)]
-    hover:shadow-[0_6px_18px_rgba(0,0,0,0.40)]
-    sm:hover:shadow-[0_12px_28px_rgba(0,0,0,0.58)]
+    shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+    hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
     transition-all duration-300
     ${
       vista === "agenda" && modo === "cliente"
@@ -1048,40 +1053,41 @@ export default function AgendaVirtualUIv3({
         : "min-h-[280px]"
     }
   `}
-        >
-          {/* CONFIG PARA EMPLEADOS (solo DUEÑO) */}
-          {vista === "empleados" && puedeConfigServiciosYEmpleados && (
-            <button
-              onClick={() => {
-                if (esEmprendimiento) {
-                  setModalEmprendimiento(true);
-                } else {
-                  setModalEmpleados(true);
-                }
-              }}
-              className="absolute top-4 right-4 z-20"
-              title={
-                esEmprendimiento
-                  ? "Configurar emprendimiento"
-                  : "Administrar empleados"
-              }
-            >
-              <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-            </button>
-          )}
+>
+  {/* CONFIG PARA EMPLEADOS (solo DUEÑO) */}
+  {vista === "empleados" && puedeConfigServiciosYEmpleados && (
+    <button
+      onClick={() => {
+        if (esEmprendimiento) {
+          setModalEmprendimiento(true);
+        } else {
+          setModalEmpleados(true);
+        }
+      }}
+      className="absolute top-4 right-4 z-20"
+      title={
+        esEmprendimiento
+          ? "Configurar emprendimiento"
+          : "Administrar empleados"
+      }
+    >
+      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+    </button>
+  )}
 
-          {/* 👇 ya sin la tuerca de servicios */}
+  {/* 👇 ya sin la tuerca de servicios */}
 
-          {renderVista()}
-        </div>
+  {renderVista()}
+</div>
+
+
 
         {/* FOOTER */}
         <div
           className="
             w-full max-w-3xl bg-black/80 mt-6 p-6 rounded-3xl 
             text-center text-white 
-            shadow-[0_4px_14px_rgba(0,0,0,0.35)]
-            sm:shadow-[0_8px_22px_rgba(0,0,0,0.45)]
+            shadow-[0_8px_20px_rgba(0,0,0,0.4)]
             flex flex-col items-center gap-2
           "
         >
