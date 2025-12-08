@@ -24,6 +24,7 @@ import {
 import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 import CardServicio from "../../ui/cardServicio";
+import CardServicioAgregar from "../../ui/cardAgregarServicio";
 import ModalEmprendimiento from "./modalEmprendimiento";
 import IconEstadisticas from "../../../assets/estadisticas-svg.svg?url";
 
@@ -165,12 +166,13 @@ const esDueno = modo === "dueño";
 const esAdmin = modo === "admin";
 const esCliente = modo === "cliente";
 
+const esDuenoOAdmin = esDueno || esAdmin; // 👈 NUEVO
+
 // 👑 Solo el dueño puede tocar perfil general + estadísticas
 const puedeConfigPerfil = esDueno;
 
-// 👑 Solo el dueño puede gestionar servicios y empleados
+// 👑 Solo el dueño puede gestionar servicios y empleados (tuerquita)
 const puedeConfigServiciosYEmpleados = esDueno;
-
 
   /* --------  ESTADOS  -------- */
   const [vista, setVista] = useState<string>("agenda");
@@ -490,23 +492,32 @@ const puedeConfigServiciosYEmpleados = esDueno;
 
   const renderVista = () => {
     switch (vista) {
-      case "servicios":
-        return (
-          <div className="flex flex-wrap gap-6 justify-start">
-            {serviciosState.length > 0 ? (
-              serviciosState.map((s) => (
-                <CardServicio
-                  key={s.id || s.servicio}
-                  nombre={s.servicio}
-                  precio={s.precio}
-                  duracion={s.duracion}
-                />
-              ))
-            ) : (
-              <p className="opacity-80">Esta agenda no tiene servicios.</p>
-            )}
-          </div>
-        );
+
+case "servicios":
+  return (
+    <div className="flex flex-wrap gap-6 justify-start">
+      {/* 👉 Card "+" SIEMPRE PRIMERO y SOLO dueño/admin */}
+      {esDuenoOAdmin && (
+        <CardServicioAgregar onClick={() => setModalServicios(true)} />
+      )}
+
+      {/* Cards de servicios existentes */}
+      {serviciosState.length > 0 &&
+        serviciosState.map((s) => (
+          <CardServicio
+            key={s.id || s.servicio}
+            nombre={s.servicio}
+            precio={s.precio}
+            duracion={s.duracion}
+          />
+        ))}
+
+      {/* Mensaje SOLO para clientes cuando no hay servicios */}
+      {esCliente && serviciosState.length === 0 && (
+        <p className="opacity-80">Esta agenda no tiene servicios.</p>
+      )}
+    </div>
+  );
 
       case "empleados": {
         // Fuente base
@@ -963,10 +974,8 @@ const puedeConfigServiciosYEmpleados = esDueno;
     <button
       onClick={() => {
         if (esEmprendimiento) {
-          // 👉 Emprendimiento: abrimos modal especial
           setModalEmprendimiento(true);
         } else {
-          // 👉 Negocio normal: abrimos modal de empleados
           setModalEmpleados(true);
         }
       }}
@@ -981,19 +990,11 @@ const puedeConfigServiciosYEmpleados = esDueno;
     </button>
   )}
 
-  {/* CONFIG PARA SERVICIOS (solo DUEÑO) */}
-  {vista === "servicios" && puedeConfigServiciosYEmpleados && (
-    <button
-      onClick={() => setModalServicios(true)}
-      className="absolute top-4 right-4 z-20"
-      title="Administrar servicios"
-    >
-      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-    </button>
-  )}
+  {/* 👇 ya sin la tuerca de servicios */}
 
   {renderVista()}
 </div>
+
 
 
         {/* FOOTER */}
