@@ -1,0 +1,448 @@
+---
+const titulo = "¿Qué es AgendateOnline?";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{titulo}</title>
+    <meta
+      name="description"
+      content="Conocé qué es AgendateOnline, para qué sirve, sus funciones, precios y cómo protege tus datos."
+    />
+    <!-- 👇 IMPRESCINDIBLE PARA QUE SE VEA BIEN EN CELULAR / INSTAGRAM -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+      .fade-in-up {
+        opacity: 0;
+        transform: translateY(16px);
+        animation: fadeInUp 0.6s ease-out forwards;
+        animation-delay: 0.05s;
+      }
+
+      @keyframes fadeInUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+
+  <body
+    class="relative min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 text-slate-50 overflow-x-hidden"
+  >
+    <!-- Luces de fondo -->
+    <div
+      class="pointer-events-none absolute -top-32 -left-20 h-56 w-56 md:h-64 md:w-64 rounded-full bg-cyan-400/35 blur-3xl"
+    ></div>
+    <div
+      class="pointer-events-none absolute -bottom-40 -right-10 h-64 w-64 md:h-72 md:w-72 rounded-full bg-purple-500/35 blur-3xl"
+    ></div>
+
+    <main
+      class="relative z-10 min-h-screen flex items-start md:items-center justify-center px-3 sm:px-4 py-8 sm:py-10"
+    >
+      <!-- Borde degradado + tarjeta principal tipo “glass” -->
+      <div
+        class="w-full max-w-5xl rounded-3xl bg-gradient-to-r from-sky-400/70 via-blue-400/40 to-indigo-400/70 p-[1.3px] shadow-[0_25px_70px_rgba(15,23,42,0.9)]"
+      >
+        <div
+          class="fade-in-up w-full h-full rounded-[1.4rem] bg-slate-950/80 border border-white/10 px-4 sm:px-6 md:px-10 py-6 sm:py-8 md:py-10 space-y-8 sm:space-y-10 backdrop-blur-2xl"
+        >
+          <!-- Cabecera -->
+          <header class="space-y-6 text-center md:text-left">
+            <div
+              class="flex flex-col md:flex-row items-center md:items-start justify-between gap-3 sm:gap-4"
+            >
+              <p
+                class="inline-flex items-center gap-2 rounded-full border border-sky-300/60 bg-sky-500/10 px-3 py-1.5 text-[10px] sm:text-[11px] font-medium text-sky-100 shadow-sm shadow-sky-500/30 backdrop-blur-xl"
+              >
+                <span
+                  class="inline-block h-2 w-2 rounded-full bg-sky-300 animate-pulse"
+                ></span>
+                Información sobre AgendateOnline
+              </p>
+
+              <span
+                class="text-[10px] sm:text-[11px] md:text-xs text-slate-200/90 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-center backdrop-blur-xl"
+              >
+                Ideal para barberías, salones, estudios de tatuajes, spas y
+                emprendedores
+              </span>
+            </div>
+
+            <div class="space-y-3">
+              <h1
+                class="text-[1.7rem] sm:text-3xl md:text-4xl font-semibold tracking-tight text-slate-50 leading-tight drop-shadow-[0_10px_30px_rgba(15,23,42,0.9)]"
+              >
+                ¿Qué es <span class="text-sky-300">AgendateOnline</span>?
+              </h1>
+
+              <p
+                class="text-[13px] sm:text-sm md:text-base text-slate-200/95 max-w-2xl mx-auto md:mx-0"
+              >
+                AgendateOnline es una <strong>agenda virtual</strong> que te
+                permite organizar todos tus turnos en un solo lugar. Tus
+                clientes se agendan solos desde su celular las 24 horas, usando
+                un link o código QR, sin que tengas que responder mensajes uno
+                por uno.
+              </p>
+            </div>
+          </header>
+
+          <!-- ¿Para qué sirve? -->
+          <section
+            class="grid gap-5 sm:gap-6 md:grid-cols-[1.1fr,0.9fr] items-start"
+          >
+            <div class="space-y-3">
+              <h2
+                class="text-base sm:text-lg font-semibold text-slate-50 flex items-center gap-2"
+              >
+                <span class="text-sky-300 text-lg sm:text-xl">✨</span>
+                ¿Para qué sirve?
+              </h2>
+              <ul
+                class="space-y-2 text-[13px] sm:text-sm md:text-base text-slate-200/95"
+              >
+                <li>• Para recibir turnos sin contestar mensajes todo el día.</li>
+                <li>• Para ahorrar tiempo y evitar estar pendiente del WhatsApp.</li>
+                <li>• Para que tus clientes se agenden solos, cuando quieran.</li>
+                <li>
+                  • Para evitar olvidos, con recordatorios automáticos al cliente.
+                </li>
+                <li>
+                  • Para tener tus servicios, precios y horarios siempre visibles.
+                </li>
+                <li>
+                  • Para que tu negocio o emprendimiento se vea más profesional.
+                </li>
+              </ul>
+            </div>
+
+            <div
+              class="rounded-2xl border border-white/10 bg-white/10 px-3 sm:px-4 py-3 text-[12px] sm:text-xs md:text-sm text-slate-100/90 shadow-[0_18px_40px_rgba(15,23,42,0.8)] backdrop-blur-xl"
+            >
+              <p class="font-semibold text-sky-200 mb-1">
+                En pocas palabras:
+              </p>
+              <p>
+                Dejá el cuaderno y los mensajes eternos. Con AgendateOnline tus
+                clientes se agendan solos, vos organizás tu tiempo y tenés todo
+                el movimiento de tu negocio en una sola pantalla.
+              </p>
+            </div>
+          </section>
+
+          <!-- Funcionalidades -->
+          <section class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sky-300 text-lg sm:text-xl">⚙️</span>
+              <h2 class="text-lg sm:text-xl font-semibold text-slate-50">
+                Funciones principales
+              </h2>
+            </div>
+
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 hover:-translate-y-[3px] hover:bg-white/10 transition-all duration-200 ease-out shadow-[0_16px_40px_rgba(15,23,42,0.9)] backdrop-blur-xl"
+              >
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2"
+                >
+                  <span class="text-base sm:text-lg">📍</span>
+                  Ubicación y servicios
+                </h3>
+                <ul class="space-y-1 text-[13px] sm:text-sm text-slate-200">
+                  <li>• Mostrá la ubicación en tiempo real de tu negocio.</li>
+                  <li>
+                    • Mostrá servicios y precios (cortes, color, uñas, tatuajes,
+                    etc.).
+                  </li>
+                </ul>
+              </div>
+
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 hover:-translate-y-[3px] hover:bg-white/10 transition-all duration-200 ease-out shadow-[0_16px_40px_rgba(15,23,42,0.9)] backdrop-blur-xl"
+              >
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2"
+                >
+                  <span class="text-base sm:text-lg">📊</span>
+                  Horarios y estadísticas
+                </h3>
+                <ul class="space-y-1 text-[13px] sm:text-sm text-slate-200">
+                  <li>• Configurá horarios de atención y días libres.</li>
+                  <li>
+                    • Mirá estadísticas: dinero generado por día/semana/mes, servicio más
+                    vendido, empleado más solicitado y más.
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Personalización -->
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 hover:-translate-y-[3px] hover:bg-white/10 transition-all duration-200 ease-out shadow-[0_16px_40px_rgba(15,23,42,0.9)] backdrop-blur-xl"
+              >
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2"
+                >
+                  <span class="text-base sm:text-lg">🎨</span>
+                  Personalización de tu agenda
+                </h3>
+                <ul class="space-y-1 text-[13px] sm:text-sm text-slate-200">
+                  <li>
+                    • Cambiá los colores de tu agenda para que combine con tu
+                    marca y se vea <strong>única</strong>.
+                  </li>
+                  <li>
+                    • Añadí una <strong>foto de perfil</strong> para que tus
+                    clientes reconozcan tu negocio al instante.
+                  </li>
+                  <li>
+                    • Escribí una <strong>descripción bonita</strong> donde cuentes
+                    quién sos, qué ofrecés y qué hace diferente a tu servicio.
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Empleados -->
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 hover:-translate-y-[3px] hover:bg-white/10 transition-all duration-200 ease-out shadow-[0_16px_40px_rgba(15,23,42,0.9)] backdrop-blur-xl"
+              >
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2"
+                >
+                  <span class="text-base sm:text-lg">👥</span>
+                  Configuración de empleados
+                </h3>
+                <ul class="space-y-1 text-[13px] sm:text-sm text-slate-200">
+                  <li>
+                    • Configurá el <strong>horario de entrada y salida</strong> de cada empleado.
+                  </li>
+                  <li>
+                    • Definí su <strong>media hora de descanso</strong> y si tiene uno o varios
+                    <strong> días libres</strong> (incluso día y medio).
+                  </li>
+                  <li>
+                    • Asigná a cada empleado los <strong>servicios que sabe ejercer</strong>
+                  </li>
+                  <li>
+                    • Añadí una <strong>foto de perfil</strong> para cada empleado, así los clientes
+                    pueden reconocerlos al agendarse.
+                  </li>
+                  <li>
+                    • Activá o desactivá empleados sin borrarlos, ideal para licencias o ausencias
+                    temporales.
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- Cómo se usa -->
+          <section class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sky-300 text-lg sm:text-xl">📆</span>
+              <h2 class="text-lg sm:text-xl font-semibold text-slate-50">
+                ¿Cómo se usa?
+              </h2>
+            </div>
+
+            <ol
+              class="space-y-2 text-[13px] sm:text-sm md:text-base text-slate-200 list-decimal list-inside"
+            >
+              <li>
+                <strong>Creás tu agenda</strong> en AgendateOnline y obtenés
+                acceso a una <strong>versión de prueba por 1 mes</strong>.
+              </li>
+              <li>
+                <strong>Configurás tu agenda</strong>: añadís servicios y
+                precios, ubicación del negocio, una foto de perfil y una
+                descripción.
+              </li>
+              <li>
+                <strong>Compartís tu agenda</strong> mediante un enlace o un
+                código QR, por WhatsApp, Instagram o donde quieras.
+              </li>
+              <li>
+                El <strong>cliente entra y se agenda</strong>: elige servicio, día y horario disponible.
+              </li>
+              <li>
+                Vos ves en <strong>tiempo real</strong> qué día, a qué hora se
+                agendó y qué servicio va a tomar cada cliente.
+              </li>
+              <li>
+                Una vez atendido el cliente, <strong>validás el turno</strong>:
+                el servicio queda guardado y se suma automáticamente a tus
+                <strong>estadísticas</strong>, para que veas cuánto dinero
+                generaste en el día, la semana o el mes.
+              </li>
+            </ol>
+
+            <p class="text-[11px] sm:text-xs md:text-sm text-slate-300">
+              Tenés 1 mes de prueba. Al terminar ese período, solo tenés que
+              contactar con soporte para abonar el plan correspondiente y
+              seguir usando tu agenda sin perder nada de lo que ya configuraste.
+            </p>
+
+            <p class="text-[11px] sm:text-xs md:text-sm text-slate-300">
+              No hace falta instalar nada: funciona desde el navegador, tanto en
+              celular como en computadora.
+            </p>
+          </section>
+
+
+          <!-- Planes y precios -->
+          <section class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sky-300 text-lg sm:text-xl">💰</span>
+              <h2 class="text-lg sm:text-xl font-semibold text-slate-50">
+                Planes y precios
+              </h2>
+            </div>
+
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+              {/* Plan Emprendimiento */}
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 relative overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.95)] backdrop-blur-xl"
+              >
+                <div
+                  class="pointer-events-none absolute -top-10 -right-10 h-20 w-20 rounded-full bg-sky-400/25 blur-2xl"
+                ></div>
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2 relative"
+                >
+                  <span class="text-base sm:text-lg">🌱</span>
+                  Plan Emprendimiento
+                </h3>
+                <p class="text-[13px] sm:text-sm text-slate-200 relative">
+                  Ideal para <strong>una persona sola</strong> que atiende a sus clientes:
+                  uñas, pestañas, cejas, masajes, tatuajes, etc.
+                </p>
+                <ul
+                  class="text-[13px] sm:text-sm text-slate-200 space-y-1 relative"
+                >
+                  <li>
+                    • Incluye <strong>1 agenda virtual</strong> con todas las funciones.
+                  </li>
+                  <li>
+                    • Podés configurar servicios, precios, ubicación, colores, foto de perfil
+                    y descripción.
+                  </li>
+                  <li>
+                    • Ver estadísticas de dinero generado por día, semana o mes.
+                  </li>
+                </ul>
+                <p
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 mt-2 relative"
+                >
+                  Desde <span class="underline">$800</span> por mes.
+                </p>
+              </div>
+
+              {/* Plan Negocio */}
+              <div
+                class="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-4 space-y-2 relative overflow-hidden shadow-[0_18px_45px_rgba(15,23,42,0.95)] backdrop-blur-xl"
+              >
+                <div
+                  class="pointer-events-none absolute -bottom-10 -left-10 h-24 w-24 rounded-full bg-blue-500/25 blur-2xl"
+                ></div>
+                <h3
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 flex items-center gap-2 relative"
+                >
+                  <span class="text-base sm:text-lg">🚀</span>
+                  Plan Negocio
+                </h3>
+                <p class="text-[13px] sm:text-sm text-slate-200 relative">
+                  Pensado para negocios con <strong>varios empleados</strong>:
+                  barberías, salones, estudios de tatuajes, centros estéticos, etc.
+                </p>
+                <ul
+                  class="text-[13px] sm:text-sm text-slate-200 space-y-1 relative"
+                >
+                  <li>
+                    • Incluye <strong>varias agendas</strong>, una por empleado
+                    (cada uno con su propio calendario).
+                  </li>
+                  <li>
+                    • Todos tienen las <strong>mismas funciones</strong> que el Plan
+                    Emprendimiento: servicios, precios, colores, foto, descripción, etc.
+                  </li>
+                  <li>
+                    • El dueño ve todo en un solo panel y puede ver qué hace cada empleado.
+                  </li>
+                  <li>
+                    • El cliente puede elegir con quién quiere agendarse o dejar que el
+                    sistema le muestre el primer disponible.
+                  </li>
+                </ul>
+                <p
+                  class="text-[13px] sm:text-sm font-semibold text-sky-200 mt-2 relative"
+                >
+                  Desde <span class="underline">$1000</span> al mes por empleado.
+                </p>
+              </div>
+            </div>
+
+            <p class="text-[11px] sm:text-xs md:text-sm text-slate-300">
+              Ambos planes tienen las <strong>mismas funciones</strong> en la agenda.  
+              La diferencia principal es la cantidad de agendas: el Plan Emprendimiento incluye
+              1 agenda, y el Plan Negocio permite tener una agenda separada para cada empleado.
+            </p>
+
+          </section>
+
+
+          <!-- Seguridad -->
+          <section class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sky-300 text-lg sm:text-xl">🔒</span>
+              <h2 class="text-lg sm:text-xl font-semibold text-slate-50">
+                Seguridad y datos
+              </h2>
+            </div>
+            <ul
+              class="space-y-2 text-[13px] sm:text-sm md:text-base text-slate-200"
+            >
+              <li>
+                • Toda la información se guarda en la infraestructura de
+                <strong> Google (Firebase / Firestore)</strong>, con cifrado y
+                medidas de seguridad estándar de Google.
+              </li>
+              <li>
+                • <strong>No guardamos datos personales innecesarios</strong>:
+                solo lo básico para que el turno exista (por ejemplo: nombre,
+                teléfono y horario).
+              </li>
+              <li>• No vendemos ni compartimos datos con terceros.</li>
+              <li>
+                • Si un cliente lo solicita, se pueden eliminar sus datos y
+                turnos asociados a la agenda.
+              </li>
+            </ul>
+          </section>
+
+          <!-- CTA final -->
+          <section
+            class="mt-3 sm:mt-4 border-t border-white/10 pt-5 sm:pt-6 flex flex-col items-center justify-center gap-4 text-center"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <button
+                class="inline-flex items-center justify-center rounded-full px-7 sm:px-8 py-2.5 text-[13px] sm:text-sm font-semibold bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-300 hover:to-blue-400 text-slate-950 shadow-[0_18px_45px_rgba(56,189,248,0.6)] transition-transform duration-150 hover:-translate-y-[1px] active:translate-y-[1px]"
+              >
+                Obtener mi agenda
+              </button>
+              <p class="text-[10px] sm:text-[11px] text-slate-300 text-center max-w-xs">
+                Aquí puedes adquirir tu agenda de forma gratuita con un mes de prueba! 
+              </p>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
