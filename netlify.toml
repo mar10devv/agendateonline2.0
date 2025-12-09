@@ -8,6 +8,10 @@
 [[blobs]]
   name = "mp_tokens"
 
-# 🚀 Scheduler para recordatorios
+# 🚀 Scheduler para recordatorios (cada 15 minutos)
 [functions."recordatorios"]
   schedule = "*/15 * * * *"
+
+# 🕒 Scheduler para actualizar días de prueba (1 vez al día)
+[functions."actualizar-trials"]
+  schedule = "0 6 * * *" # todos los días a las 06:00 UTC aprox
