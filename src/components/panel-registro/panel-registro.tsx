@@ -190,6 +190,11 @@ export default function PanelRegistro() {
               calendario: configuracionBase,
             },
           ],
+
+          // 🆕 CAMPOS DEL CONTADOR DE DÍAS
+          trialActivo: true,        // el contador está encendido
+          trialDiasRestantes: 30,   // arranca con 30 días
+          estadoAgenda: "activa",   // agenda disponible
         },
         { merge: true }
       );
