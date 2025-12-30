@@ -3,11 +3,14 @@ import { useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import ModalBase from "../../ui/modalGenerico";
+import { subirImagenImgBB } from "../backend/modalEmpleadosBackend";
+import { Camera } from "lucide-react";
 
 // Tipo mínimo que necesitamos del negocio
 type EmpleadoBasico = {
   id?: string;
   nombre?: string;
+  fotoPerfil?: string;
   calendario?: {
     diasLibres?: string[];
     horaInicio?: string;
@@ -23,7 +26,7 @@ type NegocioBasico = {
   id: string;
   nombre: string;
   slug: string;
-  tipoAgenda?: string; // 👈 importante para saber si es "emprendimiento"
+  tipoAgenda?: string;
   configuracionAgenda?: {
     diasLibres?: string[];
     horaInicio?: string;
@@ -58,6 +61,20 @@ export default function ModalEmprendimiento({
   negocio,
 }: Props) {
   const cfg = negocio.configuracionAgenda || {};
+  const empleadoActual = negocio.empleadosData?.[0];
+
+  // 🧑 Nombre del empleado
+  const [nombreEmpleado, setNombreEmpleado] = useState<string>(
+    empleadoActual?.nombre || ""
+  );
+
+  // 📷 Foto del empleado
+  const [fotoActual, setFotoActual] = useState<string>(
+    empleadoActual?.fotoPerfil || ""
+  );
+  const [fotoNueva, setFotoNueva] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
 
   // 🔀 MODO: jornada vs personalizado
   const [modoTurnos, setModoTurnos] = useState<"jornada" | "personalizado">(
@@ -80,11 +97,9 @@ export default function ModalEmprendimiento({
   // 🔢 Validación de horarios
   // ============================
 
-  // "HH:mm" -> minutos desde 0:00
   const aMinutos = (h: string | undefined) => {
     if (!h) return null;
     const [hh, mm] = h.split(":").map(Number);
-    // Caso especial: 00:00 lo tratamos como 24:00 (fin del día)
     const horas = hh === 0 && mm === 0 ? 24 : hh;
     return horas * 60 + mm;
   };
@@ -101,12 +116,35 @@ export default function ModalEmprendimiento({
     modoTurnos === "personalizado" &&
     (!clientesPorDia || clientesPorDia <= 0);
 
+  const nombreInvalido = !nombreEmpleado.trim();
+
   if (!abierto) return null;
 
   const toggleDia = (dia: string) => {
     setDiasLibres((prev) =>
       prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
     );
+  };
+
+  // 📷 Manejar selección de foto
+  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor seleccioná una imagen válida");
+      return;
+    }
+
+    // Validar tamaño (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("La imagen no puede superar los 5MB");
+      return;
+    }
+
+    setFotoNueva(file);
+    setFotoPreview(URL.createObjectURL(file));
   };
 
   const handleGuardar = async () => {
@@ -116,6 +154,17 @@ export default function ModalEmprendimiento({
 
       const turnosPorDiaFinal =
         modoTurnos === "personalizado" ? Number(clientesPorDia) || 0 : null;
+
+      // 📷 Subir foto si hay una nueva
+      let fotoFinal = fotoActual;
+      if (fotoNueva) {
+        setSubiendoFoto(true);
+        const urlSubida = await subirImagenImgBB(fotoNueva);
+        if (urlSubida) {
+          fotoFinal = urlSubida;
+        }
+        setSubiendoFoto(false);
+      }
 
       // 🔹 Configuración de agenda unificada (nivel negocio)
       const nuevaConfig = {
@@ -127,7 +176,7 @@ export default function ModalEmprendimiento({
         clientesPorDia: turnosPorDiaFinal,
       };
 
-      // 🔹 Solo si es EMPRENDIMIENTO → sincronizar calendario del ÚNICO empleado
+      // 🔹 Solo si es EMPRENDIMIENTO → sincronizar calendario, nombre y foto del ÚNICO empleado
       let empleadosActualizados: EmpleadoBasico[] | undefined = undefined;
 
       const esEmprendimiento = negocio.tipoAgenda === "emprendimiento";
@@ -149,7 +198,12 @@ export default function ModalEmprendimiento({
         };
 
         empleadosActualizados = [
-          { ...primerEmpleado, calendario: nuevoCalendario },
+          { 
+            ...primerEmpleado, 
+            nombre: nombreEmpleado.trim(),
+            fotoPerfil: fotoFinal, // 👈 Actualizar foto
+            calendario: nuevoCalendario 
+          },
           ...resto,
         ];
       }
@@ -158,7 +212,6 @@ export default function ModalEmprendimiento({
         configuracionAgenda: nuevaConfig,
       };
 
-      // 👇 Solo tocamos empleadosData si calculamos algo arriba
       if (empleadosActualizados) {
         payload.empleadosData = empleadosActualizados;
       }
@@ -168,15 +221,18 @@ export default function ModalEmprendimiento({
       setExito(true);
       setGuardando(false);
 
-      // 🔄 Refrescar la web para que calendario & agenda tomen la nueva config
       setTimeout(() => {
         window.location.reload();
       }, 600);
     } catch (err) {
       console.error("❌ Error guardando configuración de emprendimiento:", err);
       setGuardando(false);
+      setSubiendoFoto(false);
     }
   };
+
+  // Foto a mostrar (preview > actual > ninguna)
+  const fotoMostrar = fotoPreview || fotoActual;
 
   return (
     <ModalBase
@@ -188,11 +244,64 @@ export default function ModalEmprendimiento({
       <div className="space-y-5">
         <p className="text-sm text-gray-300">
           Esta agenda está en modo <strong>emprendimiento</strong>. Acá definís
-          el <strong>horario de trabajo</strong>, los{" "}
+          tu <strong>foto</strong>, tu <strong>nombre</strong>, el <strong>horario de trabajo</strong>, los{" "}
           <strong>días libres</strong> y, si usás modo{" "}
           <strong>personalizado</strong>, la{" "}
           <strong>cantidad de turnos por día</strong>.
         </p>
+
+        {/* 📷 Foto + Nombre en fila */}
+        <div className="flex items-start gap-4">
+          {/* Foto de perfil */}
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-600 bg-[var(--color-primario-oscuro)]">
+              {fotoMostrar ? (
+                <img
+                  src={fotoMostrar}
+                  alt="Foto de perfil"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl text-gray-400">
+                  {nombreEmpleado.charAt(0).toUpperCase() || "?"}
+                </div>
+              )}
+            </div>
+            
+            {/* Overlay para cambiar foto */}
+            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition cursor-pointer">
+              <Camera className="w-6 h-6 text-white" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFotoChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {/* Nombre */}
+          <div className="flex-1">
+            <label className="block text-xs mb-1 text-gray-400">
+              Tu nombre (visible para clientes)
+            </label>
+            <input
+              type="text"
+              value={nombreEmpleado}
+              onChange={(e) => setNombreEmpleado(e.target.value)}
+              placeholder="Ej: María García"
+              className="w-full px-3 py-2 rounded-md bg-[var(--color-primario-oscuro)] border border-gray-700 text-white text-sm placeholder:text-gray-500"
+            />
+            {nombreInvalido && (
+              <p className="text-xs text-red-400 mt-1">
+                El nombre no puede estar vacío.
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Pasá el mouse sobre la foto para cambiarla
+            </p>
+          </div>
+        </div>
 
         {/* 🔀 Toggle modo de turnos */}
         <div className="flex gap-2 bg-[var(--color-primario-oscuro)] rounded-xl p-1 text-xs">
@@ -322,7 +431,7 @@ export default function ModalEmprendimiento({
           <button
             type="button"
             onClick={handleGuardar}
-            disabled={guardando || horarioInvalido || clientesInvalidos}
+            disabled={guardando || horarioInvalido || clientesInvalidos || nombreInvalido}
             className={`
               px-5 py-2 rounded-lg text-sm font-medium
               ${
@@ -332,7 +441,9 @@ export default function ModalEmprendimiento({
               }
             `}
           >
-            {guardando
+            {subiendoFoto
+              ? "Subiendo foto..."
+              : guardando
               ? "Guardando..."
               : exito
               ? "✅ Guardado"

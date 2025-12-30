@@ -865,118 +865,135 @@ case "servicios":
           transition-colors duration-300
         "
       >
-        {/* HEADER */}
-        <div
-          className="
-            w-full max-w-3xl 
-            bg-[var(--color-primario)]
-            rounded-3xl p-6 flex flex-col items-center 
-            shadow-[0_8px_20px_rgba(0,0,0,0.45)]
-            hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-            transition-all duration-300
-            relative
-            text-[var(--color-texto)]
-          "
-        >
-          {/* Configuración + Estadísticas (solo DUEÑO) */}
-          {modo === "dueño" && (
-            <div className="absolute top-4 right-4 flex items-center gap-3">
-              {/* Icono estadísticas */}
-              <button
-                onClick={() => setModalEstadisticas(true)}
-                className="p-1 rounded-full hover:bg-black/10 transition"
-                title="Ver estadísticas"
-              >
-                <img
-                  src={IconEstadisticas}
-                  alt="Estadísticas"
-                  className="w-7 h-7 icono-blanco opacity-80 hover:opacity-100 transition"
-                />
-              </button>
-
-              {/* Icono configuración */}
-              <button
-                onClick={() => setModalPerfil(true)}
-                className="p-1 rounded-full hover:bg-black/10 transition"
-                title="Configurar perfil"
-              >
-                <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
-              </button>
-            </div>
-          )}
-
-          {/* Foto */}
-          <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
-            {negocio.perfilLogo ? (
-              <img
-                src={negocio.perfilLogo}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-3xl">
-                {negocio.nombre[0]}
-              </div>
-            )}
-          </div>
-
-{/* Nombre */}
-<h1
+{/* HEADER */}
+<div
   className="
+    w-full max-w-3xl 
+    bg-[var(--color-primario)]
+    rounded-3xl p-6 pb-8 flex flex-col items-center 
+    shadow-[0_8px_20px_rgba(0,0,0,0.45)]
+    hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
+    transition-all duration-300
     relative
-    font-euphoria
-    text-[34px]
-    md:text-[48px]
-    leading-none
-    tracking-wide
-    mt-4
-    text-white
+    text-[var(--color-texto)]
   "
-  style={{
-    // ⭐ Sombra mucho más suave
-    textShadow: "0 2px 6px rgba(0,0,0,0.45)",
-
-    // ⭐ Trazo finito y clarito (casi imperceptible en mobile)
-    WebkitTextStroke: "0.3px rgba(255,255,255,0.30)",
-
-    // Relleno blanco normal
-    WebkitTextFillColor: "#ffffff",
-  }}
 >
-  {negocio.nombre}
-</h1>
+{/* Iconos superiores derechos */}
+<div className="absolute top-4 right-4 flex items-center gap-3">
+  {/* Icono compartir (todos) */}
+  <button
+    onClick={() => setModalShare(true)}
+    className="p-1 rounded-full hover:bg-black/10 transition"
+    title="Compartir agenda"
+  >
+    <Share2 className="w-6 h-6 opacity-80 hover:opacity-100 transition" />
+  </button>
 
+  {/* Icono estadísticas (solo DUEÑO) */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalEstadisticas(true)}
+      className="p-1 rounded-full hover:bg-black/10 transition"
+      title="Ver estadísticas"
+    >
+      <img
+        src={IconEstadisticas}
+        alt="Estadísticas"
+        className="w-7 h-7 icono-blanco opacity-80 hover:opacity-100 transition"
+      />
+    </button>
+  )}
 
+  {/* Icono configuración (solo DUEÑO) */}
+  {modo === "dueño" && (
+    <button
+      onClick={() => setModalPerfil(true)}
+      className="p-1 rounded-full hover:bg-black/10 transition"
+      title="Configurar perfil"
+    >
+      <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
+    </button>
+  )}
+</div>
+  {/* Foto */}
+  <div className="w-24 h-24 rounded-full bg-[var(--color-primario-oscuro)] overflow-hidden border-4 border-white/20">
+    {negocio.perfilLogo ? (
+      <img
+        src={negocio.perfilLogo}
+        className="w-full h-full object-cover"
+      />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center text-3xl">
+        {negocio.nombre[0]}
+      </div>
+    )}
+  </div>
 
-          {/* Descripción */}
-          <p className="opacity-80 text-center mt-4 px-4">
-            {negocio.descripcion || "Sin descripción."}
-          </p>
+  {/* Nombre */}
+  <h1
+    className="
+      relative
+      font-euphoria
+      text-[34px]
+      md:text-[48px]
+      leading-none
+      tracking-wide
+      mt-4
+      text-white
+    "
+    style={{
+      textShadow: "0 2px 6px rgba(0,0,0,0.45)",
+      WebkitTextStroke: "0.3px rgba(255,255,255,0.30)",
+      WebkitTextFillColor: "#ffffff",
+    }}
+  >
+    {negocio.nombre}
+  </h1>
 
-                   {/* Botón para compartir agenda */}
-          <div className="flex justify-center mt-3">
-            <button
-              onClick={() => setModalShare(true)}
-              className="p-2 rounded-full border border-white/40 hover:bg-black/10 transition"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
-          </div>
+  {/* Descripción */}
+  <p className="opacity-80 text-center mt-4 px-4">
+    {negocio.descripcion || "Sin descripción."}
+  </p>
 
-        </div>
+  {/* Botón para compartir agenda */}
+  <div className="flex justify-center mt-3">
+    <button
+      onClick={() => setModalShare(true)}
+      className="p-2 rounded-full border border-white/40 hover:bg-black/10 transition"
+    >
+      <Share2 className="w-4 h-4" />
+    </button>
+  </div>
+
+{/* Agujeros inferiores del header (para los ganchos) */}
+<div className="absolute -bottom-2 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none">
+  {[...Array(4)].map((_, i) => (
+    <div
+      key={i}
+      className="w-5 h-5 rounded-full bg-[var(--color-fondo)] shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)]"
+    />
+  ))}
+</div>
+</div>
 
 {/* NAV CON GANCHOS DE AGENDA */}
 <div className="relative w-full max-w-3xl mt-6">
-  {/* Ganchos de espiral */}
-  <div className="absolute -top-4 left-0 right-0 flex justify-around px-20 pointer-events-none z-10">
-    {[...Array(4)].map((_, i) => (
-      <div key={i} className="flex flex-col items-center">
-        {/* Parte superior del gancho (visible arriba) */}
-        <div className="w-3 h-4 rounded-t-full bg-gradient-to-b from-gray-300 to-gray-500 shadow-md" />
-        {/* Anillo del gancho */}
-        <div className="w-5 h-5 rounded-full border-4 border-gray-400 bg-[var(--color-fondo)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_2px_4px_rgba(0,0,0,0.3)]" />
-      </div>
-    ))}
-  </div>
+{/* Ganchos de espiral */}
+<div className="absolute -top-0 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none z-[100]">
+  {[...Array(4)].map((_, i) => (
+    <div key={i} className="relative flex flex-col items-center">
+      {/* Gancho superior */}
+      <div 
+        className="absolute -top-7 left-1/2 -translate-x-1/2 w-3 h-10 rounded-t-full shadow-md"
+        style={{
+          background: 'linear-gradient(to bottom, #d1d5db 0%, #9ca3af 50%, #374151 80%, #1f2937 100%)'
+        }}
+      />
+      {/* Anillo del gancho */}
+      <div className="w-6 h-6 rounded-full border-4 border-gray-400 bg-[var(--color-fondo)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_2px_4px_rgba(0,0,0,0.3)]" />
+    </div>
+  ))}
+</div>
 
   {/* Barra del nav */}
   <div

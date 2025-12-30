@@ -19,6 +19,7 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   if (!abierto) return null;
 
   const [temaSeleccionado, setTemaSeleccionado] = useState<string>("gris");
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     const guardado = localStorage.getItem("temaSeleccionado");
@@ -33,6 +34,8 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   }, []);
 
   const manejarGuardar = async () => {
+    setGuardando(true);
+    
     aplicarTema(temaSeleccionado as keyof typeof temas);
 
     try {
@@ -48,13 +51,16 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
       });
 
       console.log("✅ Tema guardado en Firestore:", temaSeleccionado);
+      
+      // Pequeña pausa para que se vea el mensaje
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+      
     } catch (err) {
       console.error("❌ Error al guardar el tema:", err);
+      setGuardando(false);
     }
-
-    onCerrar();
-    // 🔥 Recargar la web (solución definitiva al bug visual)
-    window.location.reload();
   };
 
   // 👉 Filtramos los temas que sí queremos mostrar en el modal
@@ -72,7 +78,7 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
   return (
     <ModalGenerico
       abierto={abierto}
-      onClose={onCerrar}
+      onClose={guardando ? () => {} : onCerrar}
       titulo="Seleccionar tema"
       maxWidth="max-w-sm"
     >
@@ -80,12 +86,13 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
         {temasVisibles.map(([nombre, valores]) => (
           <button
             key={nombre}
-            onClick={() => setTemaSeleccionado(nombre)}
+            onClick={() => !guardando && setTemaSeleccionado(nombre)}
+            disabled={guardando}
             className={`w-14 h-14 rounded-full border-4 transition ${
               temaSeleccionado === nombre
                 ? "border-white scale-110"
                 : "border-transparent"
-            }`}
+            } ${guardando ? "opacity-50 cursor-not-allowed" : ""}`}
             style={{
               backgroundColor: valores.primario,
             }}
@@ -96,16 +103,34 @@ export default function ModalTema({ abierto, onCerrar, negocioId }: Props) {
       <div className="flex justify-end mt-4 gap-2">
         <button
           onClick={onCerrar}
-          className="px-4 py-2 rounded bg-neutral-700 hover:bg-neutral-600 text-white"
+          disabled={guardando}
+          className={`px-4 py-2 rounded bg-neutral-700 hover:bg-neutral-600 text-white ${
+            guardando ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
           Cancelar
         </button>
 
         <button
           onClick={manejarGuardar}
-          className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+          disabled={guardando}
+          className={`px-4 py-2 rounded text-white font-medium flex items-center gap-2 ${
+            guardando 
+              ? "bg-indigo-500 cursor-wait" 
+              : "bg-indigo-600 hover:bg-indigo-700"
+          }`}
         >
-          Guardar
+          {guardando ? (
+            <>
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Aplicando estilo...
+            </>
+          ) : (
+            "Guardar"
+          )}
         </button>
       </div>
     </ModalGenerico>
