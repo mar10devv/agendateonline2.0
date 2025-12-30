@@ -1,6 +1,6 @@
 // src/components/agendaVirtual/ui/modalEmpleadosUI.tsx
 import { useState, useEffect } from "react";
-import ModalServicios from "../modalAsignarServiciosEmpleados";
+import ModalServicios from "../modales/modalAsignarServiciosEmpleados";
 import ModalBase from "../../ui/modalGenerico";
 import ModalAviso from "../../ui/modalAviso";
 import ModalHorariosEmpleados from "./modalEmpleadosHorarios";

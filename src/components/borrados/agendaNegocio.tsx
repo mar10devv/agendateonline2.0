@@ -13,7 +13,7 @@ import {
   addDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { db } from "../../../lib/firebase";
+import { db } from "../../lib/firebase";
 
 /* ================== Tipos ================== */
 type Empleado = {

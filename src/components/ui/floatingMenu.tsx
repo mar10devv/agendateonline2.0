@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import styled from "styled-components";
-import ModalAgendarse from "../agendaVirtual/ui/modalAgendarse";
+import ModalAgendarse from "../agendaVirtual/modales/modalAgendarse";
 import CalendarIcon from "../../assets/calendario-svg.svg?url"; // 👈 Import del SVG
 
 const FloatingButton = ({ negocio }: { negocio: any }) => {

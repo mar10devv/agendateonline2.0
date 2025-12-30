@@ -12,10 +12,10 @@ import {
   getDoc,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "../../lib/firebase";
-import ModalBase from "../ui/modalGenerico";
-import LoaderSpinner from "../ui/loaderSpinner";
-import AddIcon from "../../assets/add.svg?url";
+import { db } from "../../../lib/firebase";
+import ModalBase from "../../ui/modalGenerico";
+import LoaderSpinner from "../../ui/loaderSpinner";
+import AddIcon from "../../../assets/add.svg?url";
 
 type Servicio = {
   id?: string;

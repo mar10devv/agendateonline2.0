@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import ConfigIcon from "../../ui/Config-icono";
-import { obtenerDireccion } from "../../../lib/geocoding";
+import ConfigIcon from "../ui/Config-icono";
+import { obtenerDireccion } from "../../lib/geocoding";
 import { useRef } from "react";
-import ModalEmpleadosUI from "./modalEmpleadosUI";
-import ModalAgregarServicios from "../modalAgregarServicios";
-import { inicializarTema } from "../../../lib/temaColores";
-import SelectorTema from "../ui/SelectorTema";
+import ModalEmpleadosUI from "../agendaVirtual/modales/modalEmpleadosUI";
+import ModalAgregarServicios from "../agendaVirtual/modalAgregarServicios";
+import { inicializarTema } from "../../lib/temaColores";
+import SelectorTema from "../agendaVirtual/ui/SelectorTema";
 
-import ModalShare from "./share";
+import ModalShare from "../agendaVirtual/ui/share";
 import { 
   doc, 
   updateDoc, 
@@ -17,21 +17,21 @@ import {
   getDocs,
   onSnapshot,
 } from "firebase/firestore";
-import ModalAgendarse from "./modalAgendarse";
-import { db } from "../../../lib/firebase";
-import FloatingMenu from "../../ui/floatingMenu";
+import ModalAgendarse from "../agendaVirtual/modales/modalAgendarse";
+import { db } from "../../lib/firebase";
+import FloatingMenu from "../ui/floatingMenu";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
-import ModalPerfil from "../ui/modalPerfil"; // 👈 asegurate de importar el modal
-import { useAgendaCache } from "../../../hooks/useAgendaCache";
+import ModalPerfil from "../agendaVirtual/ui/modalPerfil"; // 👈 asegurate de importar el modal
+import { useAgendaCache } from "../../hooks/useAgendaCache";
 import {
   subirLogoNegocio,
   agregarServicio,
   actualizarNombreYSlug,
   escucharServicios, 
   guardarUbicacionNegocio
-} from "../backend/agenda-backend";
-import CalendarioUI from "../ui/calendarioUI";
+} from "../agendaVirtual/backend/agenda-backend";
+import CalendarioUI from "./calendarioUI";
 import { Instagram, Facebook, Phone, Music } from "lucide-react";
 import AgendaNegocio from "./agendaNegocio";
 import ShareIcon from "../../../assets/share.svg?url";
@@ -40,8 +40,8 @@ import ShareIcon from "../../../assets/share.svg?url";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import LoaderSpinner from "../../ui/loaderSpinner"; 
-import ModalCalendario from "../ui/modalCalendario";
+import LoaderSpinner from "../ui/loaderSpinner"; 
+import ModalCalendario from "../agendaVirtual/modales/modalCalendario";
 
 
 // ✅ Icono personalizado para Leaflet
@@ -370,7 +370,7 @@ useEffect(() => {
 
   // 👉 Escuchar empleados (si seguís usando backend)
   let unsubscribeEmpleados: () => void;
-  import("../backend/agenda-backend").then(({ escucharEmpleados }) => {
+  import("../agendaVirtual/backend/agenda-backend").then(({ escucharEmpleados }) => {
     escucharEmpleados(negocio.slug, (emps) => {
       setEmpleadosState(emps); // 👈 refresca empleados
     }).then((unsub) => {
@@ -405,7 +405,7 @@ if (data.perfilLogo && data.perfilLogo !== logo) {
   // 🧹 Limpiar y actualizar cache local del cliente
   (async () => {
     try {
-      const cacheModule = await import("../../../lib/cacheAgenda");
+      const cacheModule = await import("../../lib/cacheAgenda");
       if ("clearCache" in cacheModule && "setCache" in cacheModule) {
         const { clearCache, setCache } = cacheModule as {
           clearCache: (slug: string, key: string) => void;

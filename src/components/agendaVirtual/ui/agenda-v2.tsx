@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 
 import CalendarioBase from "../calendario/calendario-diseño";
-import ModalAgendarse from "./modalAgendarse";
+import ModalAgendarse from "../modales/modalAgendarse";
 import ModalShare from "./share";
-import ModalPerfil from "../ui/modalPerfil";
-import ModalEmpleadosUI from "./modalEmpleadosUI";
+import ModalPerfil from "../modales/modalPerfil";
+import ModalEmpleadosUI from "../modales/modalEmpleadosUI";
 import ConfigIcon from "../../ui/Config-icono";
-import ModalAgregarServicios from "../modalAgregarServicios";
+import ModalAgregarServicios from "../modales/modalAgregarServicios";
 import { obtenerDireccion } from "../../../lib/geocoding";
 import {
   guardarUbicacionNegocio,
@@ -24,10 +24,10 @@ import LoaderSpinner from "../../ui/loaderSpinner";
 import ComponenteMapa from "./mapa";
 import CardServicio from "../../ui/cardServicio";
 import CardServicioAgregar from "../../ui/cardAgregarServicio";
-import ModalEmprendimiento from "./modalEmprendimiento";
+import ModalEmprendimiento from "../modales/modalEmprendimiento";
 import IconEstadisticas from "../../../assets/estadisticas-svg.svg?url";
 
-import ModalEstadisticas from "../ui/modalEstadisticas";
+import ModalEstadisticas from "../modales/modalEstadisticas";
 import IconAgenda from "../../../assets/icon-navbar/calendario.svg?url";
 import IconServicios from "../../../assets/icon-navbar/servicio.svg?url";
 import IconEmpleados from "../../../assets/icon-navbar/personal.svg?url";

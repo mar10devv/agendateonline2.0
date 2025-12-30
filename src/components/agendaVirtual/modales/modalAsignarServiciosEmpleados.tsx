@@ -1,9 +1,9 @@
 // src/components/agendaVirtual/ui/modalServicios.tsx
 import { useState, useEffect } from "react";
 import { doc, collection, getDocs, addDoc } from "firebase/firestore";
-import { db } from "../../lib/firebase";
-import ModalBase from "../ui/modalGenerico";
-import AddIcon from "../../assets/add.svg?url";
+import { db } from "../../../lib/firebase";
+import ModalBase from "../../ui/modalGenerico";
+import AddIcon from "../../../assets/add.svg?url";
 
 type Servicio = {
   id?: string;

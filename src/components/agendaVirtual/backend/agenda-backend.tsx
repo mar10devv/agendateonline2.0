@@ -434,10 +434,11 @@ export async function actualizarNombreYSlug(
   nuevoNombre: string
 ) {
   const nuevoSlug = nuevoNombre
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9\-]/g, "");
+  .toLowerCase()
+  .trim()
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9]+/g, "");
 
   // 👉 Buscar el doc actual por slugActual
   const negocioDocs = await getDocs(
