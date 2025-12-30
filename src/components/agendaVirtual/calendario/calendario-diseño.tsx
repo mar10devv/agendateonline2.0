@@ -340,7 +340,7 @@ export default function CalendarioBase({
   if (modo === "cliente") {
     fechaMinima.setHours(0, 0, 0, 0);
   } else {
-    fechaMinima.setDate(hoy.getDate() - 10);
+    fechaMinima.setDate(hoy.getDate() - 5);
     fechaMinima.setHours(0, 0, 0, 0);
   }
 
@@ -732,94 +732,90 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
           ))}
         </div>
 
-        {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
-          {dias.map((d, idx) => {
-            if (!d) return <div key={idx} className="w-10 h-8" />;
+{/* Días del mes - SIN FILAS VACÍAS */}
+<div className="grid grid-cols-7 gap-y-1 text-sm mb-4">
+  {(() => {
+    // Agrupar días en filas de 7
+    const filas: (Date | null)[][] = [];
+    for (let i = 0; i < dias.length; i += 7) {
+      filas.push(dias.slice(i, i + 7));
+    }
 
-            const esHoy =
-              d.toDateString() === hoy.toDateString();
-            const esPasado =
-              d <
-              new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    // Filtrar filas completamente vacías
+    const filasVisibles = filas.filter((fila) =>
+      fila.some((d) => d !== null)
+    );
 
-            const nombreDiaLong = d.toLocaleDateString("es-ES", {
-              weekday: "long",
-            });
-            const diaNorm = normalizarDia(nombreDiaLong);
+    return filasVisibles.flat().map((d, idx) => {
+      if (!d) return <div key={idx} className="w-10 h-8" />;
 
-            // ======================
-            // 🔥 Jerarquía de días libres
-            // ======================
-            const diasNegocio = (config as any).diasLibresNegocioNorm || [];
-            const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
+      const esHoy = d.toDateString() === hoy.toDateString();
+      const esPasado =
+        d < new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
-            // RAW (tal cual vienen)
-            const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
-            const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
+      const nombreDiaLong = d.toLocaleDateString("es-ES", {
+        weekday: "long",
+      });
+      const diaNorm = normalizarDia(nombreDiaLong);
 
-            // Detectar si ES el día medio del empleado
-            const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
-            const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
+      const diasNegocio = (config as any).diasLibresNegocioNorm || [];
+      const diasEmpleado = (config as any).diasLibresEmpleadoNorm || [];
 
-            // 👉 El negocio manda SIEMPRE:
-            const esLibreNegocio = esLibreNegocioRaw;
+      const esLibreNegocioRaw = diasNegocio.includes(diaNorm);
+      const esLibreEmpleadoRaw = diasEmpleado.includes(diaNorm);
 
-            // 👉 El empleado solo aporta día libre completo si NO es su medio día
-            const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
+      const diaMedioNorm = normalizarDia(config.descansoDiaMedio || "");
+      const esDiaMedio = diaMedioNorm && diaMedioNorm === diaNorm;
 
-            // Día libre total si:
-            //  - negocio lo marca libre, o
-            //  - empleado lo marca libre y NO es medio día
-            const esDiaLibre = esLibreNegocio || esLibreEmpleado;
+      const esLibreNegocio = esLibreNegocioRaw;
+      const esLibreEmpleado = esDiaMedio ? false : esLibreEmpleadoRaw;
+      const esDiaLibre = esLibreNegocio || esLibreEmpleado;
 
-            const seleccionado =
-              diaSeleccionado && esMismoDia(d, diaSeleccionado);
-            const disabled = esPasado || esDiaLibre;
+      const seleccionado =
+        diaSeleccionado && esMismoDia(d, diaSeleccionado);
+      const disabled = esPasado || esDiaLibre;
 
-            // ======================
-            // 🎨 ESTILOS DEL DÍA
-            // ======================
-            let clases =
-              "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+      let clases =
+        "w-10 h-8 flex items-center justify-center rounded-lg transition ";
 
-            if (esDiaLibre) {
-              clases +=
-                "text-red-400 line-through cursor-not-allowed opacity-70";
-            } else if (esHoy) {
-              clases += "bg-white text-black font-bold";
-            } else if (esPasado) {
-              clases += "text-gray-500 line-through cursor-not-allowed";
-            } else if (seleccionado) {
-              clases += "bg-indigo-600 text-white font-bold";
-            } else {
-              clases += "hover:bg-neutral-700";
-            }
+      if (esDiaLibre) {
+        clases +=
+          "text-red-400 line-through cursor-not-allowed opacity-70";
+      } else if (esHoy) {
+        clases += "bg-white text-black font-bold";
+      } else if (esPasado) {
+        clases += "text-gray-500 line-through cursor-not-allowed";
+      } else if (seleccionado) {
+        clases += "bg-indigo-600 text-white font-bold";
+      } else {
+        clases += "hover:bg-neutral-700";
+      }
 
-            return (
-              <button
-                key={idx}
-                disabled={disabled}
-                onClick={() =>
-                  manejarClickDia(d, {
-                    esPasado,
-                    esDiaLibre,
-                  })
-                }
-                className={clases}
-                title={
-                  esDiaLibre
-                    ? esLibreNegocio
-                      ? "Día cerrado por el negocio"
-                      : "Día libre del empleado"
-                    : ""
-                }
-              >
-                {d.getDate()}
-              </button>
-            );
-          })}
-        </div>
+      return (
+        <button
+          key={idx}
+          disabled={disabled}
+          onClick={() =>
+            manejarClickDia(d, {
+              esPasado,
+              esDiaLibre,
+            })
+          }
+          className={clases}
+          title={
+            esDiaLibre
+              ? esLibreNegocio
+                ? "Día cerrado por el negocio"
+                : "Día libre del empleado"
+              : ""
+          }
+        >
+          {d.getDate()}
+        </button>
+      );
+    });
+  })()}
+</div>
 
         {/* Slots del día */}
         {diaSeleccionado ? (
