@@ -667,7 +667,7 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
                 Seleccionar agenda de:
               </span>
               <select
-                className="flex-1 bg-neutral-900 border border-neutral-700 text-xs rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 bg-[var(--color-primario-oscuro)] border border-white/20 text-xs rounded-lg px-3 py-2 text-[var(--color-texto)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={
                   empleadoSeleccionadoNombre ||
                   empleadoActual?.nombre ||
@@ -718,7 +718,7 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
         </div>
 
         {/* Días de la semana */}
-        <div className="grid grid-cols-7 text-xs text-gray-400 mb-1">
+        <div className="grid grid-cols-7 text-xs text-[var(--color-texto)] mb-1">
           {["L", "M", "X", "J", "V", "S", "D"].map((d, i) => (
             <div
               key={i}
@@ -776,17 +776,17 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
   "w-10 h-10 flex items-center justify-center rounded-full transition text-sm font-medium ";
 
 if (esDiaLibre) {
-  // 🔴 Día cerrado: fondo rojo apagado, sin tachado
-  clases += "bg-red-900/40 text-red-400 cursor-not-allowed";
+  // 🔴 Día cerrado: rojo sólido fijo (no depende del tema)
+  clases += "bg-red-800 text-white cursor-not-allowed";
 } else if (esHoy) {
   // ⚪ Hoy: anillo blanco brillante
   clases += "bg-transparent text-white ring-2 ring-white font-bold";
 } else if (esPasado) {
-  // ⬛ Pasado: gris muy tenue
-  clases += "bg-neutral-800/30 text-gray-600 cursor-not-allowed";
+  // ⬛ Pasado: texto del tema, tachado, sin fondo
+  clases += "bg-transparent text-[var(--color-texto)] opacity-70 line-through cursor-not-allowed";
 } else if (seleccionado) {
-  // 🟢 Seleccionado: verde con glow
-  clases += "bg-emerald-500 text-white font-bold shadow-[0_0_12px_rgba(16,185,129,0.6)]";
+  // 🔵 Seleccionado: color secundario del tema
+  clases += "bg-[var(--color-primario-oscuro)] text-[var(--color-texto)] font-bold ring-2 ring-white/50";
 } else {
   // ⚫ Normal: transparente, hover sutil
   clases += "bg-transparent text-gray-200 hover:bg-white/10";

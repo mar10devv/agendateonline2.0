@@ -964,74 +964,84 @@ case "servicios":
 
         </div>
 
-        {/* NAV */}
-        <div
-          className="
-    w-full max-w-3xl mt-4 p-3 rounded-3xl flex justify-around gap-2
-    bg-[var(--color-primario-oscuro)]
-    text-[var(--color-texto)]
-    shadow-[0_6px_16px_rgba(0,0,0,0.40)]
-    hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
-    transition-all duration-300
-  "
+{/* NAV CON GANCHOS DE AGENDA */}
+<div className="relative w-full max-w-3xl mt-6">
+  {/* Ganchos de espiral */}
+  <div className="absolute -top-4 left-0 right-0 flex justify-around px-20 pointer-events-none z-10">
+    {[...Array(4)].map((_, i) => (
+      <div key={i} className="flex flex-col items-center">
+        {/* Parte superior del gancho (visible arriba) */}
+        <div className="w-3 h-4 rounded-t-full bg-gradient-to-b from-gray-300 to-gray-500 shadow-md" />
+        {/* Anillo del gancho */}
+        <div className="w-5 h-5 rounded-full border-4 border-gray-400 bg-[var(--color-fondo)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_2px_4px_rgba(0,0,0,0.3)]" />
+      </div>
+    ))}
+  </div>
+
+  {/* Barra del nav */}
+  <div
+    className="
+      w-full p-3 pt-6 rounded-3xl flex justify-around gap-2
+      bg-[var(--color-primario-oscuro)]
+      text-[var(--color-texto)]
+      shadow-[0_6px_16px_rgba(0,0,0,0.40)]
+      hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
+      transition-all duration-300
+    "
+  >
+    {navItems.map((item) => {
+      const onboardingIncompleto =
+        (modo === "dueño" || modo === "admin") &&
+        negocio.configuracionAgenda?.onboardingCompletado !== true;
+
+      let mostrarAlerta = false;
+
+      if (onboardingIncompleto) {
+        if (item.id === "servicios") {
+          mostrarAlerta = serviciosState.length === 0;
+        } else if (item.id === "ubicacion") {
+          mostrarAlerta = !ubicacion;
+        } else if (item.id === "empleados") {
+          mostrarAlerta = !esEmprendimiento && hayEmpleadosIncompletos;
+        }
+      }
+
+      return (
+        <button
+          key={item.id}
+          onClick={() => setVista(item.id)}
+          className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
+            ${
+              vista === item.id
+                ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
+                : "bg-transparent"
+            }`}
         >
-          {navItems.map((item) => {
-            const onboardingIncompleto =
-              (modo === "dueño" || modo === "admin") &&
-              negocio.configuracionAgenda?.onboardingCompletado !== true;
+          {mostrarAlerta && (
+            <span
+              className="
+                absolute -top-1 right-4
+                h-2.5 w-2.5 rounded-full
+                bg-yellow-400
+                shadow-[0_0_10px_rgba(250,204,21,0.9)]
+                animate-pulse
+              "
+            />
+          )}
 
-            let mostrarAlerta = false;
-
-            if (onboardingIncompleto) {
-              if (item.id === "servicios") {
-                // 👉 Punto solo si NO hay servicios cargados
-                mostrarAlerta = serviciosState.length === 0;
-              } else if (item.id === "ubicacion") {
-                // 👉 Punto solo si todavía NO hay ubicación guardada
-                mostrarAlerta = !ubicacion;
-              } else if (item.id === "empleados") {
-                // 👉 SOLO negocios normales, no emprendimientos
-                mostrarAlerta = !esEmprendimiento && hayEmpleadosIncompletos;
-              }
-              // En "agenda" nunca mostramos punto
-            }
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => setVista(item.id)}
-                className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
-          ${
-            vista === item.id
-              ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
-              : "bg-transparent"
-          }`}
-              >
-                {/* PUNTO AMARILLO PARPADEANDO */}
-                {mostrarAlerta && (
-                  <span
-                    className="
-              absolute -top-1 right-4
-              h-2.5 w-2.5 rounded-full
-              bg-yellow-400
-              shadow-[0_0_10px_rgba(250,204,21,0.9)]
-              animate-pulse
-            "
-                  />
-                )}
-
-                <div className="w-8 h-8 flex items-center justify-center">
-                  <img
-                    src={item.icon}
-                    alt={item.label}
-                    className="w-8 h-8 icono-blanco"
-                  />
-                </div>
-                <span className="text-xs mt-1 text-center">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
+          <div className="w-8 h-8 flex items-center justify-center">
+            <img
+              src={item.icon}
+              alt={item.label}
+              className="w-8 h-8 icono-blanco"
+            />
+          </div>
+          <span className="text-xs mt-1 text-center">{item.label}</span>
+        </button>
+      );
+    })}
+  </div>
+</div>
 
 {/* CONTENIDO */}
 <div

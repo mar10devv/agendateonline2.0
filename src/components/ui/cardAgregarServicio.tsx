@@ -13,7 +13,7 @@ export default function CardServicioAgregar({ onClick }: PropsCardAgregar) {
         group relative p-3
         w-full sm:w-[210px]
         min-h-[120px]
-        bg-[#111] rounded-2xl border border-white/10
+        bg-[var(--color-primario-oscuro)] rounded-2xl border border-white/10
         shadow-[0_6px_16px_rgba(0,0,0,0.35)]
         hover:shadow-[0_10px_24px_rgba(0,0,0,0.55)]
         transition-all duration-300
