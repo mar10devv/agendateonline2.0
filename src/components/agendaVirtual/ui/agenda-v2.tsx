@@ -1042,7 +1042,8 @@ case "servicios":
     bg-[var(--color-primario)]
     shadow-[0_8px_20px_rgba(0,0,0,0.45)]
     hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
-    transition-all duration-300
+    transition-all duration-300 animate-fadeSlideIn
+    animate-[fadeSlideIn_0.3s_ease-out]
     ${
       vista === "agenda" && modo === "cliente"
         ? "min-h-0" 
