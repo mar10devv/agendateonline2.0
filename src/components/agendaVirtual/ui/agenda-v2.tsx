@@ -870,7 +870,7 @@ case "servicios":
   className="
     w-full max-w-3xl 
     bg-[var(--color-primario)]
-    rounded-3xl p-6 pb-8 flex flex-col items-center 
+    rounded-3xl p-6 pb-12 flex flex-col items-center
     shadow-[0_8px_20px_rgba(0,0,0,0.45)]
     hover:shadow-[0_12px_28px_rgba(0,0,0,0.55)]
     transition-all duration-300
@@ -955,15 +955,6 @@ case "servicios":
     {negocio.descripcion || "Sin descripción."}
   </p>
 
-  {/* Botón para compartir agenda */}
-  <div className="flex justify-center mt-3">
-    <button
-      onClick={() => setModalShare(true)}
-      className="p-2 rounded-full border border-white/40 hover:bg-black/10 transition"
-    >
-      <Share2 className="w-4 h-4" />
-    </button>
-  </div>
 
 {/* Agujeros inferiores del header (para los ganchos) */}
 <div className="absolute -bottom-2 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none">
