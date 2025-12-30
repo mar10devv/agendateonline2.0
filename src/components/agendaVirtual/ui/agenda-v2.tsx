@@ -989,7 +989,7 @@ case "servicios":
   {/* Barra del nav */}
   <div
     className="
-      w-full p-3 pt-6 rounded-3xl flex justify-around gap-2
+     w-full px-3 pt-10 md:pt-6 pb-5 md:pb-3 rounded-3xl flex justify-around gap-2
       bg-[var(--color-primario-oscuro)]
       text-[var(--color-texto)]
       shadow-[0_6px_16px_rgba(0,0,0,0.40)]
