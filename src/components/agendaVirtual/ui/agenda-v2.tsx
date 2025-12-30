@@ -7,7 +7,8 @@ import {
   MapPin,
   Share2,
 } from "lucide-react";
-
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { Timestamp } from "firebase/firestore";
 import CalendarioBase from "../calendario/calendario-diseño";
 import ModalAgendarse from "../modales/modalAgendarse";
 import ModalShare from "./share";
@@ -41,6 +42,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  getDocs,  // 👈 agregar esto
 } from "firebase/firestore";
 
 import { useMap } from "react-leaflet";
@@ -184,6 +186,10 @@ const puedeConfigServiciosYEmpleados = esDueno;
   const [estadoUbicacion, setEstadoUbicacion] =
     useState<"idle" | "cargando" | "exito">("idle");
   const [modalEmprendimiento, setModalEmprendimiento] = useState(false);
+
+  // 🔍 Verificar si el cliente tiene turno pendiente
+const [tieneTurnoPendiente, setTieneTurnoPendiente] = useState(false);
+const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
@@ -523,6 +529,58 @@ const puedeConfigServiciosYEmpleados = esDueno;
     }
   }, [negocio, modo]);
 
+  // 🔍 Verificar turno pendiente del cliente en tiempo real
+useEffect(() => {
+  if (modo !== "cliente" || !negocio?.id) return;
+
+  setCargandoVerificacion(true);
+  const auth = getAuth();
+
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setTieneTurnoPendiente(false);
+      setCargandoVerificacion(false);
+      return;
+    }
+
+    try {
+      const refUser = collection(db, "Usuarios", user.uid, "Turnos");
+      const ahora = new Date();
+
+      const q = query(
+        refUser,
+        where("negocioId", "==", negocio.id),
+        where("finTs", ">", Timestamp.fromDate(ahora))
+      );
+
+      const snap = await getDocs(q);
+      setTieneTurnoPendiente(!snap.empty);
+    } catch (err) {
+      // Fallback: buscar sin filtro de fecha
+      try {
+        const refUser = collection(db, "Usuarios", user.uid, "Turnos");
+        const q = query(refUser, where("negocioId", "==", negocio.id));
+        const snap = await getDocs(q);
+        
+        const ahora = new Date();
+        const tieneActivo = snap.docs.some((doc) => {
+          const data = doc.data();
+          const finTs = data.finTs?.toDate?.() || new Date(0);
+          return finTs > ahora;
+        });
+        
+        setTieneTurnoPendiente(tieneActivo);
+      } catch {
+        setTieneTurnoPendiente(false);
+      }
+    } finally {
+      setCargandoVerificacion(false);
+    }
+  });
+
+  return () => unsubscribe();
+}, [modo, negocio?.id]);
+
     // 📍 Abrir ubicación en Google Maps
   const handleAbrirEnGoogleMaps = () => {
     if (!ubicacion) return;
@@ -628,25 +686,35 @@ case "servicios":
       }
 
       case "agenda": {
-        const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
+  const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
 
-        // 📌 Vista cliente: solo botón de reservar (se abre ModalAgendarse)
-        if (modoAgenda === "cliente") {
-          return (
-            <div className="flex justify-center">
-              <button
-                onClick={() => setModalAgendarse(true)}
-                className="
-                  px-6 py-3 rounded-2xl transition
-                  bg-[var(--color-primario)]
-                  hover:bg-[var(--color-primario-oscuro)]
-                "
-              >
-                Reservar Turno
-              </button>
-            </div>
-          );
-        }
+  // 📌 Vista cliente: botón dinámico
+  if (modoAgenda === "cliente") {
+    return (
+      <div className="flex justify-center">
+        <button
+  onClick={() => setModalAgendarse(true)}
+  disabled={cargandoVerificacion}
+  className={`
+    px-6 py-3 rounded-2xl transition
+    ${cargandoVerificacion 
+      ? "bg-[var(--color-primario-oscuro)] cursor-wait"
+      : tieneTurnoPendiente 
+        ? "bg-red-600 hover:bg-red-700" 
+        : "bg-[var(--color-primario)] hover:bg-[var(--color-primario-oscuro)]"
+    }
+  `}
+>
+  {cargandoVerificacion 
+    ? "Verificando..." 
+    : tieneTurnoPendiente 
+      ? "Cancelar mi turno" 
+      : "Reservar Turno"
+  }
+</button>
+      </div>
+    );
+  }
 
         // 📌 Vista dueño/admin: CalendarioBase con selector interno
         const empleadoActual = empleadosParaAgenda[0] || null;
@@ -960,11 +1028,11 @@ case "servicios":
 
 
 {/* Agujeros inferiores del header (para los ganchos) */}
-<div className="absolute -bottom-2 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none">
+<div className="absolute -bottom-1 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none">
   {[...Array(4)].map((_, i) => (
     <div
       key={i}
-      className="w-5 h-5 rounded-full bg-[var(--color-fondo)] shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)]"
+      className="w-6 h-6 rounded-full bg-[var(--color-fondo)] shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)]"
     />
   ))}
 </div>
