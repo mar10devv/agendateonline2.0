@@ -493,44 +493,41 @@ export default function CalendarioBase({
     }
   };
 
-
-  const getSlotClasses = (slot: SlotCalendario) => {
+const getSlotClasses = (slot: SlotCalendario) => {
   const base =
     "relative h-12 w-full rounded-lg text-sm font-semibold flex items-center justify-center transition focus:outline-none";
 
-    switch (slot.estado) {
-      case "libre":
-        // ✅ disponibles en VERDE
-        return `${base} bg-emerald-600 text-white hover:bg-emerald-700`;
+  switch (slot.estado) {
+    case "libre":
+  // ✅ disponibles: borde blanco, fondo transparente
+  return `${base} !bg-transparent text-gray-200 border border-white/30 hover:bg-emerald-600 hover:text-white`;
 
-      case "ocupado":
-        // ✅ turnos ocupados en ROJO
-        if (modo === "cliente") {
-          return `${base} bg-red-700 text-white cursor-not-allowed opacity-70`;
-        }
-        return `${base} bg-red-600 text-white hover:bg-red-700`;
+    case "ocupado":
+      // ✅ turnos ocupados en ROJO + PARPADEO
+      if (modo === "cliente") {
+        return `${base} bg-red-600 text-white cursor-not-allowed animate-pulse`;
+      }
+      return `${base} bg-red-600 text-white hover:bg-red-700 animate-pulse`;
 
-      case "bloqueado":
-        // 🚫 bloqueado: rojo más oscuro / apagado
-        if (modo === "cliente") {
-          return `${base} bg-red-900 text-red-200 cursor-not-allowed opacity-60`;
-        }
-        return `${base} bg-red-900 text-red-100 hover:bg-red-800`;
+    case "bloqueado":
+      // 🚫 bloqueado: rojo más oscuro / apagado
+      if (modo === "cliente") {
+        return `${base} bg-red-900 text-red-200 cursor-not-allowed opacity-60`;
+      }
+      return `${base} bg-red-900 text-red-100 hover:bg-red-800`;
 
-      case "pasado":
-        // 🔹 PASADO SIN reserva → gris apagado (igual que antes)
-        if (!slot.turnoOcupado) {
-          return `${base} bg-neutral-900 text-gray-500 cursor-not-allowed`;
-        }
+    case "pasado":
+      // 🔹 PASADO SIN reserva → gris apagado
+      if (!slot.turnoOcupado) {
+        return `${base} bg-neutral-900 text-gray-500 cursor-not-allowed`;
+      }
+      // 🔸 PASADO CON reserva → gris con borde amarillo
+      return `${base} bg-neutral-800 text-gray-100 border border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)] hover:bg-neutral-700`;
 
-        // 🔸 PASADO CON reserva → gris PERO marcado con borde y mejor contraste
-        return `${base} bg-neutral-800 text-gray-100 border border-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)] hover:bg-neutral-700`;
-
-
-      default:
-        return `${base} bg-neutral-700 text-gray-300`;
-    }
-  };
+    default:
+      return `${base} bg-neutral-700 text-gray-300`;
+  }
+};
 
   const getSlotTitle = (slot: SlotCalendario) => {
     if (modo === "cliente") {
@@ -776,20 +773,24 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
       const disabled = esPasado || esDiaLibre;
 
       let clases =
-        "w-10 h-8 flex items-center justify-center rounded-lg transition ";
+  "w-10 h-10 flex items-center justify-center rounded-full transition text-sm font-medium ";
 
-      if (esDiaLibre) {
-        clases +=
-          "text-red-400 line-through cursor-not-allowed opacity-70";
-      } else if (esHoy) {
-        clases += "bg-white text-black font-bold";
-      } else if (esPasado) {
-        clases += "text-gray-500 line-through cursor-not-allowed";
-      } else if (seleccionado) {
-        clases += "bg-indigo-600 text-white font-bold";
-      } else {
-        clases += "hover:bg-neutral-700";
-      }
+if (esDiaLibre) {
+  // 🔴 Día cerrado: fondo rojo apagado, sin tachado
+  clases += "bg-red-900/40 text-red-400 cursor-not-allowed";
+} else if (esHoy) {
+  // ⚪ Hoy: anillo blanco brillante
+  clases += "bg-transparent text-white ring-2 ring-white font-bold";
+} else if (esPasado) {
+  // ⬛ Pasado: gris muy tenue
+  clases += "bg-neutral-800/30 text-gray-600 cursor-not-allowed";
+} else if (seleccionado) {
+  // 🟢 Seleccionado: verde con glow
+  clases += "bg-emerald-500 text-white font-bold shadow-[0_0_12px_rgba(16,185,129,0.6)]";
+} else {
+  // ⚫ Normal: transparente, hover sutil
+  clases += "bg-transparent text-gray-200 hover:bg-white/10";
+}
 
       return (
         <button
@@ -864,7 +865,9 @@ const handleCancelarTurno = async (turno: TurnoExistente) => {
       title={getSlotTitle(slot)}
     >
       {/* Hora del slot */}
-      <span>{slot.hora}</span>
+      <span>
+  {slot.estado === "bloqueado" ? "Bloqueado" : slot.hora}
+</span>
 
       {/* 🔔 Punto amarillo parpadeando solo si la asistencia está pendiente */}
       {mostrarPuntoAmarillo && (
