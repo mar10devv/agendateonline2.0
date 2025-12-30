@@ -929,26 +929,29 @@ case "servicios":
     )}
   </div>
 
-  {/* Nombre */}
-  <h1
-    className="
-      relative
-      font-euphoria
-      text-[34px]
-      md:text-[48px]
-      leading-none
-      tracking-wide
-      mt-4
-      text-white
-    "
-    style={{
-      textShadow: "0 2px 6px rgba(0,0,0,0.45)",
-      WebkitTextStroke: "0.3px rgba(255,255,255,0.30)",
-      WebkitTextFillColor: "#ffffff",
-    }}
-  >
-    {negocio.nombre}
-  </h1>
+{/* Nombre */}
+<h1
+  className="
+    relative
+    font-euphoria
+    text-[34px]
+    md:text-[48px]
+    leading-none
+    tracking-wide
+    mt-4
+    text-white
+    text-center
+    w-full
+    px-4
+  "
+  style={{
+    textShadow: "0 2px 6px rgba(0,0,0,0.45)",
+    WebkitTextStroke: "0.3px rgba(255,255,255,0.30)",
+    WebkitTextFillColor: "#ffffff",
+  }}
+>
+  {negocio.nombre}
+</h1>
 
   {/* Descripción */}
   <p className="opacity-80 text-center mt-4 px-4">
