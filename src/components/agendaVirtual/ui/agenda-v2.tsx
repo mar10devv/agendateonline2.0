@@ -639,51 +639,74 @@ case "servicios":
     </div>
   );
 
-      case "empleados": {
-        // Fuente base
-        let listaEmpleados =
-          empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
+case "empleados": {
+  // Fuente base
+  let listaEmpleados =
+    empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
-        // 🟢 Si es EMPRENDIMIENTO, mostramos solo al dueño (o el primero)
-        if (esEmprendimiento) {
-          const dueno =
-            listaEmpleados.find((e) => e.rol === "dueño") || listaEmpleados[0];
-          listaEmpleados = dueno ? [dueno] : [];
-        }
+  // 🟢 Si es EMPRENDIMIENTO, mostramos solo al dueño (o el primero)
+  if (esEmprendimiento) {
+    const dueno =
+      listaEmpleados.find((e) => e.rol === "dueño") || listaEmpleados[0];
+    listaEmpleados = dueno ? [dueno] : [];
+  }
 
-        return (
-          <div className="relative w-full">
-            <div className="flex flex-wrap justify-center gap-6 mt-10">
-              {listaEmpleados?.length > 0 ? (
-                listaEmpleados.map((e) => (
-                  <div
-                    key={e.id || e.email || e.nombre}
-                    className="flex flex-col items-center"
-                  >
-                    <div className="w-20 h-20 rounded-full overflow-hidden border border-white/30">
-                      {e.fotoPerfil ? (
-                        <img
-                          src={e.fotoPerfil}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-[var(--color-primario-oscuro)] flex items-center justify-center">
-                          <span className="text-xl font-bold">
-                            {(e.nombre && e.nombre[0]) || "?"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm">{e.nombre}</p>
+  return (
+    <div className="w-full py-4">
+      {/* Título */}
+      <h3 className="text-center text-lg font-medium opacity-80 mb-6">
+        {esEmprendimiento ? "Profesionales" : "Nuestro equipo"}
+      </h3>
+
+      {/* Lista de empleados */}
+      <div className="flex flex-wrap justify-center gap-8">
+        {listaEmpleados?.length > 0 ? (
+          listaEmpleados.map((e) => (
+            <div
+              key={e.id || e.email || e.nombre}
+              className="
+                flex flex-col items-center p-4 rounded-2xl
+                bg-[var(--color-primario-oscuro)]/40
+                hover:bg-[var(--color-primario-oscuro)]/60
+                transition-all duration-300
+                hover:scale-105
+              "
+            >
+              {/* Foto más grande con borde */}
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white/20 shadow-lg">
+                {e.fotoPerfil ? (
+                  <img
+                    src={e.fotoPerfil}
+                    className="w-full h-full object-cover"
+                    alt={e.nombre}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[var(--color-primario-oscuro)] flex items-center justify-center">
+                    <span className="text-2xl font-bold">
+                      {(e.nombre && e.nombre[0]) || "?"}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <p className="opacity-80">No hay empleados cargados.</p>
+                )}
+              </div>
+
+              {/* Nombre */}
+              <p className="mt-3 text-base font-medium">{e.nombre}</p>
+
+              {/* Rol o especialidad (opcional) */}
+              {e.rol && (
+                <span className="mt-1 text-xs opacity-60 capitalize">
+                  {e.rol === "dueño" ? "Profesional" : e.rol}
+                </span>
               )}
             </div>
-          </div>
-        );
-      }
+          ))
+        ) : (
+          <p className="opacity-80">No hay empleados cargados.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
       case "agenda": {
   const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
@@ -1068,57 +1091,80 @@ case "servicios":
       transition-all duration-300
     "
   >
-    {navItems.map((item) => {
-      const onboardingIncompleto =
-        (modo === "dueño" || modo === "admin") &&
-        negocio.configuracionAgenda?.onboardingCompletado !== true;
+{navItems.map((item) => {
+  const onboardingIncompleto =
+    (modo === "dueño" || modo === "admin") &&
+    negocio.configuracionAgenda?.onboardingCompletado !== true;
 
-      let mostrarAlerta = false;
+  let mostrarAlerta = false;
 
-      if (onboardingIncompleto) {
-        if (item.id === "servicios") {
-          mostrarAlerta = serviciosState.length === 0;
-        } else if (item.id === "ubicacion") {
-          mostrarAlerta = !ubicacion;
-        } else if (item.id === "empleados") {
-          mostrarAlerta = !esEmprendimiento && hayEmpleadosIncompletos;
-        }
-      }
+  if (onboardingIncompleto) {
+    if (item.id === "servicios") {
+      mostrarAlerta = serviciosState.length === 0;
+    } else if (item.id === "ubicacion") {
+      mostrarAlerta = !ubicacion;
+    } else if (item.id === "empleados") {
+      mostrarAlerta = !esEmprendimiento && hayEmpleadosIncompletos;
+    }
+  }
 
-      return (
-        <button
-          key={item.id}
-          onClick={() => setVista(item.id)}
-          className={`relative flex flex-col items-center p-2 min-w-[70px] transition 
-            ${
-              vista === item.id
-                ? "rounded-xl bg-[var(--color-primario)] text-[var(--color-texto)]"
-                : "bg-transparent"
-            }`}
-        >
-          {mostrarAlerta && (
-            <span
-              className="
-                absolute -top-1 right-4
-                h-2.5 w-2.5 rounded-full
-                bg-yellow-400
-                shadow-[0_0_10px_rgba(250,204,21,0.9)]
-                animate-pulse
-              "
-            />
-          )}
+  const estaSeleccionado = vista === item.id;
 
-          <div className="w-8 h-8 flex items-center justify-center">
-            <img
-              src={item.icon}
-              alt={item.label}
-              className="w-8 h-8 icono-blanco"
-            />
-          </div>
-          <span className="text-xs mt-1 text-center">{item.label}</span>
-        </button>
-      );
-    })}
+  return (
+    <button
+      key={item.id}
+      onClick={() => setVista(item.id)}
+      className="
+        relative flex flex-col items-center justify-center
+        p-2 min-w-[70px] transition-all duration-300
+        bg-transparent
+        outline-none focus:outline-none focus:ring-0 border-none
+      "
+    >
+      {/* Borde animado con estela (solo si está seleccionado) */}
+      {estaSeleccionado && (
+        <>
+          {/* Gradiente cónico que rota - como pseudo borde */}
+          <div 
+            className="absolute inset-[-2px] animate-spin-slow rounded-xl"
+            style={{
+              background: 'conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(255,255,255,0.1) 70%, rgba(255,255,255,0.3) 80%, rgba(255,255,255,0.6) 90%, white 100%)',
+            }}
+          />
+          {/* Máscara interior que "corta" el centro */}
+          <div 
+            className="absolute inset-0 rounded-xl bg-[var(--color-primario-oscuro)]"
+          />
+        </>
+      )}
+
+      {/* Alerta de onboarding */}
+      {mostrarAlerta && (
+        <span
+          className="
+            absolute -top-1 right-4 z-10
+            h-2.5 w-2.5 rounded-full
+            bg-yellow-400
+            shadow-[0_0_10px_rgba(250,204,21,0.9)]
+            animate-pulse
+          "
+        />
+      )}
+
+      {/* Icono */}
+      <div className="relative z-10 w-8 h-8 flex items-center justify-center">
+        <img
+          src={item.icon}
+          alt={item.label}
+          className="w-8 h-8 icono-blanco"
+        />
+      </div>
+      
+      {/* Label */}
+      <span className="relative z-10 text-xs mt-1 text-center">{item.label}</span>
+    </button>
+  );
+})}
   </div>
 </div>
 
