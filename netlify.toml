@@ -17,13 +17,45 @@
   schedule = "0 6 * * *" # todos los días a las 06:00 UTC aprox
 
 # ----------------------------
-# ✅ URL nueva: /:slug
-# ✅ URL vieja: /agenda/:slug  -> redirige a /:slug
+# ✅ Mantener agenda funcionando SIN tocar el frontend
+# /slug  -> /agenda/slug  (redirige)
 # ----------------------------
 
+# ⚠️ Primero, NO toques rutas reales de tu app
 [[redirects]]
-  from = "/agenda/:slug"
-  to = "/:slug"
+  from = "/agenda/*"
+  to = "/agenda/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/panel/*"
+  to = "/panel/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/admin/*"
+  to = "/admin/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/login"
+  to = "/login"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/.netlify/*"
+  to = "/.netlify/:splat"
+  status = 200
+
+# ✅ AHORA SÍ: /slug => /agenda/slug (cambia la URL)
+[[redirects]]
+  from = "/:slug"
+  to = "/agenda/:slug"
   status = 301
   force = true
 
