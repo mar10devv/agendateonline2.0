@@ -524,7 +524,7 @@ export default function HeroInicio() {
         )}
 </div>
 
-      {/* CURVA PANZA HACIA ABAJO */}
+{/* CURVA PANZA HACIA ABAJO */}
 <div className="absolute left-0 right-0 bottom-0 translate-y-full">
   <svg
     viewBox="0 0 1200 120"
@@ -537,6 +537,12 @@ export default function HeroInicio() {
         <stop offset="100%" stopColor="#4f46e5" />
       </linearGradient>
     </defs>
+    {/* Fondo blanco debajo de la curva */}
+    <path
+      d="M0,0 C300,100 900,100 1200,0 L1200,120 L0,120 Z"
+      fill="white"
+    />
+    {/* Curva con gradiente */}
     <path
       d="M0,0 C300,100 900,100 1200,0 L1200,0 L0,0 Z"
       fill="url(#curveGradient)"

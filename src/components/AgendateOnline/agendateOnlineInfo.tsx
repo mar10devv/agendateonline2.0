@@ -274,7 +274,7 @@ export default function AgendateOnlineInfo() {
   ];
 
   return (
-    <section className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 py-12 sm:py-24 relative overflow-hidden">
+    <section className="bg-gradient-to-b from-white via-blue-50/20 to-purple-50/20 py-12 sm:py-24 relative overflow-hidden">
 {/* Decoración de fondo mejorada */}
 <div className="absolute inset-0 overflow-hidden">
   <div className="absolute top-32 sm:top-40 left-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-br from-blue-400/15 to-cyan-300/15 rounded-full blur-3xl animate-pulse"></div>
