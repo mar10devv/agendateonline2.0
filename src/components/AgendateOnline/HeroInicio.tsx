@@ -302,8 +302,8 @@ export default function HeroInicio() {
   };
 
   return (
-    <section className="relative bg-gradient-to-r from-blue-600 to-indigo-600 flex flex-col items-center text-center px-6 pt-16 pb-28 md:pt-20 md:pb-32">
-      <h1 className="mb-8 mt-20 text-4xl sm:text-5xl lg:text-6xl font-bold text-white max-w-3xl">
+    <section className="relative bg-gradient-to-r from-blue-600 to-indigo-600 flex flex-col items-center text-center px-6 pt-16 pb-28 md:pt-0 md:pb-12">
+      <h1 className="mt-40 text-4xl sm:text-5xl lg:text-6xl font-bold text-white max-w-3xl">
         Reserva turno donde quiera que estés con solo un clic
       </h1>
     <br />
