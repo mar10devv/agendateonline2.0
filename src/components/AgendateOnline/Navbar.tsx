@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   onAuthStateChanged,
   signOut,
@@ -34,71 +34,109 @@ export default function Navbar() {
   ]);
   const [notifOpen, setNotifOpen] = useState(false);
 
-const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-useEffect(() => {
-  // 1️⃣ Leer cache local al inicio
-  const cachedPremium = localStorage.getItem("tipoPremium");
-  const cachedSlug = localStorage.getItem("slug");
+  // ✅ Navbar hide/show al hacer scroll (iOS style)
+  const [navHidden, setNavHidden] = useState(false);
+  const lastY = useRef(0);
+  const ticking = useRef(false);
 
-  if (cachedPremium) setTipoPremium(cachedPremium as "lite" | "gold");
-  if (cachedSlug) setSlug(cachedSlug);
+  useEffect(() => {
+    lastY.current = window.scrollY || 0;
 
-  // 2️⃣ Suscribirse a cambios de auth
-  const unsub = onAuthStateChanged(auth, async (u) => {
-    setUser(u);
-    setCheckingAuth(false);
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      if (ticking.current) return;
+      ticking.current = true;
 
-    if (u) {
-      try {
-        const userSnap = await getDoc(doc(db, "Usuarios", u.uid));
-        if (userSnap.exists()) {
-          const data = userSnap.data();
+      requestAnimationFrame(() => {
+        const prev = lastY.current;
+        const goingDown = y > prev;
+        const delta = Math.abs(y - prev);
 
-          // 🔑 Guardar si es admin
-          setIsAdmin(data?.rol === "admin");
+        // siempre visible cerca del tope
+        if (y < 48) {
+          setNavHidden(false);
+        } else if (delta > 8) {
+          // baja => ocultar / sube => mostrar
+          setNavHidden(goingDown);
+        }
 
-          const premium = data?.tipoPremium || null;
-          setTipoPremium(premium);
+        lastY.current = y;
+        ticking.current = false;
+      });
+    };
 
-          // Guardar en cache
-          if (premium) {
-            localStorage.setItem("tipoPremium", premium);
-          } else {
-            localStorage.removeItem("tipoPremium");
-          }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-          const negocioSnap = await getDoc(doc(db, "Negocios", u.uid));
-          if (negocioSnap.exists()) {
-            const newSlug = negocioSnap.data()?.slug || null;
-            setSlug(newSlug);
+  // ✅ Si se abre un overlay, que el navbar no desaparezca
+  useEffect(() => {
+    if (mobileOpen || menuOpen || notifOpen) setNavHidden(false);
+  }, [mobileOpen, menuOpen, notifOpen]);
+
+  useEffect(() => {
+    // 1️⃣ Leer cache local al inicio
+    const cachedPremium = localStorage.getItem("tipoPremium");
+    const cachedSlug = localStorage.getItem("slug");
+
+    if (cachedPremium) setTipoPremium(cachedPremium as "lite" | "gold");
+    if (cachedSlug) setSlug(cachedSlug);
+
+    // 2️⃣ Suscribirse a cambios de auth
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      setCheckingAuth(false);
+
+      if (u) {
+        try {
+          const userSnap = await getDoc(doc(db, "Usuarios", u.uid));
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+
+            // 🔑 Guardar si es admin
+            setIsAdmin(data?.rol === "admin");
+
+            const premium = data?.tipoPremium || null;
+            setTipoPremium(premium);
 
             // Guardar en cache
-            if (newSlug) {
-              localStorage.setItem("slug", newSlug);
+            if (premium) {
+              localStorage.setItem("tipoPremium", premium);
             } else {
-              localStorage.removeItem("slug");
+              localStorage.removeItem("tipoPremium");
+            }
+
+            const negocioSnap = await getDoc(doc(db, "Negocios", u.uid));
+            if (negocioSnap.exists()) {
+              const newSlug = negocioSnap.data()?.slug || null;
+              setSlug(newSlug);
+
+              // Guardar en cache
+              if (newSlug) {
+                localStorage.setItem("slug", newSlug);
+              } else {
+                localStorage.removeItem("slug");
+              }
             }
           }
+        } catch (err) {
+          console.error("❌ Error al leer Firestore:", err);
         }
-      } catch (err) {
-        console.error("❌ Error al leer Firestore:", err);
+      } else {
+        setTipoPremium(null);
+        setSlug(null);
+        setIsAdmin(false);
+
+        // Limpiar cache
+        localStorage.removeItem("tipoPremium");
+        localStorage.removeItem("slug");
       }
-    } else {
-      setTipoPremium(null);
-      setSlug(null);
-      setIsAdmin(false);
+    });
 
-      // Limpiar cache
-      localStorage.removeItem("tipoPremium");
-      localStorage.removeItem("slug");
-    }
-  });
-
-  return () => unsub();
-}, []);
-
-
+    return () => unsub();
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -112,35 +150,39 @@ useEffect(() => {
     signOut(auth).catch((e) => console.error("[Navbar] signOut error:", e));
   };
 
-// 🔹 Links dinámicos para menú
-const linksMenu: ClienteLink[] = [
-  { label: "Mis turnos", href: "/usuarios/usuario-agenda", highlight: true },
-  ...baseLinks,
-];
+  // 🔹 Links dinámicos para menú
+  const linksMenu: ClienteLink[] = [
+    { label: "Mis turnos", href: "/usuarios/usuario-agenda", highlight: true },
+    ...baseLinks,
+  ];
 
-// Si es premium gold → aparece primero
-if (tipoPremium === "gold") {
-  linksMenu.unshift({
-    label: "Mi Panel",
-    href: "/panel/paneldecontrol",
-    highlight: true,
-  });
-}
+  // Si es premium gold → aparece primero
+  if (tipoPremium === "gold") {
+    linksMenu.unshift({
+      label: "Mi Panel",
+      href: "/panel/paneldecontrol",
+      highlight: true,
+    });
+  }
 
-// Si es premium lite → aparece después de "Mis turnos"
-if (tipoPremium === "lite" && slug) {
-  linksMenu.splice(1, 0, {
-    label: "Mi Agenda",
-    href: `/agenda/${slug}`,
-    highlight: true,
-  });
-}
-
+  // Si es premium lite → aparece después de "Mis turnos"
+  if (tipoPremium === "lite" && slug) {
+    linksMenu.splice(1, 0, {
+      label: "Mi Agenda",
+      href: `/agenda/${slug}`,
+      highlight: true,
+    });
+  }
 
   return (
     <>
-      <header className="fixed top-0 left-0 w-full z-[10000] bg-transparent">
-
+      <header
+        className={[
+          "fixed top-0 left-0 w-full z-[10000] bg-transparent",
+          "transition-transform duration-300 ease-out will-change-transform",
+          navHidden ? "-translate-y-[110%]" : "translate-y-0",
+        ].join(" ")}
+      >
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
@@ -208,176 +250,169 @@ if (tipoPremium === "lite" && slug) {
                 </button>
               )}
 
-              
               <label className="hamburger cursor-pointer">
-  <input
-    type="checkbox"
-    checked={mobileOpen}
-    onChange={() => setMobileOpen((prev) => !prev)}
-    className="hidden"
-  />
-  <svg
-    viewBox="0 0 32 32"
-    className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
-  >
-    <path
-      className="line line-top-bottom stroke-white"
-      d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
-    />
-    <path className="line stroke-white" d="M7 16 27 16" />
-  </svg>
-</label>
-
+                <input
+                  type="checkbox"
+                  checked={mobileOpen}
+                  onChange={() => setMobileOpen((prev) => !prev)}
+                  className="hidden"
+                />
+                <svg
+                  viewBox="0 0 32 32"
+                  className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
+                >
+                  <path
+                    className="line line-top-bottom stroke-white"
+                    d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
+                  />
+                  <path className="line stroke-white" d="M7 16 27 16" />
+                </svg>
+              </label>
             </div>
           </div>
         </div>
       </header>
 
-
-{/* Mobile sidebar */}
-{mobileOpen && (
-  <div className="fixed inset-0 z-[10001] flex justify-end">
-    <div
-      className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn"
-      onClick={() => setMobileOpen(false)}
-    />
-    <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
-      <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
-        
-        {/* Botón hamburguesa/X animado dentro del sidebar */}
-        <label className="hamburger cursor-pointer absolute top-3 right-3">
-          <input
-            type="checkbox"
-            checked={mobileOpen}              // 👉 sincronizado con el estado
-            onChange={() => setMobileOpen(false)} // 👉 al clic cierra sidebar
-            className="hidden"
+      {/* Mobile sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[10001] flex justify-end">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fadeIn"
+            onClick={() => setMobileOpen(false)}
           />
-          <svg
-            viewBox="0 0 32 32"
-            className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
-          >
-            <path
-              className="line line-top-bottom stroke-white"
-              d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
-            />
-            <path className="line stroke-white" d="M7 16 27 16" />
-          </svg>
-        </label>
+          <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
+            <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
+              {/* Botón hamburguesa/X animado dentro del sidebar */}
+              <label className="hamburger cursor-pointer absolute top-3 right-3">
+                <input
+                  type="checkbox"
+                  checked={mobileOpen}
+                  onChange={() => setMobileOpen(false)}
+                  className="hidden"
+                />
+                <svg
+                  viewBox="0 0 32 32"
+                  className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
+                >
+                  <path
+                    className="line line-top-bottom stroke-white"
+                    d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
+                  />
+                  <path className="line stroke-white" d="M7 16 27 16" />
+                </svg>
+              </label>
 
-        {user ? (
-          <div className="flex items-center gap-3 animate-fadeIn delay-150">
-            <img
-              src={user.photoURL ?? ""}
-              alt="Usuario"
-              className="w-12 h-12 rounded-full border-2 border-white"
-              referrerPolicy="no-referrer"
-            />
-            <div>
-              <p className="font-semibold">{user.displayName}</p>
-              <p className="text-xs opacity-80">{user.email}</p>
+              {user ? (
+                <div className="flex items-center gap-3 animate-fadeIn delay-150">
+                  <img
+                    src={user.photoURL ?? ""}
+                    alt="Usuario"
+                    className="w-12 h-12 rounded-full border-2 border-white"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <p className="font-semibold">{user.displayName}</p>
+                    <p className="text-xs opacity-80">{user.email}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="font-semibold animate-fadeIn delay-150">
+                  Bienvenido 👋
+                </p>
+              )}
+            </div>
+
+            {/* Opciones */}
+            <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
+              {checkingAuth ? (
+                <p className="text-sm text-gray-500 animate-fadeIn delay-200">
+                  Cargando...
+                </p>
+              ) : !user ? (
+                <>
+                  <button
+                    onClick={handleLogin}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
+                  >
+                    👉 Iniciar sesión
+                  </button>
+                  <a
+                    href="/app"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+                  >
+                    📲 Descargar la app
+                  </a>
+                  <a
+                    href="/ayuda"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
+                  >
+                    ❓ Ayuda y servicio al cliente
+                  </a>
+                </>
+              ) : (
+                <>
+                  {/* Links de cliente */}
+                  <a
+                    href="/usuarios/usuario-agenda"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
+                  >
+                    <img src={alarmIcon} alt="Mis turnos" className="w-5 h-5" />
+                    Mis turnos
+                  </a>
+
+                  {tipoPremium === "gold" && (
+                    <a
+                      href="/panel/paneldecontrol"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+                    >
+                      <img src={settingsIcon} alt="Mi Panel" className="w-5 h-5" />
+                      Mi Panel
+                    </a>
+                  )}
+
+                  {tipoPremium === "lite" && slug && (
+                    <a
+                      href={`/agenda/${slug}`}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
+                    >
+                      <img src={agendaIcon} alt="Mi Agenda" className="w-5 h-5" />
+                      Mi Agenda
+                    </a>
+                  )}
+
+                  {!tipoPremium && (
+                    <a
+                      href="/panel/panel-registro"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 animate-fadeIn delay-300"
+                    >
+                      Obtener mi agenda
+                    </a>
+                  )}
+
+                  {/* Admin extra */}
+                  {isAdmin && (
+                    <a
+                      href="/panel/panel-admin"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
+                    >
+                      <img src={settingsIcon} alt="Panel Admin" className="w-5 h-5" />
+                      Panel Admin
+                    </a>
+                  )}
+
+                  {/* Logout al final */}
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 animate-fadeIn delay-600"
+                  >
+                    🚪 Cerrar sesión
+                  </button>
+                </>
+              )}
             </div>
           </div>
-        ) : (
-          <p className="font-semibold animate-fadeIn delay-150">
-            Bienvenido 👋
-          </p>
-        )}
-      </div>
-
-      {/* Opciones */}
-      <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
-        {checkingAuth ? (
-          <p className="text-sm text-gray-500 animate-fadeIn delay-200">
-            Cargando...
-          </p>
-        ) : !user ? (
-          <>
-            <button
-              onClick={handleLogin}
-              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
-            >
-              👉 Iniciar sesión
-            </button>
-            <a
-              href="/app"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-            >
-              📲 Descargar la app
-            </a>
-            <a
-              href="/ayuda"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-400"
-            >
-              ❓ Ayuda y servicio al cliente
-            </a>
-          </>
-        ) : (
-          <>
-            {/* Links de cliente */}
-            <a
-              href="/usuarios/usuario-agenda"
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-200"
-            >
-              <img src={alarmIcon} alt="Mis turnos" className="w-5 h-5" />
-              Mis turnos
-            </a>
-
-            {tipoPremium === "gold" && (
-              <a
-                href="/panel/paneldecontrol"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-              >
-                <img src={settingsIcon} alt="Mi Panel" className="w-5 h-5" />
-                Mi Panel
-              </a>
-            )}
-
-            {tipoPremium === "lite" && slug && (
-              <a
-                href={`/agenda/${slug}`}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 animate-fadeIn delay-300"
-              >
-                <img src={agendaIcon} alt="Mi Agenda" className="w-5 h-5" />
-                Mi Agenda
-              </a>
-            )}
-
-            {!tipoPremium && (
-  <a
-    href="/panel/panel-registro"
-    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 animate-fadeIn delay-300"
-  >
-    Obtener mi agenda
-  </a>
-)}
-
-
-            {/* Admin extra */}
-            {isAdmin && (
-              <a
-                href="/panel/panel-admin"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800"
-              >
-                <img src={settingsIcon} alt="Panel Admin" className="w-5 h-5" />
-                Panel Admin
-              </a>
-            )}
-
-            {/* Logout al final */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-medium text-red-600 animate-fadeIn delay-600"
-            >
-              🚪 Cerrar sesión
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  </div>
-)}
-
-
+        </div>
+      )}
 
       {/* 🔔 Modal de notificaciones */}
       {notifOpen && (
@@ -404,7 +439,9 @@ if (tipoPremium === "lite" && slug) {
                     <span>{n}</span>
                     <button
                       onClick={() =>
-                        setNotificaciones((prev) => prev.filter((_, idx) => idx !== i))
+                        setNotificaciones((prev) =>
+                          prev.filter((_, idx) => idx !== i)
+                        )
                       }
                       className="text-red-500 hover:text-red-700 text-sm font-bold"
                     >

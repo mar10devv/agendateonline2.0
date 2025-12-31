@@ -1,0 +1,239 @@
+/* ============================================================
+   📅 AGENDA.CSS - Estilos específicos de la Agenda Virtual
+   ============================================================ */
+
+/* ================= Fuente de la Agenda ================= */
+@import url('https://fonts.googleapis.com/css2?family=Euphoria+Script&display=swap');
+
+/* ================= Variables base ================= */
+:root {
+  --color-fondo: #171717;
+  --color-primario: #262626;
+  --color-primario-oscuro: #0a0a0a;
+  --color-texto: #ffffff;
+}
+
+/* ================= Colores dinámicos ================= */
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ================= Contenedores ================= */
+.bg-primario,
+.bg-fondo {
+  background-color: var(--color-primario);
+  color: var(--color-texto);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ================= Texto adaptable ================= */
+.text-dinamico {
+  color: var(--color-texto);
+  transition: color 0.3s ease;
+}
+
+.text-dinamico-secundario {
+  color: color-mix(in srgb, var(--color-texto) 70%, transparent);
+  transition: color 0.3s ease;
+}
+
+/* ================= Sincronización de colores ================= */
+body, h1, h2, h3, h4, h5, h6, p, span, label, input, button, a {
+  color: var(--color-texto);
+  transition: color 0.3s ease;
+}
+
+/* ================= Icono blanco (SVGs) ================= */
+.icono-blanco {
+  filter: brightness(0) invert(1);
+}
+
+/* ================= Animación cambio de pestaña ================= */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeSlideIn {
+  animation: fadeSlideIn 0.3s ease-out forwards;
+}
+
+/* ================= Animación spin lento (navbar) ================= */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+/* ================= Animación glow ================= */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.animate-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ================= Alerta icono respirando ================= */
+@keyframes icon-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+.icon-alerta-breath {
+  animation: icon-breathe 1.8s ease-in-out infinite;
+}
+
+/* ================= Hamburguesa animada ================= */
+.hamburger .line {
+  fill: none;
+  stroke: var(--color-texto);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  transition: stroke-dasharray 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              stroke-dashoffset 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hamburger .line-top-bottom {
+  stroke-dasharray: 12 63;
+}
+
+.hamburger input:checked + svg {
+  transform: rotate(-45deg);
+}
+
+.hamburger input:checked + svg .line-top-bottom {
+  stroke-dasharray: 20 300;
+  stroke-dashoffset: -32.42;
+}
+
+/* ================= Swiper personalizado ================= */
+.custom-swiper .swiper-button-next,
+.custom-swiper .swiper-button-prev {
+  display: none !important;
+}
+
+.custom-swiper .swiper-pagination {
+  position: relative !important;
+  margin-top: 12px;
+  bottom: 0 !important;
+  text-align: center !important;
+}
+
+.custom-swiper .swiper-pagination-bullet {
+  background: var(--color-texto) !important;
+  opacity: 0.4;
+}
+
+.custom-swiper .swiper-pagination-bullet-active {
+  background: var(--color-texto) !important;
+  opacity: 1;
+}
+
+/* ================= Botones de horarios ================= */
+.horario-btn {
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0.75rem;
+}
+
+.horario-disponible {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+.horario-ocupado {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.horario-bloqueado {
+  background-color: #6b7280 !important;
+  color: #e5e7eb !important;
+}
+
+.horario-pasado {
+  background-color: #374151 !important;
+  color: #9ca3af !important;
+}
+
+/* ================= ⚪ Tema claro ================= */
+[data-tema="white"] {
+  --color-texto: #111111;
+  --color-fondo: #f9fafb;
+  --color-primario: #ffffff;
+  --color-primario-oscuro: #e5e7eb;
+}
+
+[data-tema="white"] .bg-primario,
+[data-tema="white"] .bg-fondo {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* ================= 🌈 Tema gradient ================= */
+[data-tema="gradient"] {
+  --color-texto: #111111;
+  --color-primario: #ffffff;
+  --color-primario-oscuro: #e5e7eb;
+  --color-fondo: transparent;
+  --color-fondo-gradient: linear-gradient(to right, #2563eb, #4f46e5);
+}
+
+html[data-tema="gradient"],
+body[data-tema="gradient"] {
+  background-image: var(--color-fondo-gradient);
+  background-size: cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+[data-tema="gradient"] .bg-primario,
+[data-tema="gradient"] .bg-fondo {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+[data-tema="gradient"] body,
+[data-tema="gradient"] h1,
+[data-tema="gradient"] h2,
+[data-tema="gradient"] h3,
+[data-tema="gradient"] h4,
+[data-tema="gradient"] h5,
+[data-tema="gradient"] h6,
+[data-tema="gradient"] p,
+[data-tema="gradient"] span,
+[data-tema="gradient"] label,
+[data-tema="gradient"] input,
+[data-tema="gradient"] button,
+[data-tema="gradient"] a,
+[data-tema="gradient"] .text-dinamico {
+  color: #111111 !important;
+}
+
+/* ================= Fix modal gradient ================= */
+[data-tema="gradient"] .fixed.inset-0 {
+  backdrop-filter: none !important;
+  background-color: rgba(0,0,0,0.45) !important;
+}
+
+[data-tema="gradient"] .animate-fadeInModal {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+}
