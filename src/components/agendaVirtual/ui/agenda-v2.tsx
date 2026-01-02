@@ -1121,22 +1121,10 @@ case "empleados": {
         outline-none focus:outline-none focus:ring-0 border-none
       "
     >
-      {/* Borde animado con estela (solo si está seleccionado) */}
-      {estaSeleccionado && (
-        <>
-          {/* Gradiente cónico que rota - como pseudo borde */}
-          <div 
-            className="absolute inset-[-2px] animate-spin-slow rounded-xl"
-            style={{
-              background: 'conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(255,255,255,0.1) 70%, rgba(255,255,255,0.3) 80%, rgba(255,255,255,0.6) 90%, white 100%)',
-            }}
-          />
-          {/* Máscara interior que "corta" el centro */}
-          <div 
-            className="absolute inset-0 rounded-xl bg-[var(--color-primario-oscuro)]"
-          />
-        </>
-      )}
+      {/* Borde glass */}
+{estaSeleccionado && (
+  <div className="absolute inset-0 rounded-xl border border-white/30 bg-white/5 backdrop-blur-sm" />
+)}
 
       {/* Alerta de onboarding */}
       {mostrarAlerta && (
