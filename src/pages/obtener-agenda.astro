@@ -1,0 +1,36 @@
+---
+import "../styles/global.css";
+import PanelRegistroComponent from "../components/panel-registro/panel-registro.tsx";
+
+// 📌 Variables de SEO
+const title = "AgéndateOnline - Registro de Negocios";
+const description = "Registrá tu negocio gratis y empezá a recibir turnos online 🚀";
+const image = "https://www.agendateonline.com/preview.jpg"; // poné la imagen en /public
+---
+
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.agendateonline.com/panel/panel-registro/" />
+    <meta property="og:image" content={image} />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+  </head>
+  <body class="min-h-screen">
+    <section class="min-h-screen bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
+      <PanelRegistroComponent client:load />
+    </section>
+  </body>
+</html>

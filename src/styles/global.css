@@ -1,8 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
 /* ================= Librerías externas ================= */
 @import "animate.css/animate.min.css";
 @import "swiper/css";
 @import "swiper/css/navigation";
 @import "swiper/css/pagination";
+
 
 /* ================= Animaciones de entrada ================= */
 @keyframes slideIn {
@@ -42,19 +46,23 @@
 @keyframes pulse {
   0% {
     transform: scale(0.8);
-    background-color: #b3d4fc;
-    box-shadow: 0 0 0 0 rgba(178, 212, 252, 0.7);
+    background-color: #ddd6fe;
+    box-shadow: 0 0 0 0 rgba(196, 181, 253, 0.7);
   }
   50% {
     transform: scale(1.2);
-    background-color: #6793fb;
-    box-shadow: 0 0 0 10px rgba(178, 212, 252, 0);
+    background-color: #a78bfa;
+    box-shadow: 0 0 0 10px rgba(196, 181, 253, 0);
   }
   100% {
     transform: scale(0.8);
-    background-color: #b3d4fc;
-    box-shadow: 0 0 0 0 rgba(178, 212, 252, 0.7);
+    background-color: #ddd6fe;
+    box-shadow: 0 0 0 0 rgba(196, 181, 253, 0.7);
   }
+}
+
+.animate-pulse {
+  animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* ================= Animaciones de UI ================= */

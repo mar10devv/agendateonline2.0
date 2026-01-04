@@ -25,7 +25,7 @@ interface StatCardProps {
 interface FeatureItemProps {
   item: FeatureItem;
   index: number;
-  colorScheme: 'blue' | 'purple';
+  colorScheme: 'violet' | 'purple';
 }
 
 // Hook personalizado para detectar cuando un elemento es visible
@@ -88,9 +88,9 @@ const StatCard: React.FC<StatCardProps> = ({ stat, index }) => {
   
   // Colores de sombra según el gradiente de cada card
   const shadowColors: Record<string, string> = {
-    "from-blue-500 to-cyan-400": "hover:shadow-blue-500/25",
-    "from-purple-500 to-pink-400": "hover:shadow-purple-500/25",
-    "from-indigo-500 to-blue-400": "hover:shadow-indigo-500/25",
+    "from-violet-500 to-purple-400": "hover:shadow-violet-500/25",
+    "from-purple-500 to-fuchsia-400": "hover:shadow-purple-500/25",
+    "from-violet-600 to-purple-500": "hover:shadow-violet-600/25",
   };
   
   const hoverShadow = shadowColors[stat.color] || "hover:shadow-gray-500/25";
@@ -160,10 +160,10 @@ const FeatureItemComponent: React.FC<FeatureItemProps> = ({ item, index, colorSc
   const Icon = item.icon;
   
   const colors = {
-    blue: {
-      hover: 'hover:bg-blue-50/80',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600'
+    violet: {
+      hover: 'hover:bg-violet-50/80',
+      iconBg: 'bg-violet-100',
+      iconColor: 'text-violet-600'
     },
     purple: {
       hover: 'hover:bg-purple-50/80',
@@ -221,19 +221,19 @@ export default function AgendateOnlineInfo() {
       icon: Users,
       number: "15000+",
       label: "Usuarios Activos",
-      color: "from-blue-500 to-cyan-400",
+      color: "from-violet-500 to-purple-400",
     },
     {
       icon: Store,
       number: "850+",
       label: "Negocios Activos",
-      color: "from-purple-500 to-pink-400",
+      color: "from-purple-500 to-fuchsia-400",
     },
     {
       icon: Briefcase,
       number: "1200+",
       label: "Emprendimientos Activos",
-      color: "from-indigo-500 to-blue-400",
+      color: "from-violet-600 to-purple-500",
     },
   ];
 
@@ -274,22 +274,22 @@ export default function AgendateOnlineInfo() {
   ];
 
   return (
-    <section className="bg-gradient-to-b from-white via-blue-50/20 to-purple-50/20 py-12 sm:py-24 relative overflow-hidden">
-{/* Decoración de fondo mejorada */}
-<div className="absolute inset-0 overflow-hidden">
-  <div className="absolute top-32 sm:top-40 left-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-br from-blue-400/15 to-cyan-300/15 rounded-full blur-3xl animate-pulse"></div>
-  <div className="absolute bottom-20 right-1/4 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-purple-400/15 to-pink-300/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] sm:w-[800px] h-[500px] sm:h-[800px] bg-gradient-to-br from-indigo-200/5 to-transparent rounded-full blur-3xl"></div>
-  
-  {/* Patrón de puntos */}
-  <div 
-    className="absolute inset-0 opacity-[0.03]"
-    style={{
-      backgroundImage: 'radial-gradient(circle, #6366f1 1px, transparent 1px)',
-      backgroundSize: '30px 30px'
-    }}
-  ></div>
-</div>
+    <section className="bg-gradient-to-b from-white via-violet-50/20 to-purple-50/20 py-12 sm:py-24 relative overflow-hidden">
+      {/* Decoración de fondo */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-32 sm:top-40 left-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-br from-violet-300/10 to-purple-200/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-1/4 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-purple-300/10 to-fuchsia-200/10 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Patrón de puntos */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'radial-gradient(#8b5cf6 1.5px, transparent 1.5px)',
+          backgroundSize: '30px 30px',
+          opacity: 0.1
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         {/* Título con animación */}
@@ -302,7 +302,7 @@ export default function AgendateOnlineInfo() {
         >
           <h2 className="text-3xl sm:text-5xl md:text-6xl font-black mb-4 sm:mb-6 text-gray-900 text-center tracking-tight">
             ¿Qué es{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600">
               AgéndateOnline
             </span>
             ?
@@ -334,7 +334,7 @@ export default function AgendateOnlineInfo() {
             `}
           >
             <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center shadow-lg shadow-violet-500/30">
                 <Users className="w-6 h-6 sm:w-7 sm:h-7 text-white" strokeWidth={1.5} />
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -351,7 +351,7 @@ export default function AgendateOnlineInfo() {
                   key={index} 
                   item={item} 
                   index={index} 
-                  colorScheme="blue"
+                  colorScheme="violet"
                 />
               ))}
             </div>
@@ -370,7 +370,7 @@ export default function AgendateOnlineInfo() {
             style={{ transitionDelay: '150ms' }}
           >
             <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-400 flex items-center justify-center shadow-lg shadow-purple-500/30">
                 <Store className="w-6 h-6 sm:w-7 sm:h-7 text-white" strokeWidth={1.5} />
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -394,25 +394,6 @@ export default function AgendateOnlineInfo() {
           </div>
         </div>
 
-        {/* CTA final */}
-        <div 
-          ref={ctaRef}
-          className={`
-            text-center mt-12 sm:mt-20
-            transition-all duration-700
-            ${ctaInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}
-          `}
-        >
-          <p className="text-lg sm:text-xl text-gray-600 font-medium">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 font-bold text-xl sm:text-2xl">
-              AgéndateOnline
-            </span>
-            <br />
-            <span className="text-gray-400 text-base sm:text-lg">
-              Conectando comunidades, simplificando reservas ✨
-            </span>
-          </p>
-        </div>
       </div>
     </section>
   );

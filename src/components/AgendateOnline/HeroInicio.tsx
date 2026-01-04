@@ -302,10 +302,27 @@ export default function HeroInicio() {
   };
 
   return (
-    <section className="relative bg-gradient-to-r from-blue-600 to-indigo-600 flex flex-col items-center text-center px-6 pt-16 pb-28 md:pt-0 md:pb-12">
-      <h1 className="mt-40 text-4xl sm:text-5xl lg:text-6xl font-bold text-white max-w-3xl">
-        Reserva turno donde quiera que estés con solo un clic
-      </h1>
+    <section className="relative bg-gradient-to-r from-violet-600 to-purple-600 flex flex-col items-center text-center px-6 pt-16 pb-28 md:pt-0 md:pb-12">
+
+<h1 className="relative mt-40 max-w-4xl leading-[1.1] text-center">
+  <span className="block text-xl sm:text-2xl font-medium text-white/80 tracking-wide mb-2">
+    Reserva turno
+  </span>
+  
+<span 
+  className="block text-6xl sm:text-7xl lg:text-8xl font-oswald uppercase text-white"
+  style={{
+    fontWeight: 700,
+  }}
+>
+  donde quieras
+</span>
+  
+  <span className="block text-lg sm:text-xl text-white/70 tracking-widest uppercase mt-3">
+    con solo un clic
+  </span>
+</h1>
+    <br />
     <br />
       {/* ✅ BOTÓN estilo macOS/iOS (glass + borde suave + highlight) */}
       {!mostrarBloqueServicio && (
@@ -500,14 +517,14 @@ export default function HeroInicio() {
                   )}
 
                   <div className="p-4 transition-colors duration-300 group-hover:bg-gray-50">
-                    <h3 className="text-lg font-bold group-hover:text-blue-600 transition-colors duration-300">
+                    <h3 className="text-lg font-bold group-hover:text-violet-600 transition-colors duration-300">
                       {negocio.nombre}
                     </h3>
                     <p className="text-gray-600 text-sm">
                       {negocio.ubicacion?.direccion || "Ubicación no disponible"}
                     </p>
 
-                    <span className="mt-2 inline-block bg-gray-100 text-gray-800 px-3 py-1 text-xs rounded-full capitalize group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors duration-300">
+                    <span className="mt-2 inline-block bg-gray-100 text-gray-800 px-3 py-1 text-xs rounded-full capitalize group-hover:bg-violet-100 group-hover:text-violet-700 transition-colors duration-300">
                       {negocio.plantilla}
                     </span>
 
@@ -533,8 +550,8 @@ export default function HeroInicio() {
   >
     <defs>
       <linearGradient id="curveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#2563eb" />
-        <stop offset="100%" stopColor="#4f46e5" />
+        <stop offset="0%" stopColor="#7c3aed" />
+        <stop offset="100%" stopColor="#9333ea" />
       </linearGradient>
     </defs>
     {/* Fondo blanco debajo de la curva */}

@@ -12,6 +12,8 @@ module.exports = {
     "font-playfair",
     "font-bebas",
     "font-euphoria",
+    "font-anton",
+    "font-oswald",
 
     // 🎯 COLORES FIJOS PARA TURNOS — con patrones RegExp para que NO los purge
     { pattern: /^bg-emerald-/ },
@@ -49,6 +51,8 @@ module.exports = {
         playfair: ["Playfair Display", "serif"],
         bebas: ["Bebas Neue", "sans-serif"],
         euphoria: ["Euphoria Script", "cursive"],
+        anton: ["Anton", "sans-serif"],
+        oswald: ["Oswald", "sans-serif"],
       },
     },
   },

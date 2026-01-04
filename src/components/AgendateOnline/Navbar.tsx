@@ -19,6 +19,13 @@ const baseLinks: ClienteLink[] = [
   { label: "Ayuda y servicio al cliente", href: "/ayuda" },
 ];
 
+const navLinks = [
+  { label: "Qué es", href: "#que-es" },
+  { label: "Cómo funciona", href: "#como-funciona" },
+  { label: "Funciones", href: "#funciones" },
+  { label: "Precios", href: "#precios" },
+];
+
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -178,7 +185,7 @@ export default function Navbar() {
     <>
       <header
         className={[
-          "fixed top-0 left-0 w-full z-[10000] bg-transparent",
+          "fixed top-0 left-0 w-full z-[10000] bg-transparent mt-5",
           "transition-transform duration-300 ease-out will-change-transform",
           navHidden ? "-translate-y-[110%]" : "translate-y-0",
         ].join(" ")}
@@ -195,6 +202,19 @@ export default function Navbar() {
 
             {/* Desktop */}
             <nav className="hidden md:flex items-center gap-3">
+              {/* Links de navegación - Desktop */}
+              <div className="flex items-center gap-1 mr-4">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className="px-3 py-2 rounded-full text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+
               {checkingAuth ? (
                 <span className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-500">
                   Cargando…
@@ -281,7 +301,7 @@ export default function Navbar() {
             onClick={() => setMobileOpen(false)}
           />
           <div className="relative w-72 h-screen bg-white text-gray-800 shadow-xl animate-slideIn flex flex-col z-10">
-            <div className="bg-indigo-600 h-32 flex items-end p-4 text-white relative">
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 h-32 flex items-end p-4 text-white relative">
               {/* Botón hamburguesa/X animado dentro del sidebar */}
               <label className="hamburger cursor-pointer absolute top-3 right-3">
                 <input
@@ -324,6 +344,20 @@ export default function Navbar() {
 
             {/* Opciones */}
             <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
+              {/* Links de navegación - Mobile */}
+              <div className="border-b border-gray-200 pb-3 mb-3">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="block px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+
               {checkingAuth ? (
                 <p className="text-sm text-gray-500 animate-fadeIn delay-200">
                   Cargando...
@@ -383,7 +417,7 @@ export default function Navbar() {
                   {!tipoPremium && (
                     <a
                       href="/panel/panel-registro"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 animate-fadeIn delay-300"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-violet-600 animate-fadeIn delay-300"
                     >
                       Obtener mi agenda
                     </a>

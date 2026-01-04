@@ -3,6 +3,11 @@ import "../styles/global.css";
 import NavBar from "../components/AgendateOnline/Navbar.tsx";
 import HeroInicio from "../components/AgendateOnline/HeroInicio.tsx";
 import AgendateOnlineInfo from "../components/AgendateOnline/agendateOnlineInfo";
+import ComoFunciona from "../components/AgendateOnline/ComoFunciona";
+import Funcionalidades from "../components/AgendateOnline/Funcionalidades";
+import Planes from "../components/AgendateOnline/Planes-Precios";
+import Footer from "../components/AgendateOnline/Footer";
+import Search from "../components/AgendateOnline/Search";
 import CookieCard from "../components/ui/cookieCard";
 
 // Props para SEO (pueden sobreescribirse desde cada página si hace falta)
@@ -20,8 +25,11 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-     <!-- ✅ Favicon -->
-<link rel="icon" type="image/webp" href="/favicon.webp" sizes="32x32" />
+<!-- ✅ Favicon completo -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
 
     <!-- ✅ Open Graph -->
     <meta property="og:site_name" content="AgéndateOnline" />
@@ -42,6 +50,18 @@ const {
     <HeroInicio client:load />
 <div class="pt-[60px] sm:pt-[80px] md:pt-[100px]">
   <AgendateOnlineInfo client:load />
+</div>
+<div>
+  <ComoFunciona client:load />
+</div>
+<div>
+  <Funcionalidades client:load />
+</div>
+<div>
+  <Planes client:load />
+</div>
+<div>
+  <Footer client:load />
 </div>
     <CookieCard client:load />
     <slot />
