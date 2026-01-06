@@ -197,12 +197,12 @@ export default function Navbar() {
     <>
       <header
         className={[
-          "fixed top-0 left-0 w-full z-[10000] mt-5",
+          "fixed left-0 w-full z-[10000]",
           "transition-all duration-300 ease-out will-change-transform",
           navHidden ? "-translate-y-[110%]" : "translate-y-0",
           hasScrolled 
-            ? "bg-white/80 backdrop-blur-md shadow-sm mt-0 py-2" 
-            : "bg-transparent",
+            ? "top-0 bg-gradient-to-r from-violet-600 to-purple-600 shadow-lg py-2" 
+            : "top-5 bg-transparent",
         ].join(" ")}
       >
         <div className="mx-auto max-w-7xl px-4">
@@ -210,10 +210,7 @@ export default function Navbar() {
             {/* Logo */}
             <a
               href="/"
-              className={[
-                "text-3xl font-bold tracking-tight font-inter transition-colors duration-300",
-                hasScrolled ? "text-violet-600" : "text-white",
-              ].join(" ")}
+              className="text-3xl font-bold tracking-tight font-inter text-white"
             >
               AgéndateOnline
             </a>
@@ -226,12 +223,7 @@ export default function Navbar() {
                   <a
                     key={link.label}
                     href={link.href}
-                    className={[
-                      "px-3 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                      hasScrolled 
-                        ? "text-gray-600 hover:text-violet-600 hover:bg-violet-50" 
-                        : "text-white/80 hover:text-white hover:bg-white/10",
-                    ].join(" ")}
+                    className="px-3 py-2 rounded-full text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200"
                   >
                     {link.label}
                   </a>
@@ -249,10 +241,7 @@ export default function Navbar() {
                     <img
                       src={user.photoURL ?? ""}
                       alt="Usuario"
-                      className={[
-                        "h-8 w-8 rounded-full border-2 transition-colors duration-300",
-                        hasScrolled ? "border-violet-600" : "border-white",
-                      ].join(" ")}
+                      className="h-8 w-8 rounded-full border-2 border-white"
                       referrerPolicy="no-referrer"
                     />
                   </div>
@@ -290,16 +279,10 @@ export default function Navbar() {
                   className="h-8 w-8 transition-transform duration-[600ms] ease-in-out"
                 >
                   <path
-                    className={[
-                      "line line-top-bottom transition-colors duration-300",
-                      hasScrolled ? "stroke-violet-600" : "stroke-white",
-                    ].join(" ")}
+                    className="line line-top-bottom stroke-white"
                     d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22L7 22"
                   />
-                  <path className={[
-                    "line transition-colors duration-300",
-                    hasScrolled ? "stroke-violet-600" : "stroke-white",
-                  ].join(" ")} d="M7 16 27 16" />
+                  <path className="line stroke-white" d="M7 16 27 16" />
                 </svg>
               </label>
             </div>
