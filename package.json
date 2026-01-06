@@ -9,7 +9,6 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/vercel": "^8.2.7",
     "@gsap/react": "^2.1.2",
     "@netlify/blobs": "^10.0.11",
     "animate.css": "^4.1.1",
