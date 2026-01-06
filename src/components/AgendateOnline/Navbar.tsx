@@ -248,10 +248,7 @@ export default function Navbar() {
               ) : user ? (
                 <>
                   {/* Foto usuario */}
-                  <div
-                    className="relative cursor-pointer"
-                    onClick={() => setNotifOpen(true)}
-                  >
+                  <div className="relative">
                     <img
                       src={user.photoURL ?? ""}
                       alt="Usuario"
@@ -261,9 +258,6 @@ export default function Navbar() {
                       ].join(" ")}
                       referrerPolicy="no-referrer"
                     />
-                    {notificaciones.length > 0 && (
-                      <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-yellow-400" />
-                    )}
                   </div>
                 </>
               ) : (
@@ -287,21 +281,6 @@ export default function Navbar() {
 
             {/* Mobile */}
             <div className="md:hidden flex items-center gap-2">
-              {user && (
-                <button
-                  onClick={() => setNotifOpen(true)}
-                  className={[
-                    "relative rounded-md border px-3 py-2 text-sm transition-colors duration-300",
-                    hasScrolled ? "border-violet-300" : "border-gray-300",
-                  ].join(" ")}
-                >
-                  🔔
-                  {notificaciones.length > 0 && (
-                    <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-yellow-400" />
-                  )}
-                </button>
-              )}
-
               <label className="hamburger cursor-pointer">
                 <input
                   type="checkbox"
