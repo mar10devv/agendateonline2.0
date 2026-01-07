@@ -87,12 +87,6 @@ export default function Menu({ open, setOpen, user, onLogout, links }: Props) {
               </a>
             ) : (
               <>
-                <a
-                  href="/panel/panel-registro/"
-                  className="block text-sm font-bold text-white hover:underline px-3 py-2 rounded hover:bg-white/20 transition drop-shadow-sm"
-                >
-                  Para negocios →
-                </a>
 
                 <button
                   type="button"
