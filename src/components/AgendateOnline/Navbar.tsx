@@ -13,7 +13,7 @@ type ClienteLink = { label: string; href: string; highlight?: boolean };
 
 const baseLinks: ClienteLink[] = [
   { label: "Descargar la app", href: "/app" },
-  { label: "Ayuda y servicio al cliente", href: "/ayuda" },
+  { label: "Ayuda y servicio al cliente", href: "/soporte" },
 ];
 
 const navLinks = [
@@ -37,6 +37,9 @@ export default function Navbar() {
     "Tu suscripción vence en 3 días",
   ]);
   const [notifOpen, setNotifOpen] = useState(false);
+
+  // 📱 Modal de App no disponible
+  const [showAppModal, setShowAppModal] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -88,8 +91,8 @@ export default function Navbar() {
 
   // ✅ Si se abre un overlay, que el navbar no desaparezca
   useEffect(() => {
-    if (mobileOpen || menuOpen || notifOpen) setNavHidden(false);
-  }, [mobileOpen, menuOpen, notifOpen]);
+    if (mobileOpen || menuOpen || notifOpen || showAppModal) setNavHidden(false);
+  }, [mobileOpen, menuOpen, notifOpen, showAppModal]);
 
   useEffect(() => {
     // 1️⃣ Leer cache local al inicio
@@ -167,6 +170,11 @@ export default function Navbar() {
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 📱 Abrir modal de app (sin cerrar el menú)
+  const handleAppClick = () => {
+    setShowAppModal(true);
   };
 
   // 🔹 Links dinámicos para menú
@@ -356,17 +364,17 @@ export default function Navbar() {
                     </svg>
                     Iniciar sesión
                   </button>
-                  <a
-                    href="/app"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-300"
+                  <button
+                    onClick={handleAppClick}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-300"
                   >
                     <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
                     </svg>
                     Descargar la app
-                  </a>
+                  </button>
                   <a
-                    href="/ayuda"
+                    href="/soporte"
                     className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-400"
                   >
                     <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -438,17 +446,17 @@ export default function Navbar() {
                     </a>
                   )}
 
-                  <a
-                    href="/app"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-400"
+                  <button
+                    onClick={handleAppClick}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-400"
                   >
                     <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
                     </svg>
                     Descargar la app
-                  </a>
+                  </button>
                   <a
-                    href="/ayuda"
+                    href="/soporte"
                     className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-violet-50 hover:text-violet-600 rounded-lg transition-colors animate-fadeIn delay-500"
                   >
                     <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -540,6 +548,87 @@ export default function Navbar() {
         </div>
       )}
 
+      {/* 📱 Modal App No Disponible */}
+      {showAppModal && (
+        <div
+          className="fixed inset-0 z-[10002] flex items-center justify-center p-4"
+          style={{
+            background: "rgba(88, 28, 135, 0.4)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            animation: "fadeIn 0.3s ease-out",
+          }}
+          onClick={() => setShowAppModal(false)}
+        >
+          <div
+            className="relative w-full max-w-xs overflow-hidden"
+            style={{
+              background: "white",
+              borderRadius: "20px",
+              boxShadow: "0 25px 50px -12px rgba(88, 28, 135, 0.4)",
+              animation: "slideUp 0.4s ease-out",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Barra decorativa */}
+            <div
+              style={{
+                height: "3px",
+                background: "linear-gradient(90deg, #7c3aed, #a855f7, #7c3aed)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 2s linear infinite",
+              }}
+            />
+
+            {/* Botón X para cerrar */}
+            <button
+              onClick={() => setShowAppModal(false)}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Contenido */}
+            <div className="px-6 py-6 text-center">
+              {/* Icono */}
+              <div
+                className="mx-auto w-14 h-14 rounded-xl flex items-center justify-center mb-4"
+                style={{
+                  background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+                  boxShadow: "0 6px 16px rgba(124, 58, 237, 0.3)",
+                }}
+              >
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                </svg>
+              </div>
+
+              {/* Texto */}
+              <h3 className="text-xl font-bold text-gray-800 mb-1">
+                ¡Próximamente! 🚀
+              </h3>
+              <p className="text-gray-500 text-sm mb-5">
+                La app móvil aún no está disponible.
+              </p>
+
+              {/* Botón */}
+              <button
+                onClick={() => setShowAppModal(false)}
+                className="w-full py-2.5 px-5 text-white text-sm font-medium rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+                  boxShadow: "0 4px 12px rgba(124, 58, 237, 0.35)",
+                }}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🔼 Botón Scroll to Top */}
       <button
         onClick={scrollToTop}
@@ -562,6 +651,28 @@ export default function Navbar() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
         </svg>
       </button>
+
+      {/* Keyframes para animaciones */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { 
+            opacity: 0; 
+            transform: translateY(20px) scale(0.96); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+          }
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
     </>
   );
 }
