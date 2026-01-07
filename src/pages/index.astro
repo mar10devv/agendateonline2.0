@@ -8,6 +8,7 @@ import Funcionalidades from "../components/AgendateOnline/Funcionalidades";
 import Planes from "../components/AgendateOnline/Planes-Precios";
 import Footer from "../components/AgendateOnline/Footer";
 import Search from "../components/AgendateOnline/Search";
+import GoogleAuth from "../components/AgendateOnline/GoogleAuthModal";
 import CookieCard from "../components/ui/cookieCard";
 
 // Props para SEO (pueden sobreescribirse desde cada página si hace falta)
@@ -46,8 +47,10 @@ const {
     <meta name="twitter:image" content={image} />
   </head>
   <body class="bg-neutral-50 text-neutral-900">
+    <GoogleAuth client:load />
     <NavBar client:load />
     <HeroInicio client:load />
+
 <div id="que-es" class="pt-[60px] sm:pt-[80px] md:pt-[100px]">
   <AgendateOnlineInfo client:load />
 </div>
