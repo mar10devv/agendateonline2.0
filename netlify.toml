@@ -52,6 +52,12 @@
   to = "/.netlify/:splat"
   status = 200
 
+# ✅ Páginas estáticas (excluidas del redirect a /agenda/)
+[[redirects]]
+  from = "/politica-cookies"
+  to = "/politica-cookies"
+  status = 200
+
 # ✅ AHORA SÍ: /slug => /agenda/slug (cambia la URL)
 [[redirects]]
   from = "/:slug"
