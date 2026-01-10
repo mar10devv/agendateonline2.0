@@ -5,7 +5,10 @@ import {
   BarChart3, 
   Palette, 
   Users,
-  Sparkles
+  Sparkles,
+  Share2,
+  Calendar,
+  Store
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -144,30 +147,69 @@ export default function Funcionalidades() {
 
   const features: Feature[] = [
     {
-      icon: MapPin,
-      title: "Ubicación y servicios",
-      description: "Mostrá toda la información de tu negocio en un solo lugar",
+      icon: Store,
+      title: "Tu Negocio",
+      description: "Mostrá toda la información de tu emprendimiento en un solo lugar",
       items: [
-        "Ubicación en tiempo real con mapa integrado",
-        "Lista de servicios con precios visibles",
-        "Horarios de atención siempre actualizados",
-        "Información de contacto y redes sociales"
+        "Agregá la ubicación de tu negocio con mapa integrado",
+        "Subí tu foto de perfil y escribí una descripción atractiva",
+        "Cargá todos tus servicios con sus precios",
+        "Personalizá tu agenda con los colores de tu marca"
       ],
       gradient: "from-violet-500 to-purple-500",
       shadowColor: "hover:shadow-violet-500/20"
     },
     {
-      icon: BarChart3,
-      title: "Horarios y estadísticas",
-      description: "Controlá tu tiempo y medí el rendimiento de tu negocio",
+      icon: Share2,
+      title: "Compartir",
+      description: "Hacé que tus clientes te encuentren fácilmente",
       items: [
-        "Configurá horarios de atención flexibles",
-        "Definí días libres y feriados fácilmente",
-        "Mirá cuánto dinero generaste por día, semana o mes",
-        "Descubrí tu servicio más vendido y empleado estrella"
+        "Compartí tu agenda con un link corto y fácil de recordar",
+        "Generá un código QR para que escaneen y reserven al instante",
+        "Ideal para redes sociales, WhatsApp o tu local"
       ],
       gradient: "from-purple-500 to-fuchsia-500",
       shadowColor: "hover:shadow-purple-500/20"
+    },
+    {
+      icon: Users,
+      title: "Modo Negocio",
+      description: "Organizá a tu equipo con total flexibilidad",
+      items: [
+        "Agregá varios empleados, cada uno con su propia agenda",
+        "Subí foto y asigná servicios específicos a cada uno",
+        "Configurá horarios de entrada, salida y descanso",
+        "Definí días libres individuales por empleado",
+        "Activá o desactivá empleados sin borrarlos"
+      ],
+      gradient: "from-fuchsia-500 to-pink-500",
+      shadowColor: "hover:shadow-fuchsia-500/20"
+    },
+    {
+      icon: BarChart3,
+      title: "Estadísticas",
+      description: "Medí el rendimiento de tu negocio en tiempo real",
+      items: [
+        "Mirá cuánto generó cada empleado por día, semana o mes",
+        "Descubrí cuál es tu servicio más vendido",
+        "Funciona tanto en modo negocio como emprendimiento",
+        "Tomá mejores decisiones con datos reales"
+      ],
+      gradient: "from-violet-600 to-purple-600",
+      shadowColor: "hover:shadow-violet-600/20"
+    },
+    {
+      icon: Calendar,
+      title: "Calendario en tiempo real",
+      description: "Controlá todos los turnos de tu agenda al instante",
+      items: [
+        "Visualizá quién se agendó con su contacto y servicio",
+        "Cancelá turnos y enviá un mensaje personalizado",
+        "Bloqueá horarios específicos o días completos",
+        "Agregá clientes manualmente para reservar bloques"
+      ],
+      gradient: "from-indigo-500 to-violet-500",
+      shadowColor: "hover:shadow-indigo-500/20"
     },
     {
       icon: Palette,
@@ -175,46 +217,32 @@ export default function Funcionalidades() {
       description: "Hacé que tu agenda refleje la identidad de tu marca",
       items: [
         "Elegí los colores que combinan con tu negocio",
-        "Subí tu logo o foto de perfil",
-        "Escribí una descripción atractiva",
-        "Tu agenda se ve única y profesional"
+        "Tu agenda se ve única y profesional",
+        "Destacá frente a la competencia",
+        "Sin publicidad ni marcas de agua"
       ],
-      gradient: "from-fuchsia-500 to-pink-500",
-      shadowColor: "hover:shadow-fuchsia-500/20"
-    },
-    {
-      icon: Users,
-      title: "Gestión de empleados",
-      description: "Organizá a tu equipo con total flexibilidad",
-      items: [
-        "Horario de entrada, salida y descanso por empleado",
-        "Días libres individuales (incluso día y medio)",
-        "Asigná servicios específicos a cada uno",
-        "Foto de perfil para que los clientes los reconozcan",
-        "Activá o desactivá empleados sin borrarlos"
-      ],
-      gradient: "from-violet-600 to-purple-600",
-      shadowColor: "hover:shadow-violet-600/20"
+      gradient: "from-pink-500 to-rose-500",
+      shadowColor: "hover:shadow-pink-500/20"
     }
   ];
 
   return (
     <section className="bg-gradient-to-b from-violet-50/20 via-white to-purple-50/30 py-5 sm:py-5 relative overflow-hidden">
-{/* Decoración de fondo */}
-<div className="absolute inset-0 pointer-events-none">
-  <div className="absolute top-1/4 left-0 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-br from-violet-300/10 to-purple-200/10 rounded-full blur-3xl"></div>
-  <div className="absolute bottom-1/4 right-0 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-fuchsia-300/10 to-pink-200/10 rounded-full blur-3xl"></div>
-</div>
+      {/* Decoración de fondo */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-0 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-br from-violet-300/10 to-purple-200/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-0 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-fuchsia-300/10 to-pink-200/10 rounded-full blur-3xl"></div>
+      </div>
 
-{/* Patrón de puntos */}
-<div 
-  className="absolute inset-0 pointer-events-none z-0"
-  style={{
-    backgroundImage: 'radial-gradient(#8b5cf6 1.5px, transparent 1.5px)',
-    backgroundSize: '30px 30px',
-    opacity: 0.1
-  }}
-/>
+      {/* Patrón de puntos */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'radial-gradient(#8b5cf6 1.5px, transparent 1.5px)',
+          backgroundSize: '30px 30px',
+          opacity: 0.1
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         {/* Título */}
@@ -241,8 +269,8 @@ export default function Funcionalidades() {
           </p>
         </div>
 
-        {/* Grid de features - 2 columnas desde sm */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
+        {/* Grid de features - 2 columnas desde sm, 3 en lg */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
           {features.map((feature, index) => (
             <FeatureCard key={index} feature={feature} index={index} />
           ))}

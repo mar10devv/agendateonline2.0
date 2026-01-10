@@ -186,7 +186,7 @@ export default function PlanesPrecios() {
       icon: Rocket,
       name: "Plan Negocio",
       description: "Pensado para negocios con varios empleados: barberías, salones, estudios de tatuajes, centros estéticos, etc.",
-      price: "399",
+      price: "499",
       priceDetail: "por empleado / mes",
       features: [
         "1 agenda por cada empleado",
