@@ -10,7 +10,7 @@ type Props = {
 };
 
 export default function ModalShare({ abierto, onCerrar, slug }: Props) {
-  const url = `https://agendateonline.com/${slug}`;
+  const url = `https://agendateonline.com/a/${slug}`;
 
   // Copiamos al portapapeles apenas se abre el modal (una sola vez por apertura)
   useEffect(() => {
