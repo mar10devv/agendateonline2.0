@@ -17,11 +17,9 @@
   schedule = "0 6 * * *" # todos los días a las 06:00 UTC aprox
 
 # ----------------------------
-# ✅ Mantener agenda funcionando SIN tocar el frontend
-# /slug  -> /agenda/slug  (redirige)
+# ✅ Rutas protegidas de la app
 # ----------------------------
 
-# ⚠️ Primero, NO toques rutas reales de tu app
 [[redirects]]
   from = "/agenda/*"
   to = "/agenda/:splat"
@@ -52,20 +50,14 @@
   to = "/.netlify/:splat"
   status = 200
 
-# ✅ Páginas estáticas (excluidas del redirect a /agenda/)
+# ✅ URL corta para agendas: /a/slug => /agenda/slug
 [[redirects]]
-  from = "/politica-cookies"
-  to = "/politica-cookies"
-  status = 200
-
-# ✅ AHORA SÍ: /slug => /agenda/slug (cambia la URL)
-[[redirects]]
-  from = "/:slug"
+  from = "/a/:slug"
   to = "/agenda/:slug"
   status = 301
   force = true
 
-# ✅ SPA fallback (Vite): cualquier ruta carga la app
+# ✅ SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
