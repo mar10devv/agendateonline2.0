@@ -632,28 +632,39 @@ const puedeConfigServiciosYEmpleados = esDueno;
 
 case "servicios":
   return (
-    <div className="flex flex-wrap gap-6 justify-start">
-      {/* 👉 Card "+" SIEMPRE PRIMERO y SOLO dueño/admin */}
-      {esDuenoOAdmin && (
-        <CardServicioAgregar onClick={() => setModalServicios(true)} />
-      )}
+    <div className="w-full">
+      {/* Título + línea separadora */}
+      <div className="mb-6">
+        <h3 className="text-center text-lg font-medium opacity-80">
+          {esDuenoOAdmin ? "Mis servicios" : `Servicios de ${negocio.nombre}`}
+        </h3>
+        <div className="flex justify-center mt-3">
+          <div className="w-1/2 h-px bg-white/20" />
+        </div>
+      </div>
 
-      {/* Cards de servicios existentes (ordenados) */}
-      {serviciosOrdenados.length > 0 &&
-        serviciosOrdenados.map((s) => (
-          <CardServicio
-            key={s.id || s.servicio}
-            nombre={s.servicio}
-            precio={s.precio}
-            duracion={s.duracion}
-          />
-        ))}
+      <div className="flex flex-wrap gap-6 justify-start">
+        {/* 👉 Card "+" SIEMPRE PRIMERO y SOLO dueño/admin */}
+        {esDuenoOAdmin && (
+          <CardServicioAgregar onClick={() => setModalServicios(true)} />
+        )}
 
+        {/* Cards de servicios existentes (ordenados) */}
+        {serviciosOrdenados.length > 0 &&
+          serviciosOrdenados.map((s) => (
+            <CardServicio
+              key={s.id || s.servicio}
+              nombre={s.servicio}
+              precio={s.precio}
+              duracion={s.duracion}
+            />
+          ))}
 
-      {/* Mensaje SOLO para clientes cuando no hay servicios */}
-      {esCliente && serviciosState.length === 0 && (
-        <p className="opacity-80">Esta agenda no tiene servicios.</p>
-      )}
+        {/* Mensaje SOLO para clientes cuando no hay servicios */}
+        {esCliente && serviciosState.length === 0 && (
+          <p className="opacity-80">Esta agenda no tiene servicios.</p>
+        )}
+      </div>
     </div>
   );
 
@@ -669,9 +680,14 @@ case "empleados": {
 
   return (
     <div className="w-full py-4">
-      <h3 className="text-center text-lg font-medium opacity-80 mb-6">
-        {esEmprendimiento ? "Profesionales" : "Nuestro equipo"}
-      </h3>
+      <div className="mb-6">
+  <h3 className="text-center text-lg font-medium opacity-80">
+    {esEmprendimiento ? "Profesionales" : "Nuestro equipo"}
+  </h3>
+  <div className="flex justify-center mt-3">
+    <div className="w-1/2 h-px bg-white/20" />
+  </div>
+</div>
 
       <div className="flex flex-wrap justify-center gap-8">
         {listaEmpleados?.length > 0 ? (
