@@ -324,7 +324,7 @@ export default function HeroInicio() {
 </h1>
     <br />
     <br />
-      {/* ✅ BOTÓN estilo macOS/iOS (glass + borde suave + highlight) */}
+      {/* ✅ BOTÓN estilo macOS/iOS (glass + borde suave + highlight) con lupa */}
       {!mostrarBloqueServicio && (
         <button
           type="button"
@@ -356,7 +356,11 @@ export default function HeroInicio() {
             aria-hidden="true"
             className="pointer-events-none absolute inset-[1px] rounded-full ring-1 ring-white/10"
           />
-          <span className="relative">Buscar servicios</span>
+          {/* ✅ Contenido con lupa */}
+          <span className="relative flex items-center gap-2">
+            <Search className="w-4 h-4 text-white/90 group-hover:text-white transition-colors" />
+            <span>Buscar servicios</span>
+          </span>
         </button>
       )}
 
