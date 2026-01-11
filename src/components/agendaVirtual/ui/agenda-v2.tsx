@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 import {
   Calendar,
@@ -42,7 +42,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-  getDocs,  // 👈 agregar esto
+  getDocs,
 } from "firebase/firestore";
 
 import { useMap } from "react-leaflet";
@@ -79,7 +79,7 @@ export type Empleado = {
   adminEmail?: string;
   trabajos?: string[];
   calendario?: any;
-  esEmpleado?: boolean; // 🔥 clave para saber si trabaja
+  esEmpleado?: boolean;
 };
 
 export type Servicio = {
@@ -114,9 +114,7 @@ export type Negocio = {
     colorPrimarioOscuro: string;
   };
 
-  // 🟢 UNIFICADO: pagos + agenda
   configuracionAgenda?: {
-    // ---- Cosas que ya tenías para pagos ----
     modoPago?: "libre" | "senia";
     porcentajeSenia?: number;
     mercadoPago?: {
@@ -124,7 +122,6 @@ export type Negocio = {
       accessToken?: string;
     };
 
-    // ---- Nuevos campos de agenda ----
     diasLibres?: string[];
     modoTurnos?: "jornada" | "personalizado";
     clientesPorDia?: number | null;
@@ -145,8 +142,6 @@ type Props = {
   turnos: Turno[];
   modo: "dueño" | "cliente" | "admin";
   usuario?: Usuario;
-
-  // 👇 NUEVO: viene del padre (agendaVirtual.tsx)
   esEmprendimiento: boolean;
 };
 
@@ -159,7 +154,7 @@ export default function AgendaVirtualUIv3({
   turnos,
   modo,
   usuario,
-  esEmprendimiento, // 👈 ahora lo recibimos
+  esEmprendimiento,
 }: Props) {
 
 /* -------- ROLES -------- */
@@ -167,12 +162,9 @@ const esDueno = modo === "dueño";
 const esAdmin = modo === "admin";
 const esCliente = modo === "cliente";
 
-const esDuenoOAdmin = esDueno || esAdmin; // 👈 NUEVO
+const esDuenoOAdmin = esDueno || esAdmin;
 
-// 👑 Solo el dueño puede tocar perfil general + estadísticas
 const puedeConfigPerfil = esDueno;
-
-// 👑 Solo el dueño puede gestionar servicios y empleados (tuerquita)
 const puedeConfigServiciosYEmpleados = esDueno;
 
   /* --------  ESTADOS  -------- */
@@ -188,13 +180,12 @@ const puedeConfigServiciosYEmpleados = esDueno;
   const [modalEmprendimiento, setModalEmprendimiento] = useState(false);
 
   // 🔍 Verificar si el cliente tiene turno pendiente
-const [tieneTurnoPendiente, setTieneTurnoPendiente] = useState(false);
-const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
+  const [tieneTurnoPendiente, setTieneTurnoPendiente] = useState(false);
+  const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
 
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [readyToShowMap, setReadyToShowMap] = useState(false);
 
-  // 🟢 NUEVO: estado para el modal de configuración de agenda
   const [mostrarModalConfigAgenda, setMostrarModalConfigAgenda] =
     useState(false);
   const [configAgendaInicial, setConfigAgendaInicial] = useState<{
@@ -223,11 +214,9 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
     return null;
   }
 
-  // 🔥 Nuevo estado: servicios en tiempo real
   const [serviciosState, setServiciosState] = useState<Servicio[]>([]);
   const [modalServicios, setModalServicios] = useState(false);
 
-  // 🧮 Ordenar servicios: más nuevo → más viejo (usando createdAt)
   const serviciosOrdenados = useMemo(() => {
     if (!serviciosState || serviciosState.length === 0) return [];
 
@@ -248,7 +237,7 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
           ? b.createdAt
           : 0);
 
-      return tb - ta; // 👈 más nuevo primero
+      return tb - ta;
     });
   }, [serviciosState]);
 
@@ -263,9 +252,6 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
     return Array.isArray(lista) ? lista : [];
   }, [empleados, negocio.empleadosData]);
 
-  // Ocultamos:
-  // - Dueño: solo se muestra si esEmpleado === true
-  // - Resto: se ocultan si esEmpleado === false
   const empleadosActivos = useMemo(() => {
     return empleadosFuente.filter((e) => {
       if (e.rol === "dueño") {
@@ -275,16 +261,12 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
     });
   }, [empleadosFuente]);
 
-  // Para el calendario: usamos los activos; si no hay ninguno marcado, usamos la fuente
   const empleadosParaAgenda =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
-  // 🟡 ¿Hay empleados sin configurar del todo?
   const hayEmpleadosIncompletos = useMemo(() => {
-    // Tomamos solo los que realmente trabajan
     const lista = empleadosParaAgenda.filter((e) => e.esEmpleado !== false);
 
-    // Si no hay nadie configurado todavía, consideramos "incompleto"
     if (lista.length === 0) return true;
 
     return lista.some((e) => {
@@ -294,7 +276,6 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
       const diasLibres = Array.isArray(cal.diasLibres) ? cal.diasLibres : [];
       const trabajos = Array.isArray(e.trabajos) ? e.trabajos : [];
 
-      // 👉 también aceptamos configuración de día y medio
       const diaYMedio = cal.diaYMedio as any | null;
       const tieneDiaYMedioValido =
         diaYMedio &&
@@ -306,19 +287,16 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
         typeof fin === "string" &&
         inicio < fin;
 
-      // ✅ ahora es válido si tiene díasLibres O diaYMedio configurado
       const diasOk = diasLibres.length > 0 || !!tieneDiaYMedioValido;
 
       const trabajosOk = trabajos.length > 0;
 
-      // Si le falta alguna de las 3 cosas → empleado incompleto
       return !(horarioOk && diasOk && trabajosOk);
     });
   }, [empleadosParaAgenda]);
 
   // 📍 FUNCIÓN PARA GUARDAR UBICACIÓN
   const handleGuardarUbicacion = () => {
-    // Si estamos en SSR o no existe navigator, salimos
     if (typeof window === "undefined" || typeof navigator === "undefined") {
       console.error("Navigator no está disponible en este entorno.");
       return;
@@ -326,7 +304,6 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
 
     if (!("geolocation" in navigator)) {
       console.error("Tu navegador no soporta geolocalización.");
-      // Nos aseguramos de no dejar el botón en 'cargando'
       setEstadoUbicacion("idle");
       alert(
         "Tu navegador no soporta geolocalización o está desactivada. Configura la ubicación manualmente."
@@ -343,7 +320,6 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
 
           let direccion = "";
           try {
-            // Si falla obtenerDireccion, no rompemos todo
             direccion = await obtenerDireccion(latitude, longitude);
           } catch (e) {
             console.error("No se pudo obtener la dirección legible:", e);
@@ -376,13 +352,12 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000, // 10s → si no responde, dispara el callback de error
+        timeout: 10000,
         maximumAge: 0,
       }
     );
   };
 
-  // 🔹 Guardar cambios del modal de perfil (nombre, descripción, logo, etc.)
   const handleGuardarPerfil = async (data: {
     perfilLogo?: string;
     descripcion?: string;
@@ -529,14 +504,14 @@ const [cargandoVerificacion, setCargandoVerificacion] = useState(false);
     }
   }, [negocio, modo]);
 
-  // 🔍 Verificar turno pendiente del cliente en tiempo real
-useEffect(() => {
-  if (modo !== "cliente" || !negocio?.id) return;
+  // ✅ FUNCIÓN para verificar turno pendiente (extraída para poder reutilizar)
+  const verificarTurnoPendiente = useCallback(async () => {
+    if (modo !== "cliente" || !negocio?.id) return;
 
-  setCargandoVerificacion(true);
-  const auth = getAuth();
+    setCargandoVerificacion(true);
+    const auth = getAuth();
+    const user = auth.currentUser;
 
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
     if (!user) {
       setTieneTurnoPendiente(false);
       setCargandoVerificacion(false);
@@ -558,6 +533,13 @@ useEffect(() => {
     } catch (err) {
       // Fallback: buscar sin filtro de fecha
       try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) {
+          setTieneTurnoPendiente(false);
+          return;
+        }
+        
         const refUser = collection(db, "Usuarios", user.uid, "Turnos");
         const q = query(refUser, where("negocioId", "==", negocio.id));
         const snap = await getDocs(q);
@@ -576,12 +558,49 @@ useEffect(() => {
     } finally {
       setCargandoVerificacion(false);
     }
-  });
+  }, [modo, negocio?.id]);
 
-  return () => unsubscribe();
-}, [modo, negocio?.id]);
+  // 🔍 Verificar turno pendiente del cliente al montar y cuando cambie auth
+  useEffect(() => {
+    if (modo !== "cliente" || !negocio?.id) return;
 
-    // 📍 Abrir ubicación en Google Maps
+    setCargandoVerificacion(true);
+    const auth = getAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setTieneTurnoPendiente(false);
+        setCargandoVerificacion(false);
+        return;
+      }
+
+      await verificarTurnoPendiente();
+    });
+
+    return () => unsubscribe();
+  }, [modo, negocio?.id, verificarTurnoPendiente]);
+
+  // ✅ CALLBACK para cuando el modal confirma/cancela un turno
+  const handleTurnoActualizado = useCallback((turnoConfirmado?: boolean) => {
+    // Si sabemos que se confirmó un turno, seteamos directo sin esperar Firebase
+    if (turnoConfirmado === true) {
+      setTieneTurnoPendiente(true);
+      return;
+    }
+    
+    // Si se canceló (turnoConfirmado === false), seteamos directo
+    if (turnoConfirmado === false) {
+      setTieneTurnoPendiente(false);
+      return;
+    }
+    
+    // Fallback: verificar con Firebase (con pequeño delay para que se sincronice)
+    setTimeout(() => {
+      verificarTurnoPendiente();
+    }, 500);
+  }, [verificarTurnoPendiente]);
+
+  // 📍 Abrir ubicación en Google Maps
   const handleAbrirEnGoogleMaps = () => {
     if (!ubicacion) return;
 
@@ -602,7 +621,6 @@ useEffect(() => {
     { id: "ubicacion", label: "Ubicación", icon: IconUbicacion },
   ];
 
-  // 🔴 ¿Falta terminar el onboarding?
   const onboardingPendiente =
     (modo === "dueño" || modo === "admin") &&
     negocio?.configuracionAgenda?.onboardingCompletado !== true;
@@ -620,7 +638,7 @@ case "servicios":
         <CardServicioAgregar onClick={() => setModalServicios(true)} />
       )}
 
-            {/* Cards de servicios existentes (ordenados) */}
+      {/* Cards de servicios existentes (ordenados) */}
       {serviciosOrdenados.length > 0 &&
         serviciosOrdenados.map((s) => (
           <CardServicio
@@ -640,11 +658,9 @@ case "servicios":
   );
 
 case "empleados": {
-  // Fuente base
   let listaEmpleados =
     empleadosActivos.length > 0 ? empleadosActivos : empleadosFuente;
 
-  // 🟢 Si es EMPRENDIMIENTO, mostramos solo al dueño (o el primero)
   if (esEmprendimiento) {
     const dueno =
       listaEmpleados.find((e) => e.rol === "dueño") || listaEmpleados[0];
@@ -653,12 +669,10 @@ case "empleados": {
 
   return (
     <div className="w-full py-4">
-      {/* Título */}
       <h3 className="text-center text-lg font-medium opacity-80 mb-6">
         {esEmprendimiento ? "Profesionales" : "Nuestro equipo"}
       </h3>
 
-      {/* Lista de empleados */}
       <div className="flex flex-wrap justify-center gap-8">
         {listaEmpleados?.length > 0 ? (
           listaEmpleados.map((e) => (
@@ -672,7 +686,6 @@ case "empleados": {
                 hover:scale-105
               "
             >
-              {/* Foto más grande con borde */}
               <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white/20 shadow-lg">
                 {e.fotoPerfil ? (
                   <img
@@ -689,10 +702,8 @@ case "empleados": {
                 )}
               </div>
 
-              {/* Nombre */}
               <p className="mt-3 text-base font-medium">{e.nombre}</p>
 
-              {/* Rol o especialidad (opcional) */}
               {e.rol && (
                 <span className="mt-1 text-xs opacity-60 capitalize">
                   {e.rol === "dueño" ? "Profesional" : e.rol}
@@ -711,7 +722,6 @@ case "empleados": {
       case "agenda": {
   const modoAgenda = modo === "cliente" ? "cliente" : "negocio";
 
-  // 📌 Vista cliente: botón dinámico
   if (modoAgenda === "cliente") {
     return (
       <div className="flex justify-center">
@@ -739,7 +749,6 @@ case "empleados": {
     );
   }
 
-        // 📌 Vista dueño/admin: CalendarioBase con selector interno
         const empleadoActual = empleadosParaAgenda[0] || null;
 
         if (!empleadoActual) {
@@ -750,7 +759,6 @@ case "empleados": {
           );
         }
 
-        // 👇 Adaptamos el negocio al formato esperado por calendario-backend
         const negocioAgenda: any = {
           id: negocio.id,
           nombre: negocio.nombre,
@@ -764,7 +772,6 @@ case "empleados": {
           empleadosData: empleadosParaAgenda,
         };
 
-        // 👇 Usuario actual para esDuenoOAdmin (simple por ahora)
         const usuarioActualCalendario: any = {
           uid: usuario?.email || "anon",
           email: usuario?.email || null,
@@ -774,7 +781,7 @@ case "empleados": {
         return (
           <div className="space-y-4">
             <CalendarioBase
-              modo={modoAgenda} // "negocio"
+              modo={modoAgenda}
               usuarioActual={usuarioActualCalendario}
               negocio={negocioAgenda}
               empleado={empleadoActual as any}
@@ -791,11 +798,9 @@ case "empleados": {
 
         return (
           <div className="w-full space-y-4">
-            {/* 🔹 CARD SOLO CUANDO NO HAY UBICACIÓN (dueño/admin) */}
             {!ubicacion && (
               <div className="rounded-2xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 px-5 py-4 shadow-lg">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {/* Izquierda: icono + textos */}
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/50 bg-white/5">
                       <MapPin className="h-5 w-5 text-white" />
@@ -826,7 +831,6 @@ case "empleados": {
                     </div>
                   </div>
 
-                  {/* Botón acción (solo dueño/admin) */}
                   {esDuenoOAdminLocal && (
                     <button
                       onClick={handleGuardarUbicacion}
@@ -869,10 +873,8 @@ case "empleados": {
               </div>
             )}
 
-            {/* 🔹 MAPA + BOTONES SOLO CUANDO SÍ HAY UBICACIÓN */}
             {ubicacion && (
               <div className="space-y-3">
-                {/* Título según rol */}
                 <h2 className="text-lg font-semibold text-[var(--color-texto)]">
                   {esDuenoOAdminLocal
                     ? "Mi ubicación"
@@ -890,9 +892,7 @@ case "empleados": {
                     />
                   </div>
 
-                  {/* Botones abajo a la derecha */}
                   <div className="mt-3 flex justify-end gap-2">
-                    {/* Ver en Google Maps (todos los roles) */}
                     <button
                       onClick={handleAbrirEnGoogleMaps}
                       className="px-3 py-1.5 text-xs sm:text-sm rounded-full flex items-center gap-2 font-medium border border-white/60 bg-white/10 text-white hover:bg-white/20 transition"
@@ -901,7 +901,6 @@ case "empleados": {
                       Ver en Google Maps
                     </button>
 
-                    {/* Actualizar ubicación (solo dueño/admin) */}
                     {esDuenoOAdminLocal && (
                       <button
                         onClick={handleGuardarUbicacion}
@@ -971,7 +970,6 @@ case "empleados": {
 >
 {/* Iconos superiores derechos */}
 <div className="absolute top-4 right-4 flex items-center gap-3">
-  {/* Icono compartir (todos) */}
   <button
     onClick={() => setModalShare(true)}
     className="p-1 rounded-full hover:bg-black/10 transition"
@@ -980,7 +978,6 @@ case "empleados": {
     <Share2 className="w-6 h-6 opacity-80 hover:opacity-100 transition" />
   </button>
 
-  {/* Icono estadísticas (solo DUEÑO) */}
   {modo === "dueño" && (
     <button
       onClick={() => setModalEstadisticas(true)}
@@ -995,7 +992,6 @@ case "empleados": {
     </button>
   )}
 
-  {/* Icono configuración (solo DUEÑO) */}
   {modo === "dueño" && (
     <button
       onClick={() => setModalPerfil(true)}
@@ -1067,14 +1063,12 @@ case "empleados": {
 <div className="absolute -top-0 left-0 right-0 flex justify-between px-8 md:justify-around md:px-20 pointer-events-none z-[100]">
   {[...Array(4)].map((_, i) => (
     <div key={i} className="relative flex flex-col items-center">
-      {/* Gancho superior */}
       <div 
         className="absolute -top-7 left-1/2 -translate-x-1/2 w-3 h-10 rounded-t-full shadow-md"
         style={{
           background: 'linear-gradient(to bottom, #d1d5db 0%, #9ca3af 50%, #374151 80%, #1f2937 100%)'
         }}
       />
-      {/* Anillo del gancho */}
       <div className="w-6 h-6 rounded-full border-4 border-gray-400 bg-[var(--color-fondo)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),0_2px_4px_rgba(0,0,0,0.3)]" />
     </div>
   ))}
@@ -1121,12 +1115,10 @@ case "empleados": {
         outline-none focus:outline-none focus:ring-0 border-none
       "
     >
-      {/* Borde glass */}
 {estaSeleccionado && (
   <div className="absolute inset-0 rounded-xl border border-white/30 bg-white/5 backdrop-blur-sm" />
 )}
 
-      {/* Alerta de onboarding */}
       {mostrarAlerta && (
         <span
           className="
@@ -1139,7 +1131,6 @@ case "empleados": {
         />
       )}
 
-      {/* Icono */}
       <div className="relative z-10 w-8 h-8 flex items-center justify-center">
         <img
           src={item.icon}
@@ -1148,7 +1139,6 @@ case "empleados": {
         />
       </div>
       
-      {/* Label */}
       <span className="relative z-10 text-xs mt-1 text-center">{item.label}</span>
     </button>
   );
@@ -1178,7 +1168,6 @@ case "empleados": {
     }
   `}
 >
-  {/* CONFIG PARA EMPLEADOS (solo DUEÑO) */}
   {vista === "empleados" && puedeConfigServiciosYEmpleados && (
     <button
       onClick={() => {
@@ -1198,8 +1187,6 @@ case "empleados": {
       <ConfigIcon className="w-7 h-7 opacity-80 hover:opacity-100 transition" />
     </button>
   )}
-
-  {/* 👇 ya sin la tuerca de servicios */}
 
   {renderVista()}
 </div>
@@ -1231,7 +1218,7 @@ case "empleados": {
               transition-colors duration-300
             "
           >
-            Obtener tu agenda
+            Obtener mi agenda
           </button>
         </div>
 
@@ -1244,13 +1231,15 @@ case "empleados": {
           />
         )}
 
+        {/* ✅ Modal con onSuccess para actualizar el botón */}
         {modalAgendarse && (
           <ModalAgendarse
             abierto={modalAgendarse}
             onClose={() => setModalAgendarse(false)}
+            onSuccess={handleTurnoActualizado}
             negocio={{
               ...negocio,
-              esEmprendimiento, // 👈 le pasamos el flag que ya tenés en AgendaVirtualUIv3
+              esEmprendimiento,
             }}
           />
         )}
@@ -1270,7 +1259,7 @@ case "empleados": {
             onCerrar={() => setModalEmpleados(false)}
             negocioId={negocio.id}
             modo={modo === "cliente" ? "dueño" : modo}
-            esEmprendimiento={esEmprendimiento} // 👈 este sí lo mantiene ModalEmpleadosUI
+            esEmprendimiento={esEmprendimiento}
           />
         )}
 
@@ -1287,7 +1276,7 @@ case "empleados": {
             abierto={modalServicios}
             onCerrar={() => setModalServicios(false)}
             negocioId={negocio.id}
-            esEmprendimiento={esEmprendimiento} // 👈 pasar el flag
+            esEmprendimiento={esEmprendimiento}
           />
         )}
 

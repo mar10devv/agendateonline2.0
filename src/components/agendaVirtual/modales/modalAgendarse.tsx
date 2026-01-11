@@ -19,7 +19,7 @@ import type { DocumentReference, DocumentData } from "firebase/firestore";
 import Loader from "../../ui/loaderSpinner";
 
 import { db } from "../../../lib/firebase";
-import CalendarioBase from "../calendario/calendario-diseño"; // ✅ usamos el calendario nuevo
+import CalendarioBase from "../calendario/calendario-diseño";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 type Empleado = {
@@ -34,12 +34,13 @@ type Servicio = {
   id: string;
   servicio: string;
   precio: number;
-  duracion: number; // minutos
+  duracion: number;
 };
 
 type Props = {
   abierto: boolean;
   onClose: () => void;
+  onSuccess?: (turnoConfirmado?: boolean) => void; // ✅ Callback con parámetro opcional
   negocio: {
     id: string;
     nombre: string;
@@ -51,7 +52,6 @@ type Props = {
         conectado?: boolean;
         accessToken?: string;
       };
-      // usados en calendario
       diasLibres?: string[];
       modoTurnos?: "jornada" | "personalizado";
       clientesPorDia?: number | null;
@@ -64,7 +64,6 @@ type Props = {
       lng: number;
       direccion: string;
     };
-    // 🔹 NUEVO: saber si esta agenda es un emprendimiento
     esEmprendimiento?: boolean;
   };
 };
@@ -97,6 +96,7 @@ function toDateSafe(f: any): Date {
   if (typeof f === "string") return new Date(f);
   return new Date(f);
 }
+
 function parseDuracionMin(d: any): number {
   if (typeof d === "number") return d;
   if (typeof d === "string") {
@@ -109,12 +109,14 @@ function parseDuracionMin(d: any): number {
   }
   return 30;
 }
+
 function combinarFechaHora(fecha: Date, hhmm: string): Date {
   const [h, m] = String(hhmm ?? "00:00").split(":").map((n) => Number(n || 0));
   const d = new Date(fecha);
   d.setHours(h || 0, m || 0, 0, 0);
   return d;
 }
+
 function calcularInicioFinDesdeDoc(t: any): { inicio: Date; fin: Date } | null {
   const inicioTs = t.inicioTs ? toDateSafe(t.inicioTs) : null;
   const finTs = t.finTs ? toDateSafe(t.finTs) : null;
@@ -231,7 +233,6 @@ async function verificarTurnoActivoPorUsuarioYNegocio(
   return { activo: false, inicio: null, fin: null, docPath: null };
 }
 
-/* 🔹 helper: ¿el empleado tiene descanso configurado? (días libres o día y medio) */
 const empleadoTieneDescansoConfigurado = (e: Empleado): boolean => {
   if (!e || !e.calendario) return false;
 
@@ -251,14 +252,11 @@ const empleadoTieneDescansoConfigurado = (e: Empleado): boolean => {
   return tieneListaDias || tieneDiaYMedio;
 };
 
-// 🔹 Normaliza la URL de la foto del empleado para negocio / emprendimiento
 function getAvatarUrl(e: Empleado): string | null {
-  // Emprendimiento suele guardar directamente fotoPerfil como string
   if (typeof e.fotoPerfil === "string" && e.fotoPerfil.trim() !== "") {
     return e.fotoPerfil.trim();
   }
 
-  // En algunos negocios usamos "foto" y puede ser string u objeto
   const f: any = (e as any).foto;
   if (!f) return null;
 
@@ -278,7 +276,7 @@ function getAvatarUrl(e: Empleado): string | null {
   return null;
 }
 
-export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
+export default function ModalAgendarse({ abierto, onClose, onSuccess, negocio }: Props) {
   const [paso, setPaso] = useState(1);
   const [servicio, setServicio] = useState<Servicio | null>(null);
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
@@ -290,7 +288,6 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
   const [cargandoCheck, setCargandoCheck] = useState(false);
   const [bloqueo, setBloqueo] = useState<Bloqueo>({ activo: false, inicio: null, fin: null });
 
-  // 🆕 Resumen para el mensaje final
   const [resumenTurno, setResumenTurno] = useState<{ fecha: string; hora: string } | null>(null);
 
   const siguiente = () => setPaso((p) => p + 1);
@@ -328,45 +325,104 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
 
   if (!abierto) return null;
 
+  // 🔹 Títulos dinámicos según el paso
+  const getTitulo = () => {
+    switch (paso) {
+      case 1:
+        return "Elige un servicio";
+      case 2:
+        return "Elige un profesional";
+      case 3:
+        return "Selecciona horario";
+      case 4:
+        return "Confirma tu turno";
+      case 5:
+        return "¡Turno confirmado!";
+      default:
+        return "Agendar turno";
+    }
+  };
+
   return (
-    <ModalBase abierto={abierto} onClose={onClose} titulo="Agendar turno" maxWidth="max-w-lg">
+    <ModalBase abierto={abierto} onClose={onClose} titulo={getTitulo()} maxWidth="max-w-lg">
+      {/* Indicador de pasos */}
+      {!cargandoCheck && !bloqueo.activo && paso < 5 && (
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            {[1, 2, 3, 4].map((p) => (
+              <div
+                key={p}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  p === paso
+                    ? "w-8 bg-white"
+                    : p < paso
+                    ? "w-4 bg-white/60"
+                    : "w-4 bg-white/20"
+                }`}
+              />
+            ))}
+          </div>
+          {/* Línea separadora */}
+          <div className="flex justify-center">
+            <div className="w-2/3 h-px bg-white/20" />
+          </div>
+        </div>
+      )}
+
+      {/* Línea separadora para paso 5 */}
+      {!cargandoCheck && !bloqueo.activo && paso === 5 && (
+        <div className="px-4 pb-4">
+          <div className="flex justify-center">
+            <div className="w-2/3 h-px bg-white/20" />
+          </div>
+        </div>
+      )}
+
       <div
-        className="relative flex flex-col h-[450px] overflow-y-auto px-4 pb-6 scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent"
+        className="relative flex flex-col min-h-[200px] max-h-[70vh] overflow-y-auto px-4 pb-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         {cargandoCheck && (
-          <div className="p-4 text-sm text-gray-300">Verificando turnos disponibles...</div>
+          <div className="flex flex-col items-center justify-center h-full">
+            <Loader />
+            <p className="mt-4 text-white/70 text-sm">Verificando disponibilidad...</p>
+          </div>
         )}
 
         {!cargandoCheck && bloqueo.activo && (
-          <div className="p-4 space-y-3">
-            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
-              <div className="text-amber-300 font-semibold">Ya tienes un turno reservado</div>
-              <div className="text-amber-200 text-sm">
-                Día:{" "}
-                <b>
+          <div className="p-4 space-y-4">
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 backdrop-blur-sm p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-amber-300 font-semibold">Ya tienes un turno</div>
+              </div>
+              <p className="text-white/80 text-sm leading-relaxed">
+                Tu turno está agendado para el{" "}
+                <span className="font-semibold text-white">
                   {bloqueo.inicio?.toLocaleDateString("es-ES", {
                     weekday: "long",
-                    year: "numeric",
-                    month: "long",
                     day: "numeric",
+                    month: "long",
                   })}
-                </b>{" "}
+                </span>{" "}
                 a las{" "}
-                <b>
+                <span className="font-semibold text-white">
                   {bloqueo.inicio?.toLocaleTimeString("es-ES", {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
-                </b>
-                . No faltes <b>{negocio?.nombre ?? "a tu turno"}</b>.
-              </div>
+                </span>
+              </p>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-md bg-white text-black hover:bg-gray-200 text-sm"
+                className="flex-1 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-all"
               >
                 Entendido
               </button>
@@ -391,12 +447,15 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
                       setServicio(null);
                       setEmpleado(null);
                       setTurno(null);
+                      
+                      // ✅ Avisar al padre que se canceló el turno
+                      onSuccess?.(false);
                     } catch (err) {
                       console.error("Error cancelando turno:", err);
                       alert("Hubo un error al cancelar el turno.");
                     }
                   }}
-                  className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 text-sm"
+                  className="flex-1 px-4 py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium transition-all border border-red-500/30"
                 >
                   Cancelar turno
                 </button>
@@ -461,7 +520,14 @@ export default function ModalAgendarse({ abierto, onClose, negocio }: Props) {
             )}
 
             {paso === 5 && (
-              <PasoFinal negocio={negocio} resumen={resumenTurno} onClose={onClose} />
+              <PasoFinal 
+                negocio={negocio} 
+                resumen={resumenTurno} 
+                onClose={() => {
+                  onSuccess?.(true); // ✅ Avisar que se confirmó un turno
+                  onClose();
+                }} 
+              />
             )}
           </>
         )}
@@ -500,25 +566,60 @@ function PasoServicios({
     cargarServicios();
   }, [negocio.id]);
 
-  if (cargando) return <p>Cargando servicios...</p>;
+  if (cargando) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <Loader />
+        <p className="mt-4 text-white/70 text-sm">Cargando servicios...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid gap-4">
+    <div className="space-y-3 pt-2">
       {servicios.length > 0 ? (
         servicios.map((s) => (
           <button
             key={s.id}
             onClick={() => onSelect(s)}
-            className="w-full p-4 bg-neutral-800 rounded-xl hover:bg-neutral-700 transition text-left"
+            className="group w-full p-4 rounded-2xl transition-all duration-200 text-left
+                       bg-white/10 hover:bg-white/20 
+                       border border-white/10 hover:border-white/30
+                       hover:scale-[1.02] active:scale-[0.98]"
           >
-            <p className="text-lg font-medium">{s.servicio}</p>
-            <p className="text-sm text-gray-400">
-              ${s.precio} · {s.duracion} min
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-lg font-semibold text-white group-hover:text-white">
+                  {s.servicio}
+                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-white/90 font-medium">${s.precio}</span>
+                  <span className="text-white/50">•</span>
+                  <span className="text-white/60 text-sm flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {s.duracion} min
+                  </span>
+                </div>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-all">
+                <svg className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
           </button>
         ))
       ) : (
-        <p className="text-gray-400 text-sm">No hay servicios configurados.</p>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto rounded-full bg-white/10 flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-white/60">No hay servicios disponibles</p>
+        </div>
       )}
     </div>
   );
@@ -553,17 +654,15 @@ function PasoEmpleados({
   }, [servicio, negocio]);
 
   const validarEmpleado = (e: Empleado) => {
-    // 🟣 Emprendimiento: NO bloqueamos por días libres ni horarios
     if (!esEmprendimiento) {
-      // 🟠 Negocio: sí exigimos config por empleado
       if (!empleadoTieneDescansoConfigurado(e)) {
-        setError(`⚠️ ${e.nombre} no tiene sus días libres configurados.`);
+        setError(`${e.nombre} no tiene sus días libres configurados.`);
         return;
       }
 
       const tieneHorario = e.calendario?.inicio && e.calendario?.fin;
       if (!tieneHorario) {
-        setError(`⚠️ ${e.nombre} no tiene horario cargado.`);
+        setError(`${e.nombre} no tiene horario cargado.`);
         return;
       }
     }
@@ -573,59 +672,92 @@ function PasoEmpleados({
   };
 
   return (
-    <div className="space-y-4">
-      <p className="mb-2">
-        Servicio <b>{servicio.servicio}</b>
-        <br />
-        Selecciona un empleado
-      </p>
+    <div className="space-y-4 pt-2">
+      {/* Servicio seleccionado */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-white/60 text-xs">Servicio seleccionado</p>
+          <p className="text-white font-medium">{servicio.servicio}</p>
+        </div>
+      </div>
 
       {error && (
-        <p className="text-red-400 text-sm bg-red-900/30 p-2 rounded-lg">{error}</p>
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30">
+          <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-red-300 text-sm">{error}</p>
+        </div>
       )}
 
       {filtrados.length > 0 ? (
-        filtrados.map((e, idx) => {
-          const avatarUrl = getAvatarUrl(e);
+        <div className="space-y-3">
+          {filtrados.map((e, idx) => {
+            const avatarUrl = getAvatarUrl(e);
 
-          return (
-            <button
-              key={idx}
-              onClick={() => validarEmpleado(e)}
-              className="w-full flex items-center gap-4 p-3 rounded-xl transition bg-neutral-800 hover:bg-neutral-700"
-            >
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={e.nombre}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
-                  {e.nombre?.charAt(0) || "?"}
+            return (
+              <button
+                key={idx}
+                onClick={() => validarEmpleado(e)}
+                className="group w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-200
+                           bg-white/10 hover:bg-white/20 
+                           border border-white/10 hover:border-white/30
+                           hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={e.nombre}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-white/20 group-hover:border-white/40 transition-colors"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-white/20 group-hover:border-white/40 transition-colors">
+                    {e.nombre?.charAt(0) || "?"}
+                  </div>
+                )}
+
+                <div className="flex-1 text-left">
+                  <p className="font-semibold text-white text-lg">{e.nombre}</p>
+                  <p className="text-white/50 text-sm">Disponible</p>
                 </div>
-              )}
 
-              <div className="text-left">
-                <p className="font-medium">{e.nombre}</p>
-              </div>
-            </button>
-          );
-        })
+                <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-all">
+                  <svg className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       ) : (
-        <p className="text-gray-400 text-sm">
-          No hay empleados disponibles para este servicio.
-        </p>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto rounded-full bg-white/10 flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <p className="text-white/60">No hay profesionales disponibles para este servicio</p>
+        </div>
       )}
 
-      <button onClick={onBack} className="text-sm text-gray-400">
-        ← Volver
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-white/60 hover:text-white transition-colors mt-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Volver
       </button>
     </div>
   );
 }
-
-/* ---------- PasoTurnos: usa CalendarioBase (calendario-backend) ---------- */
 
 function PasoTurnos({
   negocio,
@@ -643,20 +775,28 @@ function PasoTurnos({
   const minutosPorSlot = negocio.configuracionAgenda?.horasSeparacion ?? 30;
 
   return (
-    <div>
-      <p className="mb-4 text-center">
-        Selecciona un turno para <b>{empleado?.nombre}</b>
-      </p>
+    <div className="pt-2">
+      {/* Info del profesional seleccionado */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 mb-4">
+        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-white/60 text-xs">Profesional</p>
+          <p className="text-white font-medium">{empleado?.nombre}</p>
+        </div>
+      </div>
 
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-4">
         <CalendarioBase
           modo="cliente"
-          usuarioActual={{} as any} // en modo cliente no usamos permisos
+          usuarioActual={{} as any}
           negocio={negocio as any}
           empleado={empleado as any}
           empleados={(negocio.empleadosData || []) as any}
           minutosPorSlot={minutosPorSlot}
-          // 🔥 duración REAL del servicio en minutos (para que no ofrezca 16:30 si dura 120')
           duracionServicioMin={servicio.duracion}
           onSlotLibreClick={(slot: any) => {
             onSelect({
@@ -667,19 +807,19 @@ function PasoTurnos({
         />
       </div>
 
-      <div className="text-center">
-        <button
-          onClick={onBack}
-          className="text-sm text-gray-400 hover:text-gray-200 transition"
-        >
-          ← Volver
-        </button>
-      </div>
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Volver
+      </button>
     </div>
   );
 }
 
-/* ---------- PasoConfirmacion con seña + guardado ---------- */
 function PasoConfirmacion({
   servicio,
   empleado,
@@ -696,6 +836,16 @@ function PasoConfirmacion({
   const [guardandoTurno, setGuardandoTurno] = useState(false);
 
   const montoSenia = Math.round((servicio.precio * porcentajeSenia) / 100);
+
+  const fechaFormateada = turno?.fecha?.toLocaleDateString?.("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }) || new Date(turno.fecha).toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   const pagarSenia = async () => {
     try {
@@ -735,7 +885,6 @@ function PasoConfirmacion({
     }
   };
 
-  // ---------- CREAR TURNO EN FIRESTORE + EMAIL ---------- //
   const guardarTurno = async () => {
     if (!usuario?.uid) {
       alert("Debes iniciar sesión para reservar un turno.");
@@ -818,7 +967,6 @@ function PasoConfirmacion({
         }),
       });
 
-      // 👉 Enviamos datos al PasoFinal (sin alert feo)
       onSaved?.({ fecha: fechaTexto, hora: horaTexto });
     } catch (err) {
       console.error("❌ Error guardando turno:", err);
@@ -832,17 +980,17 @@ function PasoConfirmacion({
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <Loader />
-        <p className="mt-4 text-yellow-300 font-medium">
-          💳 Esperando confirmación del pago...
+        <p className="mt-4 text-amber-300 font-medium">
+          Esperando confirmación del pago...
         </p>
-        <p className="text-xs text-gray-400 mt-2 max-w-xs">
+        <p className="text-white/50 text-sm mt-2 max-w-xs">
           Puedes cerrar esta ventana. Tu turno será confirmado automáticamente
-          cuando Mercado Pago apruebe tu seña.
+          cuando se apruebe tu seña.
         </p>
 
         <button
           onClick={() => setEsperandoPago(false)}
-          className="mt-4 px-4 py-2 bg-neutral-700 rounded-lg text-sm text-white hover:bg-neutral-600 transition"
+          className="mt-6 px-6 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-all"
         >
           Volver a intentar
         </button>
@@ -851,29 +999,76 @@ function PasoConfirmacion({
   }
 
   return (
-    <div>
-      <p>Confirma tu turno:</p>
-      <ul className="mb-4 text-sm">
-        <li>Servicio: {servicio?.servicio}</li>
-        <li>Empleado: {empleado?.nombre}</li>
-        <li>
-          Día:{" "}
-          {turno?.fecha?.toLocaleDateString?.("es-ES") ||
-            new Date(turno.fecha).toLocaleDateString("es-ES")}{" "}
-          – {turno?.hora}
-        </li>
+    <div className="pt-2 space-y-4">
+      {/* Resumen del turno */}
+      <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+        <div className="p-4 space-y-3">
+          {/* Servicio */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white/50 text-xs">Servicio</p>
+              <p className="text-white font-medium">{servicio?.servicio}</p>
+            </div>
+          </div>
+
+          {/* Profesional */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white/50 text-xs">Profesional</p>
+              <p className="text-white font-medium">{empleado?.nombre}</p>
+            </div>
+          </div>
+
+          {/* Fecha y hora */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white/50 text-xs">Fecha y hora</p>
+              <p className="text-white font-medium capitalize">{fechaFormateada} · {turno?.hora}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Precio */}
+        <div className="border-t border-white/10 p-4 flex items-center justify-between">
+          <span className="text-white/70">Total</span>
+          <span className="text-2xl font-bold text-white">${servicio.precio}</span>
+        </div>
 
         {requiereSenia && (
-          <li className="text-amber-400">
-            💰 Se requiere una seña del {porcentajeSenia}% (${montoSenia})
-          </li>
+          <div className="border-t border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-2 text-amber-300">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-medium">Se requiere seña del {porcentajeSenia}%</span>
+            </div>
+            <p className="text-amber-200/70 text-sm mt-1">
+              Debes pagar <span className="font-semibold">${montoSenia}</span> para confirmar tu turno
+            </p>
+          </div>
         )}
-      </ul>
+      </div>
 
-      <div className="flex justify-end gap-4">
+      {/* Botones */}
+      <div className="flex gap-3">
         <button
           onClick={onBack}
-          className="px-4 py-2 rounded bg-gray-700 text-white"
+          className="flex-1 px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-all"
           disabled={pagando || guardandoTurno}
         >
           Volver
@@ -882,18 +1077,18 @@ function PasoConfirmacion({
         {requiereSenia ? (
           <button
             onClick={pagarSenia}
-            className="px-4 py-2 rounded bg-blue-600 text-white"
+            className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-semibold transition-all disabled:opacity-50"
             disabled={pagando || guardandoTurno}
           >
-            {pagando ? "Procesando..." : "Pagar seña"}
+            {pagando ? "Procesando..." : `Pagar $${montoSenia}`}
           </button>
         ) : (
           <button
             onClick={guardarTurno}
-            className="px-4 py-2 rounded bg-green-600 text-white"
+            className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-semibold transition-all disabled:opacity-50"
             disabled={guardandoTurno}
           >
-            {guardandoTurno ? "Guardando..." : "Confirmar turno"}
+            {guardandoTurno ? "Confirmando..." : "Confirmar turno"}
           </button>
         )}
       </div>
@@ -914,49 +1109,57 @@ function PasoFinal({
     negocio?.ubicacion && negocio.ubicacion.lat && negocio.ubicacion.lng;
 
   return (
-    <div className="text-center py-4 space-y-4">
-      <h2 className="text-xl font-semibold text-emerald-400">
-        🎉 ¡Listo! Tu turno fue confirmado
-      </h2>
+    <div className="text-center py-4 space-y-5">
+      {/* Icono de éxito */}
+      <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
 
-      <p className="text-sm text-gray-200">
-        {resumen ? (
-          <>
-            Tu turno está agendado para el día{" "}
-            <span className="font-semibold">{resumen.fecha}</span> a las{" "}
-            <span className="font-semibold">{resumen.hora}</span>.
-          </>
-        ) : (
-          "Tu turno fue confirmado correctamente."
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">
+          ¡Turno confirmado!
+        </h2>
+
+        {resumen && (
+          <p className="text-white/70">
+            Te esperamos el{" "}
+            <span className="font-semibold text-white">{resumen.fecha}</span>
+            <br />
+            a las <span className="font-semibold text-white">{resumen.hora}</span>
+          </p>
         )}
+      </div>
+
+      <p className="text-white/50 text-sm max-w-xs mx-auto">
+        Te enviamos un email de confirmación. Si no puedes asistir, recuerda cancelar con anticipación.
       </p>
 
-      <p className="text-xs text-gray-400 max-w-sm mx-auto">
-        Te pedimos que asistas a tiempo para no perder tu lugar. Si no podés
-        venir, recordá cancelar tu turno con anticipación.
-      </p>
+      {/* ✅ Botón ARRIBA del mapa, bien visible */}
+      <button
+        className="w-full py-3 bg-white text-violet-600 font-semibold rounded-xl hover:bg-white/90 transition-all"
+        onClick={onClose}
+      >
+        Entendido
+      </button>
 
+      {/* Mapa (opcional, abajo del botón) */}
       {tieneUbicacion && (
-        <div className="mt-2 w-full rounded-xl overflow-hidden border border-neutral-700 bg-neutral-900/60">
+        <div className="w-full rounded-2xl overflow-hidden border border-white/10 mt-2">
+          <div className="px-4 py-3 bg-white/5">
+            <p className="text-white/50 text-xs mb-1">📍 Ubicación</p>
+            <p className="text-white text-sm">{negocio.ubicacion.direccion}</p>
+          </div>
           <iframe
             title="Mapa ubicación del negocio"
             src={`https://www.google.com/maps?q=${negocio.ubicacion.lat},${negocio.ubicacion.lng}&hl=es&z=16&output=embed`}
-            className="w-full h-56"
+            className="w-full h-36"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
-          <div className="px-3 py-2 text-xs text-gray-300 text-left">
-            {negocio.ubicacion.direccion}
-          </div>
         </div>
       )}
-
-      <button
-        className="mt-2 w-full py-2 bg-purple-600 rounded-xl hover:bg-purple-500 transition"
-        onClick={onClose}
-      >
-        Cerrar
-      </button>
     </div>
   );
 }
